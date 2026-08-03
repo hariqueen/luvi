@@ -1,0 +1,7 @@
+# 파일명에 콘텐츠 해시가 붙는 산출물만 영구 캐시한다.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# index.html 은 항상 새로 받아야 새 배포가 즉시 반영된다.
+/index.html
+  Cache-Control: no-cache
