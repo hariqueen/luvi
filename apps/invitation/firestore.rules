@@ -1,0 +1,70 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────
+// 청첩장(wedding-f328e) Firestore 보안 규칙
+//
+// 컬렉션 구조 (최소 구성)
+//   guestbook/{auto-id}  방명록
+//     · name      string  작성자 이름   (1~20자)
+//     · msg       string  축하 메시지   (1~300자)
+//     · createdAt timestamp  서버 시각 (serverTimestamp)
+//
+//   rankings/{auto-id}   미니게임 랭킹
+//     · nick      string  닉네임        (1~20자)
+//     · score     number  생존 시간(초)  (0~600, 소수 1자리)
+//     · caught    number  잡은 마리 수   (0~2000)
+//     · createdAt timestamp  서버 시각 (serverTimestamp)
+//
+//   랭킹 상한의 근거 (src/game/catchGame.ts)
+//     체력은 100이 최대이고 초당 (2 + 경과시간×0.18)씩 닳습니다. 아이템은 최소 360ms
+//     간격으로 떨어지고(hard 난이도 ÷1.3 → 277ms) 하나 잡을 때마다 +8입니다.
+//     즉 회복은 최대 초당 약 28.9, 소모가 이를 넘어서는 시점이 약 149초라
+//     완벽하게 플레이해도 150초를 넘길 수 없습니다. 상한 600은 그 4배로,
+//     정상 기록은 절대 막지 않으면서 score: 999999999 같은 조작만 걸러냅니다.
+//     score는 `+elapsed.toFixed(1)`이라 소수입니다 — 정수 검사를 넣으면 안 됩니다.
+//
+// 정책
+//   · read  : 누구나 (청첩장은 공개 페이지)
+//   · create: 형식이 맞을 때만 허용 (스팸/이상 데이터 방어)
+//   · update / delete : 클라이언트에서 전면 금지
+//     (수정·삭제는 콘솔이나 Admin SDK로만)
+// ─────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 방명록
+    match /guestbook/{id} {
+      allow read: if true;
+      allow create: if isValidGuestbook(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // 게임 랭킹
+    match /rankings/{id} {
+      allow read: if true;
+      allow create: if isValidRanking(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // 그 외 모든 경로 차단 (기본값 유지)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidGuestbook(d) {
+      return d.keys().hasOnly(['name', 'msg', 'createdAt'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 20
+        && d.msg  is string && d.msg.size()  >= 1 && d.msg.size()  <= 300
+        && d.createdAt == request.time;   // serverTimestamp 강제 (위조 방지)
+    }
+
+    function isValidRanking(d) {
+      return d.keys().hasOnly(['nick', 'score', 'caught', 'createdAt'])
+        && d.nick   is string && d.nick.size() >= 1 && d.nick.size() <= 20
+        && d.score  is number && d.score  >= 0 && d.score  <= 600
+        && d.caught is number && d.caught >= 0 && d.caught <= 2000
+        && d.createdAt == request.time;
+    }
+  }
+}

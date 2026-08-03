@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@luvi/schema": ["../../packages/schema/src/index.ts"],
+      "@luvi/api-client": ["../../packages/api-client/src/index.ts"],
+      "@luvi/ui/tokens": ["../../packages/ui/src/tokens.ts"],
+      "@luvi/ui/tailwind-preset": ["../../packages/ui/tailwind-preset.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "tailwind.config.ts"]
+}

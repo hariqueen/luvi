@@ -1,0 +1,13 @@
+{
+  "name": "@luvi/schema",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "청첩장 콘텐츠 스키마 · 테마 매니페스트 · REST API 계약 (프론트·백엔드 공유)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

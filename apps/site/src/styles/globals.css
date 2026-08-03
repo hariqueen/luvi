@@ -1,0 +1,65 @@
+/*
+  @import 는 다른 어떤 문장보다 앞에 와야 합니다 (CSS 규격).
+  @tailwind 아래에 두면 빌드 시 경고가 나고 폰트가 적용되지 않을 수 있습니다.
+
+  Pretendard 는 dynamic-subset 을 씁니다 — 한글 전체가 아니라 쓰인 글자만 내려옵니다.
+*/
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Parisienne&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* iOS Safari 의 하단 크롬 때문에 100vh 를 쓰면 화면이 잘린다 → dvh 사용 */
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    /* 한글은 단어 중간에서 끊기면 읽기 나빠진다 */
+    word-break: keep-all;
+    overflow-x: hidden;
+  }
+
+  a {
+    @apply text-ink no-underline;
+  }
+  a:hover {
+    @apply text-gold-deep;
+  }
+
+  /* iOS 는 폰트가 16px 미만이면 포커스 시 화면을 자동 확대한다 */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  ::selection {
+    @apply bg-sand;
+  }
+}
+
+@layer utilities {
+  /* 하단 고정 바 — 홈 인디케이터 영역을 침범하지 않게 */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .h-dvh {
+    height: 100dvh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+  /* 가로 스크롤 영역의 스크롤바 숨김 (네비 탭 등) */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

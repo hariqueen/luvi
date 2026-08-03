@@ -1,0 +1,154 @@
+/**
+ * 섹션 관리 — 담긴 것 / 추가할 수 있는 것.
+ *
+ * 순서 변경을 **드래그가 아니라 ↑↓ 버튼**으로 합니다. 캔버스의 텍스트 드래그와 달리
+ * 리스트 정렬은 스크롤과 충돌해서, 터치에서 드래그로 하면 오작동이 잦습니다.
+ * 버튼은 느리지만 실패하지 않습니다. (드래그는 데스크톱에서 v2 로 얹으면 됩니다)
+ *
+ * 필수 섹션은 제거 버튼을 아예 안 보여줍니다 — 누르고 나서 거절당하는 것보다 낫습니다.
+ */
+import { canRemoveSection, type SectionKey } from '@luvi/schema';
+
+export interface SectionMeta {
+  key: SectionKey;
+  label: string;
+  /** 목록에 곁들일 한 줄 상태 (예: '사진 7장') */
+  status?: string;
+  /** 추가 목록에서 보여줄 설명 */
+  desc?: string;
+}
+
+interface Props {
+  /** 담긴 섹션 — 배열 순서가 화면 순서 */
+  active: SectionKey[];
+  meta: Record<SectionKey, SectionMeta>;
+  onReorder: (next: SectionKey[]) => void;
+  onRemove: (key: SectionKey) => void;
+  onAdd: (key: SectionKey) => void;
+  onEdit: (key: SectionKey) => void;
+}
+
+const ALL_KEYS: SectionKey[] = [
+  'cover',
+  'greeting',
+  'calendar',
+  'gallery',
+  'minigame',
+  'location',
+  'account',
+  'guestbook',
+  'footer',
+];
+
+function move<T>(list: T[], from: number, to: number): T[] {
+  if (to < 0 || to >= list.length) return list;
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  if (item === undefined) return list;
+  next.splice(to, 0, item);
+  return next;
+}
+
+export function SectionManager({ active, meta, onReorder, onRemove, onAdd, onEdit }: Props) {
+  const available = ALL_KEYS.filter((k) => !active.includes(k));
+
+  return (
+    <div className="flex flex-col gap-5">
+      <section>
+        <h3 className="mb-2 text-[11px] tracking-wide text-muted-soft">내 청첩장에 담긴 것</h3>
+        <div className="flex flex-col gap-1.5">
+          {active.map((key, i) => {
+            const m = meta[key];
+            const removable = canRemoveSection(key);
+
+            return (
+              <div
+                key={key}
+                className="flex items-center gap-2 rounded-xl border border-line bg-white px-2.5 py-2.5"
+              >
+                {/* 순서 변경 */}
+                <div className="flex flex-none flex-col">
+                  <button
+                    type="button"
+                    aria-label={`${m.label} 위로`}
+                    disabled={i === 0}
+                    onClick={() => onReorder(move(active, i, i - 1))}
+                    className="px-1.5 text-[10px] leading-tight text-muted disabled:opacity-25"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${m.label} 아래로`}
+                    disabled={i === active.length - 1}
+                    onClick={() => onReorder(move(active, i, i + 1))}
+                    className="px-1.5 text-[10px] leading-tight text-muted disabled:opacity-25"
+                  >
+                    ▼
+                  </button>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold">{m.label}</div>
+                  {m.status && (
+                    <div className="truncate text-[11px] text-muted-soft">{m.status}</div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onEdit(key)}
+                  className="flex-none rounded-lg border border-line-strong bg-white px-3 py-1.5 text-[11.5px]"
+                >
+                  편집
+                </button>
+                {removable && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(key)}
+                    className="flex-none rounded-lg px-2 py-1.5 text-[11.5px] text-muted"
+                  >
+                    빼기
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-[11px] tracking-wide text-muted-soft">추가할 수 있는 것</h3>
+        {available.length === 0 ? (
+          <p className="px-0.5 py-3 text-[11.5px] text-muted-soft">
+            더 추가할 수 있는 항목이 없습니다
+          </p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {available.map((key) => {
+              const m = meta[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onAdd(key)}
+                  className="flex w-full items-center gap-2.5 rounded-xl border border-dashed border-line-strong bg-surface px-3 py-3 text-left"
+                >
+                  <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-lg bg-line-soft text-[13px] text-gold-deep">
+                    +
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold">{m.label}</div>
+                    {m.desc && (
+                      <div className="text-[11px] leading-snug text-muted">{m.desc}</div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

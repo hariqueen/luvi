@@ -1,0 +1,32 @@
+{
+  "name": "@luvi/site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Luvi 메인 사이트 — 브랜드 · 대시보드 · 에디터",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "@luvi/api-client": "*",
+    "@luvi/schema": "*",
+    "@luvi/ui": "*",
+    "firebase": "^10.12.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "vite": "^5.3.1"
+  }
+}

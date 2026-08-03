@@ -1,0 +1,26 @@
+{
+  "name": "luvi",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Luvi — 청첩장 제작 서비스 (메인 사이트 + 청첩장 뷰어 + REST API)",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @luvi/site",
+    "dev:invitation": "npm run dev --workspace @luvi/invitation",
+    "dev:api": "npm run dev --workspace @luvi/api",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

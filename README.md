@@ -1,0 +1,148 @@
+# Luvi
+
+내 손으로 만들고, 보낸 뒤에도 고칠 수 있는 청첩장.
+
+- 브랜드: **Luvi (러비)** = Love + AI
+- 도메인: **luv-ai.co.kr**
+- 기획 문서: `../docs/` (`README.md` → `06-next-steps.md` 순으로 보세요)
+
+---
+
+## 스택
+
+하나로 통일했습니다 — **TypeScript + React + Vite + Tailwind**, API도 같은 언어입니다.
+
+| 계층 | 선택 | 이유 |
+|------|------|------|
+| 프론트 | Vite 5 + React 18 + TS + Tailwind 3 | classic1이 이미 이 구성이라 빌드 체계가 하나로 유지된다 |
+| API | **Cloudflare Workers + Hono** (REST) | 프론트와 같은 TS. Python 백엔드를 없애 언어를 통일 |
+| DB | Firebase Firestore | 배포된 청첩장의 방명록 실데이터가 이미 있고, 보안 규칙으로 백엔드 없이 클라이언트 접근이 된다 |
+| 인증 | Firebase Auth (이메일·구글·카카오) | 카카오는 Worker에서 커스텀 토큰 브릿지 필요 |
+| 에셋 | Cloudflare R2 | egress 무료. 이미지 변환은 브라우저에서 (Cloudflare Images는 유료) |
+| 캐시 | Workers KV | 발행 스냅샷. **하객 페이지뷰당 Firestore 읽기 0회** |
+
+무료 티어 안에서 운영하는 것이 전제입니다 (`../docs/02-architecture.md §7`).
+
+---
+
+## 구조
+
+```
+luvi/
+├─ apps/
+│  ├─ site/           메인 사이트 — 브랜드 + 대시보드 + 에디터
+│  └─ invitation/     청첩장 뷰어 (classic1 테마) ← 하객이 보는 화면
+├─ packages/
+│  ├─ schema/         콘텐츠 스키마 · 테마 매니페스트 · REST API 계약
+│  ├─ api-client/     REST 클라이언트
+│  └─ ui/             디자인 토큰 · Tailwind 프리셋
+└─ workers/
+   └─ api/            REST API (Hono)
+```
+
+`site` 와 `invitation` 을 분리한 이유: 뷰어는 하객 트래픽 전부를 받으므로 번들이 최소여야 합니다.
+에디터·인증 코드가 섞이면 하객이 쓰지 않는 수백 KB를 다운받게 됩니다.
+
+---
+
+## 시작하기
+
+> ⚠️ **Google Drive 경로에서는 `npm ci` 가 EBADF로 깨집니다.**
+> exit code는 0으로 나오지만 `node_modules/.bin` 이 생성되지 않아 `tsc`·`vite` 실행 파일이 없습니다.
+> **개발은 로컬 디스크에서 하세요.** 이 폴더를 GitHub에 올리고 로컬 디스크로 clone 하는 것이
+> 장기적으로 가장 깔끔합니다 (Drive 동기화 + node_modules 조합도 좋지 않습니다).
+
+```bash
+npm install
+
+npm run dev              # 메인 사이트  → http://localhost:5173
+npm run dev:invitation   # 청첩장 뷰어  → http://localhost:5174
+npm run dev:api          # REST API     → http://localhost:8787
+
+npm run typecheck        # 전체 타입 검사
+npm run build            # 전체 빌드
+```
+
+### Node 버전
+
+**Node 20 이상이 필요합니다.** 현재 이 PC의 Node는 `v18.16.0` 이라 `npm install` 시
+engine 경고가 납니다 (설치·빌드는 됩니다). Node 18은 지원 종료된 버전이니 20 LTS로 올리는 편이 좋습니다.
+
+`wrangler` 는 검증된 3.x로 고정해 뒀습니다. 4.x로 올리려면 Node 20+ 가 먼저 필요합니다.
+
+사이트 개발 서버는 `/api` 를 `localhost:8787` 로 프록시하므로 CORS 설정 없이 바로 붙습니다.
+
+`.env.example` 을 `.env` 로 복사해 값을 채우세요.
+
+---
+
+## 현재 구현 상태
+
+| 영역 | 상태 |
+|------|------|
+| 디자인 토큰 · Tailwind 프리셋 | ✅ 디자인 산출물에서 추출 완료 |
+| 콘텐츠 스키마 · 테마 매니페스트 | ✅ 필드 정의까지 완료 |
+| REST API 계약 (타입) | ✅ 확정 |
+| API 구현 | 🟡 **스텁** — 라우트·검증·응답 형태만. 데이터는 `workers/api/src/mock.ts` |
+| **카카오 · 네이버 로그인** | ✅ **구현 완료** — 커스텀 토큰 서명(Web Crypto RS256), OAuth state 검증, 콜백 라우트. 키만 넣으면 동작 |
+| **커버 자유 배치** | ✅ 드래그·서식·전체화면 문구 편집 동작. 사진 업로더만 연결 필요 |
+| **섹션 추가·제거·순서** | ✅ 동작 (필수 섹션은 제거 버튼 미노출) |
+| 에디터 레이아웃 (3단 반응형 + 바텀시트) | ✅ 껍데기 완성 — 값 저장(자동저장)은 미연결 |
+| 마케팅 화면 (B1~B5) | 🔲 자리표시자 — 디자인 옮기기 필요 |
+| 구글 · 이메일 로그인 | 🟡 UI 만. Firebase Auth 연결 필요 (브릿지 불필요) |
+| 클레임 | 🟡 UI + 코드 형식 검증. API 연결 없음 |
+| 청첩장 뷰어 | ✅ 동작 (단, 콘텐츠가 아직 빌드타임 상수) |
+
+### 에디터 편집 모델
+
+에디터에 두 가지 편집 방식이 한 화면에 있습니다.
+
+| 대상 | 방식 |
+|------|------|
+| **커버** | 사진 위 텍스트를 **자유 배치** — 드래그·정렬·색·크기·글꼴. 탭하면 전체화면 문구 편집 |
+| **나머지 섹션** | 매니페스트에서 생성되는 **폼** + 섹션 추가·제거·순서 변경 |
+
+🔴 **커버 좌표는 px 가 아니라 비율(0~1)로 저장합니다.** 에디터는 데스크톱 기기 프레임(≈390px 상당)
+안에서 편집하지만 하객은 실제 폰 폭(320~430px)에서 봅니다. px 로 저장하면 **하객 화면에서 위치가
+어긋납니다.** 폰트 크기도 캔버스 **폭** 대비 비율입니다. 계산은 `packages/schema/src/layers.ts`
+한 곳에만 두고 에디터·뷰어가 공유합니다 — 한쪽만 바뀌면 두 화면이 달라집니다.
+
+섹션 순서는 `sections: SectionKey[]` 배열 하나로 관리합니다 (배열에 있으면 포함, 순서가 곧 화면 순서).
+boolean 맵으로는 순서를 표현할 수 없습니다. `features` 는 섹션이 아닌 전역 연출(BGM·꽃잎)만 담습니다.
+
+순서 변경은 **드래그가 아니라 ↑↓ 버튼**입니다. 캔버스의 텍스트 드래그와 달리 리스트 정렬은
+터치 스크롤과 충돌해 오작동이 잦습니다. 버튼은 느리지만 실패하지 않습니다.
+
+### 디자인 옮기는 방법
+
+`../docs/design/Luvi.dc.html` 이 클로드 디자인 산출물입니다.
+각 섹션에 `data-screen-label="B1 홈"` 같은 표시가 있고, 자리표시자 화면에 같은 코드를 적어뒀습니다.
+`src/routes/Home.tsx` 를 열면 어느 섹션을 보면 되는지 나옵니다.
+
+색·폰트는 이미 `packages/ui/src/tokens.ts` 로 추출했으니 **인라인 스타일을 Tailwind 클래스로 바꾸면
+됩니다** (예: `background:#F7F5F1` → `bg-bg`, `color:#C9A063` → `text-gold`).
+
+---
+
+## 다음 할 일
+
+`../docs/06-next-steps.md` 가 실행 목록입니다. 이 프로젝트 기준으로 가장 시급한 것:
+
+1. **뷰어를 런타임 데이터로** — `apps/invitation/src/config/invitation.config.ts` 의 상수를
+   `@luvi/schema` 의 `ContentDoc` 으로 바꿔 props로 주입받게 한다. **이게 전체의 핵심 작업이다**
+2. **전역 `guestbook`/`rankings` → 서브컬렉션 이관** — 두 번째 청첩장을 만들기 전에 끝내야 한다
+3. 마케팅 화면에 디자인 옮기기
+4. Firebase Auth 연결 (이메일·구글 먼저, 카카오는 Worker 브릿지)
+5. API 스텁을 Firestore·R2 실구현으로
+
+### 배포 전환 (주의)
+
+지금 `https://luvi-wedding.pages.dev/` 는 **별도 레포(`hariqueen/Luvi-wedding`)에서 빌드되고 있고,
+하객에게 이미 공유된 URL입니다.** 이 모노레포로 전환할 때:
+
+- Cloudflare Pages의 빌드 루트를 `apps/invitation` 으로 바꿔야 합니다
+- `*.pages.dev` 서브도메인은 프로젝트 간 이동이 불가하므로, 그 Pages 프로젝트를 그대로 두고
+  빌드 소스만 갈아끼웁니다 (`../docs/02-architecture.md §3` 경우 B)
+- 전환 직전 커밋을 태그로 고정해 롤백 경로를 확보하세요. **다운타임이 곧 사고입니다**
+
+원본 `classic1/` 은 아직 지우지 않았습니다. 전환이 검증된 뒤에 정리하세요.

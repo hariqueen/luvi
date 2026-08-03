@@ -1,0 +1,16 @@
+{
+  "name": "@luvi/api-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Luvi REST API 클라이언트",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@luvi/schema": "*"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@luvi/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Luvi 디자인 토큰 · Tailwind 프리셋 · 공용 컴포넌트",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens": "./src/tokens.ts",
+    "./tailwind-preset": "./tailwind-preset.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1",
+    "tailwindcss": "^3.4.4"
+  }
+}

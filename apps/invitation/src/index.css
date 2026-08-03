@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: #e9ddd2; /* 페이지 바깥 여백 색 */
+  }
+  body {
+    font-family: theme('fontFamily.sans');
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/*
+ * 요소마다 duration·delay가 달라 Tailwind 유틸리티로 만들지 않고
+ * 전역 @keyframes로 두고 인라인 style에서 참조합니다.
+ */
+@keyframes petalFall {
+  0% {
+    transform: translateY(-12vh) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(112vh) translateX(46px) rotate(380deg);
+    opacity: 0.85;
+  }
+}
+
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
