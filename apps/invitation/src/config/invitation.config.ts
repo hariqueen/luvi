@@ -3,8 +3,12 @@
  *  청첩장 데이터 (classic1 테마)
  *  이 파일 하나만 바꾸면 다른 청첩장으로 재사용할 수 있습니다.
  *  이미지/오디오 경로는 /public/assets/ 기준의 절대경로입니다.
+ *
+ *  ⚠️ 여기 값이 빌드에 박히므로 청첩장 1건만 만들 수 있습니다.
+ *     여러 건을 서비스하려면 발행 스냅샷을 런타임에 받아와야 합니다.
  * ─────────────────────────────────────────────────────────────
  */
+import type { ThemeId } from '@luvi/schema';
 
 export interface Person {
   /** 표시 이름 (예: 이호석) */
@@ -53,7 +57,16 @@ export interface TransportItem {
 
 export type GameSpeed = 'easy' | 'normal' | 'hard';
 
+export type { ThemeId };
+
 export interface InvitationConfig {
+  /**
+   * 어떤 디자인으로 그릴지. src/themes/registry.ts 에 등록된 값이어야 합니다.
+   * 지금은 이 파일에 고정돼 있지만, API 로 청첩장을 받아오는 단계에서는
+   * 발행 스냅샷의 themeId 가 이 값을 대체합니다.
+   */
+  themeId: ThemeId;
+
   groom: Person;
   bride: Person;
 
@@ -158,6 +171,8 @@ export interface InvitationConfig {
 }
 
 export const invitation: InvitationConfig = {
+  themeId: 'classic1',
+
   groom: {
     name: '이호석',
     nameEn: 'Hoseok',

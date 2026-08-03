@@ -55,9 +55,19 @@ export interface CreateInvitationBody {
 
 /** PATCH /api/invitations/:id — 자동저장. 초안만 바뀌고 하객 화면은 그대로다 */
 export interface UpdateDraftBody {
-  /** 바뀐 필드만 보낸다 (경로 → 값) */
+  /**
+   * 바뀐 필드만 보낸다 (경로 → 값).
+   *
+   * 최상위는 `core` 또는 `theme` 만 허용된다 — 서버가 그 밖의 경로를 거부한다.
+   * (허용하면 `ownerUid` 같은 문서 필드를 클라이언트가 덮어쓸 수 있다)
+   *
+   * 🔴 **배열은 인덱스가 아니라 통째로 보낸다.** Firestore 는 배열 원소를 가리키는
+   *    필드 경로를 지원하지 않으므로 `core.gallery.0` 은 거부된다.
+   */
   patch: Record<string, unknown>;
   features?: Partial<Features>;
+  /** 섹션 구성·순서. 배열 순서가 곧 화면 순서다 */
+  sections?: SectionKey[];
 }
 
 /** POST /api/invitations/:id/publish */
@@ -136,10 +146,16 @@ export interface SignUploadBody {
 }
 
 export interface SignUploadResult {
-  /** 이 URL 로 PUT */
+  /**
+   * 이 URL 로 PUT 한다. 우리 API 를 향하는 주소이며 **`Authorization` 헤더와
+   * 발급 때와 동일한 `Content-Type`·바이트 수**를 그대로 보내야 한다
+   * (서명이 그 값들에 묶여 있다).
+   */
   uploadUrl: string;
   /** ContentDoc 에 저장할 키 */
   key: string;
+  /** 업로드 URL 만료 시각 (ISO). 지나면 다시 발급받아야 한다 */
+  expiresAt: string;
 }
 
 // ─────────────────────────── 인계 (클레임) ───────────────────────────

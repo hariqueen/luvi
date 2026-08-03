@@ -10,6 +10,21 @@ export const env = {
   kakaoRestKey: import.meta.env.VITE_KAKAO_REST_KEY ?? '',
   /** 네이버 로그인 Client ID (Client Secret 은 Worker 에만 둔다) */
   naverClientId: import.meta.env.VITE_NAVER_CLIENT_ID ?? '',
+
+  /**
+   * Firebase 웹 앱 설정.
+   *
+   * 전부 브라우저에 노출되는 **공개 값**이다 — `apiKey` 는 비밀키가 아니라 프로젝트 식별자다.
+   * 실제 보호는 (1) Firebase 승인 도메인 (2) Firestore 보안 규칙 두 가지가 한다.
+   */
+  firebase: {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? '',
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? '',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '',
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? '',
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID ?? '',
+  },
 } as const;
 
 /** R2 키 → 표시용 URL. ContentDoc 에는 절대 URL을 저장하지 않으므로 여기서 조립한다. */

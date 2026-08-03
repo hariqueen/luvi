@@ -5,61 +5,15 @@
  * 커스텀 토큰은 결국 "서비스 계정 개인키로 서명한 JWT" 이므로 Web Crypto 로 만들 수 있습니다.
  *
  * 카카오·네이버처럼 Firebase Auth 가 기본 지원하지 않는 제공자는 전부 이 경로를 씁니다.
+ * 서명 자체는 `jwt.ts` 에 있습니다 (Firestore 액세스 토큰과 같은 키를 씁니다).
  */
+import { signJwt } from './jwt';
 
 const AUDIENCE =
   'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit';
 
 /** 커스텀 토큰 최대 수명은 1시간입니다. 곧바로 교환되므로 짧게 둡니다. */
 const TTL_SECONDS = 300;
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64UrlEncodeJson(value: unknown): string {
-  return base64UrlEncode(new TextEncoder().encode(JSON.stringify(value)));
-}
-
-/**
- * PEM(PKCS#8) → DER 바이트.
- *
- * 환경변수에 넣을 때 줄바꿈이 literal `\n` 으로 들어가는 일이 흔하므로 함께 정규화합니다.
- * (이 처리를 빼먹으면 importKey 가 조용히 실패합니다)
- */
-function pemToDer(pem: string): Uint8Array {
-  const body = pem
-    .replace(/\\n/g, '\n')
-    .replace(/-----BEGIN [^-]+-----/, '')
-    .replace(/-----END [^-]+-----/, '')
-    .replace(/\s+/g, '');
-
-  const bin = atob(body);
-  const der = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i += 1) der[i] = bin.charCodeAt(i);
-  return der;
-}
-
-let cachedKey: CryptoKey | null = null;
-let cachedKeySource = '';
-
-/** 개인키 import 는 비용이 있으므로 isolate 안에서 재사용합니다. */
-async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  if (cachedKey && cachedKeySource === pem) return cachedKey;
-
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToDer(pem),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  cachedKey = key;
-  cachedKeySource = pem;
-  return key;
-}
 
 export interface CustomTokenInput {
   /** 서비스 계정 이메일 (`FIREBASE_CLIENT_EMAIL`) */
@@ -78,24 +32,16 @@ export interface CustomTokenInput {
 export async function createCustomToken(input: CustomTokenInput): Promise<string> {
   const iat = Math.floor((input.now ?? Date.now()) / 1000);
 
-  const header = base64UrlEncodeJson({ alg: 'RS256', typ: 'JWT' });
-  const payload = base64UrlEncodeJson({
-    iss: input.clientEmail,
-    sub: input.clientEmail,
-    aud: AUDIENCE,
-    iat,
-    exp: iat + TTL_SECONDS,
-    uid: input.uid,
-    ...(input.claims ? { claims: input.claims } : {}),
-  });
-
-  const signingInput = `${header}.${payload}`;
-  const key = await importPrivateKey(input.privateKeyPem);
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    new TextEncoder().encode(signingInput),
+  return signJwt(
+    {
+      iss: input.clientEmail,
+      sub: input.clientEmail,
+      aud: AUDIENCE,
+      iat,
+      exp: iat + TTL_SECONDS,
+      uid: input.uid,
+      ...(input.claims ? { claims: input.claims } : {}),
+    },
+    input.privateKeyPem,
   );
-
-  return `${signingInput}.${base64UrlEncode(new Uint8Array(signature))}`;
 }
