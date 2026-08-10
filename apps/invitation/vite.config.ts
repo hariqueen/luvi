@@ -48,6 +48,8 @@ function ogTags(): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), ogTags()],
+  // `.env` 는 모노레포 루트에 하나만 둡니다. 없으면 Vite 가 이 앱 폴더만 찾아 값이 조용히 비워집니다
+  envDir: fileURLToPath(new URL('../..', import.meta.url)),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

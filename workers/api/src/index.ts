@@ -875,7 +875,8 @@ app.post('/api/auth/:provider', async (c) => {
       },
     };
 
-    // 프로필 저장은 실패해도 로그인을 막지 않습니다 — 다음 로그인에 다시 시도됩니다
+    // 프로필 저장은 실패해도 로그인을 막지 않습니다 — 다음 로그인에 다시 시도됩니다.
+    // 전화번호는 여기서 Firestore 로만 들어갑니다 — 위 result 에는 넣지 않습니다
     try {
       await usersRepo.upsertUser(firestore(c.env), {
         uid: profile.uid,
@@ -883,6 +884,7 @@ app.post('/api/auth/:provider', async (c) => {
         displayName: profile.displayName,
         photoURL: profile.photoURL,
         provider: profile.provider,
+        phone: profile.phone,
       });
     } catch (e) {
       console.error('[api] 사용자 문서 저장 실패', e);

@@ -127,6 +127,52 @@ export function createClient(opts: ClientOptions) {
 
     assets: {
       signUpload: (body: SignUploadBody) => post<SignUploadResult>('/assets/sign', body),
+
+      /**
+       * 파일 하나를 올립니다 (발급 → PUT 을 한 번에).
+       *
+       * 발급받은 서명이 **Content-Type 과 정확한 바이트 수에 묶여 있어서**
+       * 호출부가 직접 fetch 하면 헤더 하나만 어긋나도 403 이 됩니다. 그래서 여기서 감쌉니다.
+       */
+      upload: async (
+        invitationId: string,
+        kind: SignUploadBody['kind'],
+        file: Blob,
+      ): Promise<ApiResult<{ key: string }>> => {
+        const contentType = file.type;
+        const size = file.size;
+
+        const signed = await post<SignUploadResult>('/assets/sign', {
+          invitationId,
+          kind,
+          contentType,
+          size,
+        });
+        if (!signed.ok) return signed;
+
+        const token = await opts.getToken?.();
+        try {
+          const res = await fetch(signed.data.uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': contentType,
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: file,
+          });
+
+          if (!res.ok) {
+            const err = (await res.json().catch(() => null)) as { error?: ApiError } | null;
+            return {
+              ok: false,
+              error: err?.error ?? { code: 'internal', message: '업로드에 실패했습니다' },
+            };
+          }
+          return { ok: true, data: { key: signed.data.key } };
+        } catch {
+          return { ok: false, error: { code: 'internal', message: '업로드 중 연결이 끊겼습니다' } };
+        }
+      },
     },
 
     claim: {
@@ -138,6 +184,17 @@ export function createClient(opts: ClientOptions) {
       /** 카카오·네이버 공통. Firebase Auth 기본 제공자가 아니라 커스텀 토큰을 받아온다 */
       social: (provider: SocialProvider, body: SocialAuthBody) =>
         post<SocialAuthResult>(`/auth/${provider}`, body),
+
+      /**
+       * 로그인 후 `users/{uid}` 문서를 만들거나 갱신한다.
+       * 구글·이메일은 Firebase 가 클라이언트에서 처리하므로 서버가 로그인 사실을 알 방법이 없다.
+       */
+      session: (body: {
+        email: string | null;
+        displayName: string | null;
+        photoURL: string | null;
+        provider: string;
+      }) => post<{ uid: string }>('/auth/session', body),
     },
 
     contact: {

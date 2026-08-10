@@ -16,6 +16,14 @@ export interface UpsertUserInput {
   photoURL: string | null;
   /** 'password' | 'google.com' | 'kakao' | 'naver' */
   provider: string;
+  /**
+   * 휴대전화번호 — **주문(종이 청첩장) 연락용으로만** 보관합니다.
+   *
+   * 네이버 로그인에서만 값이 옵니다. 카카오·구글·이메일 가입자는 null 이라
+   * **주문 화면에서 직접 입력받는 경로가 반드시 있어야 합니다.**
+   * 이 값은 클라이언트로 내려보내지 않습니다.
+   */
+  phone?: string | null;
 }
 
 /**
@@ -33,6 +41,9 @@ export async function upsertUser(db: Firestore, input: UpsertUserInput): Promise
     displayName: encode(input.displayName),
     photoURL: encode(input.photoURL),
     lastLoginAt: fsTimestamp(now),
+    // 값이 있을 때만 씁니다. null 로 덮으면 네이버로 한 번 받아둔 번호가
+    // 다음에 카카오로 로그인하는 순간 지워집니다
+    ...(input.phone ? { phone: encode(input.phone) } : {}),
     ...(existing
       ? {}
       : {

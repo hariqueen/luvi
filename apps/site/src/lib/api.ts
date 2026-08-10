@@ -6,13 +6,24 @@
  */
 import { createClient } from '@luvi/api-client';
 import { env } from './env';
+import { currentUser } from './firebase';
 
 /**
- * TODO(실구현): Firebase Auth 의 `currentUser.getIdToken()` 을 반환하도록 바꾸세요.
- * 지금은 비로그인으로 동작합니다.
+ * 매 요청마다 유효한 ID 토큰을 가져옵니다.
+ *
+ * `getIdToken()` 은 만료가 가까우면 알아서 갱신하므로 우리가 유효기간을 관리하지 않습니다.
+ * 비로그인 상태에서는 null 을 돌려주고, 공개 엔드포인트(방명록 조회 등)는 그대로 동작합니다.
  */
 async function getToken(): Promise<string | null> {
-  return null;
+  try {
+    const user = await currentUser();
+    return user ? await user.getIdToken() : null;
+  } catch (e) {
+    // 토큰을 못 가져오는 것 자체로 화면을 깨뜨리지 않습니다 — 서버가 401 로 답하고
+    // 화면은 로그인 안내를 띄우면 됩니다
+    console.warn('[api] ID 토큰을 가져오지 못했습니다', e);
+    return null;
+  }
 }
 
 export const api = createClient({ baseUrl: env.apiBase, getToken });

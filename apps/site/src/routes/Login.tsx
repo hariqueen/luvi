@@ -7,46 +7,80 @@
  * ⚠️ **카카오·네이버 모두 이메일이 선택 동의**입니다. 이메일 없는 계정이 정상적으로 존재하므로
  *    "이메일 필수" 를 전제한 화면(비밀번호 찾기 안내 등)이 깨지지 않아야 합니다.
  */
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { env } from '@/lib/env';
+import { useAuth } from '@/lib/auth';
 import { startSocialLogin, type SocialProvider } from '@/lib/social';
 
-interface SocialButton {
-  provider: SocialProvider;
-  label: string;
-  className: string;
-  /** 키가 없으면 버튼을 감춥니다 — 눌러서 실패하게 만들 이유가 없습니다 */
-  configured: boolean;
+type EmailMode = 'signIn' | 'signUp';
+
+/** 열린 리다이렉트 방지 — `returnTo` 는 우리 사이트 내부 경로만 허용합니다 */
+function safeReturnTo(value: string | null): string {
+  if (!value) return '/app';
+  // '//evil.com' 은 브라우저가 프로토콜 상대 URL 로 해석해 외부로 나갑니다
+  if (!value.startsWith('/') || value.startsWith('//')) return '/app';
+  return value;
 }
 
 export default function Login() {
   const [search] = useSearchParams();
-  const returnTo = search.get('returnTo') ?? '/app';
+  const returnTo = safeReturnTo(search.get('returnTo'));
+
+  const { status, signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset } =
+    useAuth();
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [emailOpen, setEmailOpen] = useState(false);
-  const [busy, setBusy] = useState<SocialProvider | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<EmailMode>('signIn');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const socials: SocialButton[] = [
-    {
-      provider: 'kakao',
-      label: '카카오로 계속하기',
-      className: 'bg-[#FEE500] text-[#3A2929]',
-      configured: Boolean(env.kakaoRestKey),
-    },
-    {
-      provider: 'naver',
-      label: '네이버로 계속하기',
-      className: 'bg-[#03C75A] text-white',
-      configured: Boolean(env.naverClientId),
-    },
-  ];
+  // 로그인 화면에 이미 로그인한 상태로 들어온 경우 (뒤로가기 등)
+  useEffect(() => {
+    if (status === 'signed-in') setBusy(null);
+  }, [status]);
+
+  if (status === 'signed-in') return <Navigate to={returnTo} replace />;
+
+  const run = async (key: string, task: () => Promise<void>) => {
+    setError(null);
+    setNotice(null);
+    setBusy(key);
+    try {
+      await task();
+      // 성공하면 status 가 'signed-in' 이 되어 위 Navigate 가 처리합니다
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '로그인에 실패했습니다');
+      setBusy(null);
+    }
+  };
+
+  const socials: { provider: SocialProvider; label: string; className: string; configured: boolean }[] =
+    [
+      {
+        provider: 'kakao',
+        label: '카카오로 계속하기',
+        className: 'bg-[#FEE500] text-[#3A2929]',
+        configured: Boolean(env.kakaoRestKey),
+      },
+      {
+        provider: 'naver',
+        label: '네이버로 계속하기',
+        className: 'bg-[#03C75A] text-white',
+        configured: Boolean(env.naverClientId),
+      },
+    ];
+  const available = socials.filter((s) => s.configured);
 
   const onSocial = (provider: SocialProvider) => {
     setError(null);
     setBusy(provider);
     try {
+      // 인가 화면으로 페이지를 벗어나므로 busy 를 되돌릴 필요가 없습니다
       startSocialLogin(provider, returnTo);
     } catch (e) {
       setBusy(null);
@@ -54,7 +88,30 @@ export default function Login() {
     }
   };
 
-  const available = socials.filter((s) => s.configured);
+  const onEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password) {
+      setError('이메일과 비밀번호를 입력해주세요');
+      return;
+    }
+    void run('email', () =>
+      mode === 'signIn' ? signInWithEmail(email, password) : signUpWithEmail(email, password),
+    );
+  };
+
+  const onReset = () => {
+    if (!email.trim()) {
+      setError('비밀번호를 재설정할 이메일을 입력해주세요');
+      return;
+    }
+    void run('reset', async () => {
+      await sendPasswordReset(email);
+      setNotice('비밀번호 재설정 메일을 보냈습니다. 메일함을 확인해주세요');
+      setBusy(null);
+    });
+  };
+
+  const disabled = busy !== null || status === 'loading';
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
@@ -68,7 +125,7 @@ export default function Login() {
           <button
             key={s.provider}
             type="button"
-            disabled={busy !== null}
+            disabled={disabled}
             onClick={() => onSocial(s.provider)}
             className={`flex h-[52px] items-center justify-center rounded-xl text-[14px] font-semibold disabled:opacity-60 ${s.className}`}
           >
@@ -83,12 +140,14 @@ export default function Login() {
           </p>
         )}
 
-        {/* TODO(실구현): Firebase Auth 의 signInWithPopup(GoogleAuthProvider) — 브릿지가 필요 없습니다 */}
+        {/* 구글은 Firebase Auth 기본 제공자라 Worker 브릿지가 필요 없습니다 */}
         <button
           type="button"
-          className="flex h-[52px] items-center justify-center rounded-xl border border-line-strong bg-white text-[14px] font-medium"
+          disabled={disabled}
+          onClick={() => void run('google', signInWithGoogle)}
+          className="flex h-[52px] items-center justify-center rounded-xl border border-line-strong bg-white text-[14px] font-medium disabled:opacity-60"
         >
-          구글로 계속하기
+          {busy === 'google' ? '로그인 중…' : '구글로 계속하기'}
         </button>
 
         <button
@@ -100,25 +159,70 @@ export default function Login() {
         </button>
 
         {emailOpen && (
-          <form className="flex flex-col gap-2.5" onSubmit={(e) => e.preventDefault()}>
+          <form className="flex flex-col gap-2.5" onSubmit={onEmailSubmit}>
+            <div className="flex gap-1 rounded-xl bg-surface-sunken p-1">
+              {(
+                [
+                  ['signIn', '로그인'],
+                  ['signUp', '회원가입'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMode(value)}
+                  className={`h-9 flex-1 rounded-lg text-[12.5px] ${
+                    mode === value ? 'bg-white text-ink shadow-sm' : 'text-muted'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <input
               type="email"
               autoComplete="email"
               placeholder="이메일"
-              className="h-[50px] rounded-xl border border-line-strong bg-white px-4 outline-none focus:border-gold"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              /* 16px 미만이면 iOS 사파리가 포커스 때 화면을 확대합니다 */
+              className="h-[50px] rounded-xl border border-line-strong bg-white px-4 text-[16px] outline-none focus:border-gold"
             />
             <input
               type="password"
-              autoComplete="current-password"
-              placeholder="비밀번호"
-              className="h-[50px] rounded-xl border border-line-strong bg-white px-4 outline-none focus:border-gold"
+              autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
+              placeholder={mode === 'signIn' ? '비밀번호' : '비밀번호 (6자 이상)'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-[50px] rounded-xl border border-line-strong bg-white px-4 text-[16px] outline-none focus:border-gold"
             />
-            <button type="submit" className="h-[50px] rounded-xl bg-ink text-[14px] text-paper-soft">
-              계속하기
+            <button
+              type="submit"
+              disabled={disabled}
+              className="h-[50px] rounded-xl bg-ink text-[14px] text-paper-soft disabled:opacity-60"
+            >
+              {busy === 'email' ? '처리 중…' : mode === 'signIn' ? '로그인' : '가입하고 시작하기'}
             </button>
+
+            {mode === 'signIn' && (
+              <button
+                type="button"
+                onClick={onReset}
+                disabled={disabled}
+                className="py-1 text-[11.5px] text-muted-faint underline disabled:opacity-60"
+              >
+                비밀번호를 잊으셨나요?
+              </button>
+            )}
           </form>
         )}
 
+        {notice && (
+          <p className="rounded-lg bg-surface-sunken px-3.5 py-2.5 text-[12px] text-ink-soft">
+            {notice}
+          </p>
+        )}
         {error && (
           <p className="rounded-lg bg-cream px-3.5 py-2.5 text-[12px] text-gold-deep">{error}</p>
         )}

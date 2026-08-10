@@ -7,12 +7,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { PROVIDER_LABEL, callbackUrl, consumeCallback, type SocialProvider } from '@/lib/social';
 
 export default function SocialCallback() {
   const { provider } = useParams<{ provider: string }>();
   const [search] = useSearchParams();
   const navigate = useNavigate();
+  const { signInWithToken } = useAuth();
   const [error, setError] = useState<string | null>(null);
   /** StrictMode 는 effect 를 두 번 실행합니다. 인가 코드는 1회용이라 두 번 교환하면 두 번째가 실패합니다. */
   const ran = useRef(false);
@@ -42,14 +44,16 @@ export default function SocialCallback() {
           return;
         }
 
-        // TODO(실구현): signInWithCustomToken(auth, res.data.customToken)
-        // 그 뒤 res.data.profile 로 users/{uid} 를 upsert 합니다.
+        // Worker 가 서명한 커스텀 토큰으로 Firebase 세션을 만듭니다.
+        // 이 시점부터 카카오·네이버 사용자도 구글·이메일 사용자와 완전히 동일하게 취급됩니다
+        // (users/{uid} 문서는 Worker 가 이미 만들어 두었습니다).
+        await signInWithToken(res.data.customToken);
         navigate(returnTo, { replace: true });
       } catch (e) {
         setError(e instanceof Error ? e.message : '로그인에 실패했습니다');
       }
     })();
-  }, [provider, search, navigate]);
+  }, [provider, search, navigate, signInWithToken]);
 
   if (error) {
     return (

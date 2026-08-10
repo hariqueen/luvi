@@ -20,6 +20,37 @@ export interface SocialProfile {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+  /**
+   * 휴대전화번호. **네이버만 값이 옵니다** — 카카오는 비즈 앱 + 별도 검수 등급이라
+   * 대부분의 사용자는 null 입니다. "전화번호가 있다" 를 전제한 코드를 쓰면 안 됩니다.
+   *
+   * 🔴 이 값은 **클라이언트로 돌려주지 않습니다.** 주문 연락용으로 서버에만 보관합니다 —
+   *    브라우저에 내려보내면 노출 지점이 늘어날 뿐 화면에서 쓸 데가 없습니다.
+   */
+  phone: string | null;
+}
+
+/**
+ * 전화번호 표기 정규화.
+ *
+ * 네이버는 `010-1234-5678`, 카카오는 `+82 10-1234-5678` 형태로 줍니다.
+ * 그대로 저장하면 같은 번호가 두 가지 문자열로 쌓여 중복 판별·검색이 깨집니다.
+ * 숫자만 남긴 뒤 국가번호를 국내 표기로 되돌립니다.
+ */
+function normalizePhone(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/[^\d+]/g, '');
+  if (!digits) return null;
+
+  // +8210xxxxxxxx → 010xxxxxxxx
+  const local = digits.startsWith('+82')
+    ? `0${digits.slice(3)}`
+    : digits.startsWith('82') && digits.length > 10
+      ? `0${digits.slice(2)}`
+      : digits;
+
+  const onlyDigits = local.replace(/\D/g, '');
+  return onlyDigits.length >= 9 ? onlyDigits : null;
 }
 
 export class SocialAuthError extends Error {
@@ -61,6 +92,8 @@ interface KakaoMe {
   id?: number;
   kakao_account?: {
     email?: string;
+    /** 비즈 앱 + 별도 검수 등급. 대부분의 앱에서는 오지 않습니다 */
+    phone_number?: string;
     profile?: { nickname?: string; profile_image_url?: string };
   };
 }
@@ -84,6 +117,8 @@ async function fetchKakaoProfile(accessToken: string): Promise<SocialProfile> {
     email: json.kakao_account?.email ?? null,
     displayName: profile?.nickname ?? null,
     photoURL: profile?.profile_image_url ?? null,
+    // 카카오는 '+82 10-1234-5678' 형태로 줍니다 (동의항목이 열려 있는 경우에만)
+    phone: normalizePhone(json.kakao_account?.phone_number),
   };
 }
 
@@ -98,6 +133,10 @@ interface NaverMe {
     name?: string;
     nickname?: string;
     profile_image?: string;
+    /** '010-1234-5678' */
+    mobile?: string;
+    /** '+821012345678' — 있으면 이쪽이 더 정확합니다 */
+    mobile_e164?: string;
   };
 }
 
@@ -121,6 +160,7 @@ async function fetchNaverProfile(accessToken: string): Promise<SocialProfile> {
     email: r?.email ?? null,
     displayName: r?.name ?? r?.nickname ?? null,
     photoURL: r?.profile_image ?? null,
+    phone: normalizePhone(r?.mobile_e164 ?? r?.mobile),
   };
 }
 
