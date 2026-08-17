@@ -21,10 +21,11 @@ import {
   type SectionDef,
   type SectionKey,
   type TextLayer,
+  type ThemeId,
   type UpdateDraftBody,
 } from '@luvi/schema';
 import { api } from '@/lib/api';
-import { assetUrl } from '@/lib/env';
+import { assetUrl, env } from '@/lib/env';
 import { setPath } from '@/lib/paths';
 import { uploadAudio, uploadImageForPath } from '@/lib/upload';
 import { EditorProvider, type EditorContextValue } from '@/lib/editorContext';
@@ -90,6 +91,11 @@ export default function Editor() {
   const [doc, setDoc] = useState<ContentDoc | null>(null);
   const [sections, setSections] = useState<SectionKey[]>([...DEFAULT_SECTIONS]);
   const [features, setFeatures] = useState<Features>({ bgm: false, petals: true });
+  const [themeId, setThemeId] = useState<ThemeId>('classic1');
+
+  // ── 우측 라이브 미리보기 (실제 뷰어를 iframe 으로) ──
+  const [rightView, setRightView] = useState<'preview' | 'cover'>('preview');
+  const previewReady = useRef(false);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [savedAt, setSavedAt] = useState<string | undefined>();
@@ -113,6 +119,7 @@ export default function Editor() {
         setDoc(res.data.draft);
         setSections(res.data.sections);
         setFeatures(res.data.features);
+        setThemeId(res.data.themeId);
         setLoad({ state: 'ready' });
       } else {
         setLoad({ state: 'error', message: res.error.message });
@@ -206,6 +213,35 @@ export default function Editor() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [flush]);
+
+  // ─────────────── 라이브 미리보기 전송 ───────────────
+  // 편집 중인 초안을 iframe(실제 뷰어)에 실시간으로 보내 우측에 그대로 그려지게 한다.
+  const postPreview = useCallback(() => {
+    if (!doc) return;
+    const pub = { slug: 'preview', themeId, sections, features, content: doc, cdnBase: env.cdnBase };
+    document
+      .querySelectorAll<HTMLIFrameElement>('iframe[data-luvi-preview]')
+      .forEach((f) => f.contentWindow?.postMessage({ __luviPreview: true, pub }, window.location.origin));
+  }, [doc, themeId, sections, features]);
+
+  // 뷰어가 "준비됐다"고 알리면 현재 초안을 즉시 보낸다
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const data = e.data as { __luviPreviewReady?: boolean } | null;
+      if (data && data.__luviPreviewReady) {
+        previewReady.current = true;
+        postPreview();
+      }
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [postPreview]);
+
+  // 초안·섹션·연출이 바뀔 때마다 다시 보낸다 (준비된 뒤에만)
+  useEffect(() => {
+    if (previewReady.current) postPreview();
+  }, [postPreview]);
 
   // ─────────────── 컨텍스트 ───────────────
   const editorValue: EditorContextValue | null = useMemo(() => {
@@ -499,14 +535,52 @@ export default function Editor() {
             )}
           </div>
 
-          {/* 프리뷰 · 커버 캔버스 */}
-          <div className="h-full w-full lg:w-[clamp(340px,34vw,460px)] lg:flex-none lg:border-l lg:border-line">
-            <div className="hidden h-full items-center justify-center bg-ink-deep p-6 lg:flex">
-              <div className="h-[min(840px,calc(100dvh-140px))] w-[calc(min(840px,100dvh-140px)*9/19)] flex-none rounded-phone-outer bg-black p-2 shadow-[0_40px_90px_-44px_rgba(0,0,0,.9)]">
-                <div className="h-full w-full overflow-hidden rounded-phone bg-surface">{canvas}</div>
+          {/* 프리뷰 — 미리보기(실제 뷰어) / 커버 편집 토글 */}
+          <div className="flex h-full w-full flex-col lg:w-[clamp(340px,34vw,460px)] lg:flex-none lg:border-l lg:border-line">
+            <div className="flex flex-none items-center gap-1 border-b border-line bg-surface px-1.5 py-1.5">
+              <button
+                type="button"
+                onClick={() => setRightView('preview')}
+                className={`rounded-md px-3 py-1.5 text-[12px] font-medium ${rightView === 'preview' ? 'bg-ink text-paper' : 'text-muted'}`}
+              >
+                미리보기
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightView('cover')}
+                className={`rounded-md px-3 py-1.5 text-[12px] font-medium ${rightView === 'cover' ? 'bg-ink text-paper' : 'text-muted'}`}
+              >
+                커버 편집
+              </button>
+              <span className="ml-auto pr-1 text-[10.5px] text-muted-faint">편집 즉시 반영</span>
+            </div>
+
+            <div className="relative min-h-0 flex-1">
+              {/* 커버 편집 (사진 위 문구 드래그 배치) */}
+              <div
+                className={`absolute inset-0 lg:flex lg:items-center lg:justify-center lg:bg-ink-deep lg:p-5 ${rightView === 'cover' ? '' : 'hidden'}`}
+              >
+                <div className="h-full w-full lg:h-[min(780px,calc(100dvh-190px))] lg:w-[calc(min(780px,100dvh-190px)*9/19)] lg:flex-none lg:rounded-phone-outer lg:bg-black lg:p-2 lg:shadow-[0_40px_90px_-44px_rgba(0,0,0,.9)]">
+                  <div className="h-full w-full overflow-hidden bg-surface lg:rounded-phone">{canvas}</div>
+                </div>
+              </div>
+
+              {/* 라이브 미리보기 (실제 하객 뷰어를 iframe 으로, 초안 실시간 반영) */}
+              <div
+                className={`absolute inset-0 lg:flex lg:items-center lg:justify-center lg:bg-ink-deep lg:p-5 ${rightView === 'preview' ? '' : 'hidden'}`}
+              >
+                <div className="h-full w-full lg:h-[min(780px,calc(100dvh-190px))] lg:w-[calc(min(780px,100dvh-190px)*9/19)] lg:flex-none lg:rounded-phone-outer lg:bg-black lg:p-2 lg:shadow-[0_40px_90px_-44px_rgba(0,0,0,.9)]">
+                  <div className="h-full w-full overflow-hidden bg-ivory lg:rounded-phone">
+                    <iframe
+                      data-luvi-preview
+                      src="/i/?preview=1"
+                      title="청첩장 미리보기"
+                      className="h-full w-full border-0"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="h-full lg:hidden">{canvas}</div>
           </div>
 
           {/* 모바일 바텀시트 */}
