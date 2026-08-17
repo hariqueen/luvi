@@ -26,7 +26,6 @@ const NewInvitation = lazy(() => import('@/routes/NewInvitation'));
 const Editor = lazy(() => import('@/routes/Editor'));
 const Publish = lazy(() => import('@/routes/Publish'));
 const Guestbook = lazy(() => import('@/routes/Guestbook'));
-const Claim = lazy(() => import('@/routes/Claim'));
 
 export default function App() {
   return (
@@ -58,7 +57,6 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="new" element={<NewInvitation />} />
-          <Route path="claim" element={<Claim />} />
           <Route path="i/:id/guestbook" element={<Guestbook />} />
         </Route>
 

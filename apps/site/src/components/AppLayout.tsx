@@ -5,10 +5,9 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 
-const TABS = [
-  { to: '/app', label: '내 청첩장', end: true },
-  { to: '/app/claim', label: '청첩장 받기' },
-] as const;
+// 청첩장 수정은 **로그인한 소유자 계정으로만** 가능합니다. 코드로 소유권을 넘겨받는
+// '청첩장 받기(클레임)' 기능은 이 원칙에 어긋나 제거했습니다.
+const TABS = [{ to: '/app', label: '내 청첩장', end: true }] as const;
 
 /**
  * 카카오 프로필 이미지는 `http://k.kakaocdn.net/...` 로 오는 경우가 있습니다.
