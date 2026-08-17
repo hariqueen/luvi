@@ -139,7 +139,7 @@ export interface CreateRankBody {
  */
 export interface SignUploadBody {
   invitationId: string;
-  kind: 'cover' | 'gallery' | 'greeting' | 'game' | 'og' | 'audio' | 'footer';
+  kind: 'cover' | 'gallery' | 'greeting' | 'game' | 'og' | 'audio' | 'footer' | 'effects';
   contentType: string;
   /** 변환 후 바이트 수 */
   size: number;

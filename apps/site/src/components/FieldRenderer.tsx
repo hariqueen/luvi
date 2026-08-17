@@ -66,6 +66,19 @@ function ImageField({
   const [error, setError] = useState<string | null>(null);
   const asset = (bound.value as AssetRef | null) ?? null;
 
+  /**
+   * 이 필드가 비었을 때 **실제로 쓰이는** 이미지.
+   *
+   * 비워두면 다른 값을 물려받는 필드가 있습니다 (떨어지는 이미지 ← 인사말 말풍선 아이콘).
+   * 그때 빈 칸을 보여주면 "아무것도 안 떨어진다" 로 읽히는데 화면에는 떨어지고 있습니다.
+   * 그래서 물려받은 이미지를 그대로 보여주고, 물려받은 것임을 함께 알립니다.
+   */
+  const inherited =
+    !asset && field.inheritFrom
+      ? ((editor.get(field.inheritFrom) as AssetRef | null) ?? null)
+      : null;
+  const shown = asset ?? inherited;
+
   const onPick = async (file: File | undefined) => {
     if (!file) return;
     setBusy(true);
@@ -91,9 +104,15 @@ function ImageField({
         className="hidden"
         onChange={(e) => void onPick(e.target.files?.[0])}
       />
-      {asset ? (
+      {shown ? (
         <div className="relative overflow-hidden rounded-xl border border-line">
-          <img src={assetUrl(asset.key)} alt="" className="max-h-56 w-full object-cover" />
+          <img src={assetUrl(shown.key)} alt="" className="max-h-56 w-full object-cover" />
+          {inherited && (
+            <p className="border-t border-line bg-cream px-3 py-2 text-[11.5px] leading-[1.5] text-gold-deep">
+              지금은 <b className="font-semibold">{field.inheritLabel ?? '기본 이미지'}</b>를 쓰고
+              있어요. 다른 사진을 고르면 여기에만 적용됩니다.
+            </p>
+          )}
           <div className="flex gap-2 border-t border-line bg-surface px-3 py-2">
             <button
               type="button"
@@ -101,15 +120,18 @@ function ImageField({
               onClick={() => ref.current?.click()}
               className="rounded-lg border border-line-strong bg-white px-3 py-1.5 text-[12px] disabled:opacity-50"
             >
-              {busy ? '올리는 중…' : '바꾸기'}
+              {busy ? '올리는 중…' : inherited ? '다른 사진 고르기' : '바꾸기'}
             </button>
-            <button
-              type="button"
-              onClick={() => bound.set(null)}
-              className="rounded-lg px-3 py-1.5 text-[12px] text-muted"
-            >
-              삭제
-            </button>
+            {/* 물려받은 이미지는 이 필드의 것이 아니라 지울 게 없습니다 */}
+            {asset && (
+              <button
+                type="button"
+                onClick={() => bound.set(null)}
+                className="rounded-lg px-3 py-1.5 text-[12px] text-muted"
+              >
+                {field.inheritFrom ? '기본으로 되돌리기' : '삭제'}
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -122,7 +144,12 @@ function ImageField({
           <span className="text-[18px]">🖼️</span>
           <span className="text-[12.5px] text-ink-soft">{busy ? '올리는 중…' : '사진 고르기'}</span>
           <span className="text-[11px] text-muted-faint">
-            {field.aspect ? `${field.aspect} 권장` : '탭해서 앨범에서 선택'}
+            {/* 물려받는 필드는 비어도 기본 이미지가 쓰입니다 — '아무것도 없음' 으로 읽히면 안 됩니다 */}
+            {field.inheritFrom
+              ? '비워두면 기본 이미지가 쓰입니다'
+              : field.aspect
+                ? `${field.aspect} 권장`
+                : '탭해서 앨범에서 선택'}
           </span>
         </button>
       )}

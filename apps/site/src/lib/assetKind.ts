@@ -16,6 +16,7 @@ const BY_PATH: Record<string, AssetKind> = {
   'core.greeting.bubbleImage': 'greeting',
   'core.share.image': 'og',
   'core.footer.image': 'footer',
+  'core.effects.petals.image': 'effects',
   'core.bgm': 'audio',
   'theme.classic1.game.fallingImages': 'game',
   'theme.classic1.game.idleImage': 'game',

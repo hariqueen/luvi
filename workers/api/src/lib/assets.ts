@@ -13,7 +13,16 @@
 /** 브라우저에서 리사이즈·WebP 변환한 뒤 올립니다 (Cloudflare Images 는 유료) */
 export const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
 
-export type AssetKind = 'cover' | 'gallery' | 'greeting' | 'game' | 'og' | 'audio' | 'footer';
+export type AssetKind =
+  | 'cover'
+  | 'gallery'
+  | 'greeting'
+  | 'game'
+  | 'og'
+  | 'audio'
+  | 'footer'
+  /** 낙하 연출에 쓰는 이미지 (떨어지는 그림) */
+  | 'effects';
 
 const KINDS = new Set<AssetKind>([
   'cover',
@@ -23,6 +32,7 @@ const KINDS = new Set<AssetKind>([
   'og',
   'audio',
   'footer',
+  'effects',
 ]);
 
 /**

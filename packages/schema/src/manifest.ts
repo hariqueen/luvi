@@ -68,6 +68,16 @@ export interface FieldDef {
   fields?: FieldDef[];
   /** 권장 업로드 크기 안내용 */
   aspect?: string;
+  /**
+   * 이 필드가 비었을 때 **실제로 쓰이는** 값의 경로 (image 필드 전용).
+   *
+   * 비어 있는데 화면에는 뭔가 보이는 상황을 없애기 위한 것입니다 — 예를 들어
+   * '떨어지는 이미지' 를 비워두면 인사말 말풍선 아이콘이 떨어지는데, 필드가 빈 칸으로
+   * 보이면 사용자는 아무것도 안 떨어진다고 읽습니다. 그 이미지를 그대로 보여줍니다.
+   */
+  inheritFrom?: string;
+  /** `inheritFrom` 값이 뭔지 사람 말로 (예: '인사말 말풍선 아이콘') */
+  inheritLabel?: string;
 }
 
 export interface SectionDef {
@@ -234,7 +244,9 @@ export const CORE_SECTIONS: SectionDef[] = [
         path: 'core.effects.petals.image',
         type: 'image',
         label: '떨어지는 이미지',
-        hint: '원하는 그림을 올리면 그게 떨어집니다 (꽃잎·반려견·하트 등). 비우면 인사말 말풍선 아이콘을 씁니다. 배경이 투명한 PNG를 권합니다',
+        hint: '원하는 그림을 올리면 그게 떨어집니다 (꽃잎·반려견·하트 등). 배경이 투명한 PNG를 권합니다',
+        inheritFrom: 'core.greeting.bubbleImage',
+        inheritLabel: '인사말 말풍선 아이콘',
       },
       {
         path: 'core.effects.petals.count',
