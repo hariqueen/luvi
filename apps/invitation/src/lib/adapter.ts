@@ -7,6 +7,7 @@
  * 🔴 여기가 "발행하면 그대로 뜬다"의 실제 지점입니다 — 스냅샷의 모든 값이 화면 값으로 1:1 매핑됩니다.
  */
 import type { AssetRef, PublicInvitation } from '@luvi/schema';
+import { DEFAULT_PETAL_COUNT } from '@luvi/schema';
 import type { InvitationConfig } from '@/config/invitation.config';
 import { BASE } from './env';
 
@@ -114,6 +115,18 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
 
     bgm: pub.features.bgm ? url(c.bgm) : '',
     showPetals: pub.features.petals,
+
+    // core.effects 는 나중에 생긴 필드라 옛 스냅샷에는 없습니다. 없을 때는
+    // **지금까지 화면에 보이던 것과 똑같이** — 인사말 말풍선 아이콘 9개 — 유지합니다.
+    petals: (() => {
+      const p = c.effects?.petals;
+      const customImage = url(p?.image);
+      return {
+        image: customImage || url(c.greeting.bubbleImage) || FALLBACK.dog,
+        count: typeof p?.count === 'number' ? p.count : DEFAULT_PETAL_COUNT,
+        custom: Boolean(customImage),
+      };
+    })(),
 
     share: {
       title: c.share.title,

@@ -129,6 +129,51 @@ try {
     ok('편집 내용이 미리보기에 실시간 반영');
   } catch { bad('미리보기에 편집 내용 없음'); }
 
+  // 4-b. 연출 — 낙하 양 슬라이더 + 떨어지는 이미지 필드
+  try {
+    await page.goto(`${ORIGIN}/app/i/${invitationId}/edit`, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.waitForTimeout(3500);
+    // '연출' 폼 열기 (섹션 목록에 없는 코어 폼)
+    await page.getByText(/^연출$/).first().click();
+    await page.waitForTimeout(2000);
+
+    // 폼은 모바일 시트와 데스크톱 패널에 각각 렌더돼 DOM 에 2개 존재합니다 → 보이는 것만
+    const slider = page.locator('input[type="range"]:visible').first();
+    if ((await page.locator('input[type="range"]').count()) === 0) {
+      bad('연출에 낙하 양 슬라이더가 없음');
+    } else {
+      ok('연출 폼에 낙하 양 슬라이더 있음');
+      const body = await page.locator('body').innerText();
+      body.includes('떨어지는 이미지') ? ok('떨어지는 이미지 필드 있음') : bad('떨어지는 이미지 필드 없음');
+
+      // 슬라이더를 옮기면 미리보기의 낙하 개수가 실제로 바뀌는지
+      const countAt = async () =>
+        (await frame.locator('img, span').evaluateAll(
+          (els) => els.filter((el) => /petalFall/.test((el).style?.animation ?? '')).length,
+        ).catch(() => -1));
+
+      await slider.fill('0');
+      await page.waitForTimeout(2500);
+      const zero = await countAt();
+      await slider.fill('24');
+      await page.waitForTimeout(2500);
+      const many = await countAt();
+
+      zero === 0
+        ? ok('낙하 양 0 → 미리보기에서 사라짐')
+        : bad('0 으로 줬는데도 떨어짐', `개수=${zero}`);
+      many > zero
+        ? ok('낙하 양 늘리면 미리보기 개수도 늘어남', `${zero} → ${many}`)
+        : bad('슬라이더가 미리보기에 반영 안 됨', `${zero} → ${many}`);
+
+      // 라이브 기본값과 같은 9로 돌려놓고 발행합니다
+      await slider.fill('9');
+      await page.waitForTimeout(2500);
+    }
+  } catch (e) {
+    bad('연출 폼 검증 실패', String(e).slice(0, 140));
+  }
+
   // 5. 발행
   publishedSlug = `e2e-${stamp}`;
   await page.goto(`${ORIGIN}/app/i/${invitationId}/publish`, { waitUntil: 'networkidle', timeout: 60000 });
@@ -175,6 +220,51 @@ try {
   (await slug2.inputValue()) === publishedSlug ? ok("'원래 주소로 되돌리기' 복원") : bad('되돌리기 실패');
 
   await page.screenshot({ path: 'shot-slug-guard.png' });
+
+  // 7. 방명록 관리 — 하객 글 2건을 심어놓고 숨김/삭제를 눌러본다
+  try {
+    for (const [name, msg] of [['하객가', '축하합니다 1'], ['하객나', '축하합니다 2']]) {
+      await fetch(`${API}/invitations/${invitationId}/guestbook`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'User-Agent': UA },
+        body: JSON.stringify({ name, msg }),
+      });
+    }
+    await page.goto(`${ORIGIN}/app/i/${invitationId}/guestbook`, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.waitForTimeout(3500);
+
+    let body = await page.locator('body').innerText();
+    body.includes('방명록 관리') && !body.includes('디자인 옮기기')
+      ? ok('방명록 관리 화면 렌더 (placeholder 아님)')
+      : bad('아직 placeholder 이거나 안 열림', body.slice(0, 140));
+    body.includes('하객가') && body.includes('하객나') ? ok('방명록 글 목록 표시') : bad('글 목록이 안 보임');
+
+    // 숨기기
+    await page.getByRole('button', { name: /^숨기기$/ }).first().click();
+    await page.waitForTimeout(3000);
+    body = await page.locator('body').innerText();
+    body.includes('숨김') && body.includes('다시 보이기')
+      ? ok('숨기기 동작 (숨김 배지 + 다시 보이기 버튼)')
+      : bad('숨기기 반영 안 됨', body.slice(0, 160));
+
+    // 하객 화면에서 실제로 걸러지는지 — 숨김의 존재 이유
+    const guest = await fetch(`${API}/invitations/${invitationId}/guestbook`, { headers: { 'User-Agent': UA } }).then((r) => r.json());
+    const names = (guest.data ?? []).map((e) => e.name);
+    names.length === 1
+      ? ok('숨긴 글이 하객 응답에서 제외됨', `하객에게 보이는 글: ${names.join(', ')}`)
+      : bad('숨겼는데 하객에게 그대로 보임', JSON.stringify(names));
+
+    // '숨긴 것만 보기' 필터
+    await page.getByRole('button', { name: /숨긴 것만 보기/ }).click();
+    await page.waitForTimeout(1500);
+    const filtered = await page.locator('li').count();
+    filtered === 1 ? ok("'숨긴 것만 보기' 필터 동작") : bad('필터 결과가 이상함', `${filtered}건`);
+
+    await page.screenshot({ path: 'shot-guestbook-admin.png' });
+  } catch (e) {
+    bad('방명록 관리 검증 실패', String(e).slice(0, 140));
+  }
+
   consoleErrors.length === 0 ? ok('콘솔 에러 0건') : bad(`콘솔 에러 ${consoleErrors.length}건`, consoleErrors.slice(0, 2).join(' | '));
 } catch (e) {
   bad('예외로 중단', String(e).slice(0, 250));

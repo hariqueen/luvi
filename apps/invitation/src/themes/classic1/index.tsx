@@ -63,7 +63,13 @@ export default function Classic1Theme() {
       )}
 
       <MusicToggle musicOn={musicOn} onToggle={toggle} />
-      {invitation.showPetals && <Petals image={invitation.greeting.dogImage} />}
+      {invitation.showPetals && (
+        <Petals
+          image={invitation.petals.image}
+          count={invitation.petals.count}
+          custom={invitation.petals.custom}
+        />
+      )}
 
       <Slot section="cover"><Cover /></Slot>
       <Slot section="greeting"><Greeting /></Slot>

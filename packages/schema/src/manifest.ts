@@ -17,6 +17,8 @@ export type FieldType =
   | 'datetime'
   /** 숫자 */
   | 'number'
+  /** 슬라이더 (min·max·step). 정확한 값보다 '느낌'을 맞추는 값에 쓴다 */
+  | 'range'
   /** 2~3지 선택 */
   | 'segment'
   /** on/off */
@@ -54,8 +56,14 @@ export interface FieldDef {
   rows?: number;
   /** segment·icon 선택지 */
   options?: { value: string; label: string }[];
-  /** images 최대 개수 (유료 게이트가 붙는 지점) */
+  /** images 최대 개수 (유료 게이트가 붙는 지점) · range 최댓값 */
   max?: number;
+  /** range 최솟값 (기본 0) */
+  min?: number;
+  /** range 증가 단위 (기본 1) */
+  step?: number;
+  /** range 값 옆에 붙는 단위 (예: '개') */
+  unit?: string;
   /** repeat·repeatGroup 하위 필드 */
   fields?: FieldDef[];
   /** 권장 업로드 크기 안내용 */
@@ -222,6 +230,22 @@ export const CORE_SECTIONS: SectionDef[] = [
     required: false,
     fields: [
       { path: 'core.bgm', type: 'audio', label: '배경음악', hint: '하객이 처음 화면을 누를 때 재생됩니다' },
+      {
+        path: 'core.effects.petals.image',
+        type: 'image',
+        label: '떨어지는 이미지',
+        hint: '꽃잎·반려견 등 원하는 그림. 비우면 인사말 말풍선 아이콘을 씁니다. 배경이 투명한 PNG를 권합니다',
+      },
+      {
+        path: 'core.effects.petals.count',
+        type: 'range',
+        label: '떨어지는 양',
+        hint: '0으로 두면 아무것도 떨어지지 않습니다',
+        min: 0,
+        max: 30,
+        step: 1,
+        unit: '개',
+      },
     ],
   },
   {

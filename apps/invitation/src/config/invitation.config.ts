@@ -156,6 +156,16 @@ export interface InvitationConfig {
   /** 꽃잎/발자국 낙하 연출 노출 여부 */
   showPetals: boolean;
 
+  /** 낙하 연출의 모양·양 (on/off 는 showPetals) */
+  petals: {
+    /** 떨어질 이미지 URL */
+    image: string;
+    /** 동시에 떨어지는 개수 */
+    count: number;
+    /** 사용자가 직접 올린 이미지인지 — 기본 이미지일 때만 🐾 를 섞는다 */
+    custom: boolean;
+  };
+
   /**
    * 공유(og 태그·카카오톡 공유) 설정.
    * og 태그는 vite.config.ts의 ogTags 플러그인이 이 값으로 빌드 시 생성합니다.
@@ -354,6 +364,11 @@ export const invitation: InvitationConfig = {
   bgm: '/assets/embedded/audio_001.mp3',
 
   showPetals: true,
+  petals: {
+    image: '/assets/embedded/img_001.png',
+    count: 9,
+    custom: false,
+  },
 
   share: {
     title: '호석 ♥ 송희 결혼합니다',

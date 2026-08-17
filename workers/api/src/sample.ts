@@ -11,7 +11,7 @@
  *    그때 옛 문서에 없는 필드를 `undefined` 로 두면 **뷰어가 하객 앞에서 터집니다.**
  */
 import type { ContentDoc } from '@luvi/schema';
-import { defaultCoverLayers } from '@luvi/schema';
+import { DEFAULT_PETAL_COUNT, defaultCoverLayers } from '@luvi/schema';
 
 /** 저장된 문서에 빠진 필드를 채우기 위한 골격. 값은 모두 "비어 있음" 입니다. */
 export function emptyContent(): ContentDoc {
@@ -45,6 +45,7 @@ export function emptyContent(): ContentDoc {
       account: { description: '', groups: [] },
       footer: { image: null },
       bgm: null,
+      effects: { petals: { image: null, count: DEFAULT_PETAL_COUNT } },
       share: { title: '', description: '', image: null, durationMinutes: 120 },
     },
     theme: {},
@@ -129,6 +130,7 @@ export function sampleContent(): ContentDoc {
       },
       footer: { image: null },
       bgm: null,
+      effects: { petals: { image: null, count: DEFAULT_PETAL_COUNT } },
       share: {
         title: '호석 ♥ 송희 결혼합니다',
         description: '2026. 10. 24 SAT · PM 1:00\n포항 더퀸컨벤션 6F 갤럭시홀',

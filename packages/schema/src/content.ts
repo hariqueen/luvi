@@ -132,6 +132,20 @@ export interface CoreContent {
   };
   footer: { image: AssetRef | null };
   bgm: AssetRef | null;
+  /**
+   * 화면 위로 떨어지는 연출. on/off 는 `features.petals` 이고, 여기는 모양·양입니다.
+   *
+   * ⚠️ 이 필드가 생기기 전 스냅샷에는 없습니다. 읽는 쪽이 기본값을 채워야 합니다
+   *    (`image` 없으면 인사말 말풍선 아이콘 = 지금까지의 동작, `count` 없으면 9).
+   */
+  effects: {
+    petals: {
+      /** 떨어질 이미지. 비우면 인사말 말풍선 아이콘을 씁니다 */
+      image: AssetRef | null;
+      /** 동시에 떨어지는 개수 (0~30). 0 이면 아무것도 안 떨어집니다 */
+      count: number;
+    };
+  };
   share: {
     title: string;
     description: string;
@@ -239,3 +253,12 @@ export interface Invitation {
 }
 
 export const SCHEMA_VERSION = 1;
+
+/**
+ * 낙하 연출 기본 개수.
+ *
+ * 옛 뷰어가 손으로 배치한 9개(이미지 5 + 발자국 4)와 같은 값입니다 — 이 필드가 없는
+ * 스냅샷을 읽을 때 이 값을 쓰면 지금까지의 화면이 그대로 유지됩니다.
+ * **워커와 뷰어가 같은 값을 써야 하므로 여기서만 정의합니다.**
+ */
+export const DEFAULT_PETAL_COUNT = 9;

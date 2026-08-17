@@ -454,6 +454,45 @@ export function FieldRenderer({
         </div>
       );
 
+    case 'range': {
+      const min = field.min ?? 0;
+      const max = field.max ?? 100;
+      const step = field.step ?? 1;
+      // 값이 아직 없으면(옛 문서) 슬라이더가 맨 왼쪽으로 튀지 않게 중간값을 보여줍니다
+      const current =
+        typeof bound.value === 'number' ? bound.value : Math.round((min + max) / 2);
+      return (
+        <div>
+          <div className="flex items-baseline justify-between">
+            <Label field={field} />
+            <span className="ml-2 flex-none text-[12px] font-semibold tabular-nums text-gold-deep">
+              {current}
+              {field.unit ?? ''}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={current}
+            onChange={(e) => bound.set(Number(e.target.value))}
+            className="mt-1 h-6 w-full accent-gold"
+          />
+          <div className="flex justify-between text-[10.5px] text-muted-faint">
+            <span>
+              {min}
+              {field.unit ?? ''}
+            </span>
+            <span>
+              {max}
+              {field.unit ?? ''}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
     case 'toggle':
       return (
         <label className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-3.5 py-3">
