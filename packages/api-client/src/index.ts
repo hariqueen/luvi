@@ -109,8 +109,14 @@ export function createClient(opts: ClientOptions) {
     },
 
     guestbook: {
-      list: (invitationId: string) =>
-        get<GuestbookEntry[]>(`/invitations/${invitationId}/guestbook`),
+      /**
+       * 목록. 소유자가 부르면 숨긴 글까지 옵니다 (서버가 uid 로 판단).
+       * `limit` 기본값은 서버가 20 이라 관리 화면에서는 넉넉히 넘깁니다 (서버 상한 100).
+       */
+      list: (invitationId: string, limit?: number) =>
+        get<GuestbookEntry[]>(
+          `/invitations/${invitationId}/guestbook${limit ? `?limit=${limit}` : ''}`,
+        ),
       create: (invitationId: string, body: CreateGuestbookBody) =>
         post<GuestbookEntry>(`/invitations/${invitationId}/guestbook`, body),
       /** 숨김 — 삭제와 다르다. 하객이 남긴 축하 메시지이므로 되돌릴 수 있어야 한다 */
