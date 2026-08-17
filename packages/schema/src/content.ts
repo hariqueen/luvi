@@ -196,7 +196,13 @@ export type SectionKey =
 export interface Features {
   /** 배경음악 */
   bgm: boolean;
-  /** 꽃잎 낙하 */
+  /**
+   * 떨어지는 효과 on/off. 모양·양은 `core.effects.petals` 에 있습니다.
+   *
+   * 필드명이 `petals`(꽃잎)인 것은 초기 구현의 흔적입니다 — 이미 저장된 문서·발행
+   * 스냅샷이 이 이름을 쓰고 있어 바꾸지 않습니다. **화면 문구는 '떨어지는 효과'** 로
+   * 씁니다 (이미지를 바꿀 수 있으니 '꽃잎'이라 하면 꽃잎만 되는 것처럼 읽힙니다).
+   */
   petals: boolean;
 }
 

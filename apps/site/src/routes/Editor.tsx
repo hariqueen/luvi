@@ -507,11 +507,16 @@ export default function Editor() {
         </div>
       )}
 
-      {/* 연출(꽃잎·배경음악)은 매니페스트 필드가 아니라 features 문서 필드라 여기서 직접 그린다 */}
+      {/* 낙하 효과·배경음악은 매니페스트 필드가 아니라 features 문서 필드라 여기서 직접 그린다 */}
       {activeForm.key === 'effects' && (
         <>
+          {/*
+            '꽃잎'이라 부르지 않는다 — 이미지를 바꿀 수 있는데 꽃잎이라고 하면
+            꽃잎만 되는 것처럼 읽힌다. 데이터 필드명은 features.petals 로 남아 있지만
+            (이미 저장된 문서·스냅샷이 있어 못 바꾼다) 화면 문구는 중립적으로 쓴다.
+          */}
           <ToggleRow
-            label="꽃잎 낙하 연출"
+            label="떨어지는 효과"
             checked={features.petals}
             onChange={(v) => queueFeature('petals', v)}
           />

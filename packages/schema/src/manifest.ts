@@ -234,7 +234,7 @@ export const CORE_SECTIONS: SectionDef[] = [
         path: 'core.effects.petals.image',
         type: 'image',
         label: '떨어지는 이미지',
-        hint: '꽃잎·반려견 등 원하는 그림. 비우면 인사말 말풍선 아이콘을 씁니다. 배경이 투명한 PNG를 권합니다',
+        hint: '원하는 그림을 올리면 그게 떨어집니다 (꽃잎·반려견·하트 등). 비우면 인사말 말풍선 아이콘을 씁니다. 배경이 투명한 PNG를 권합니다',
       },
       {
         path: 'core.effects.petals.count',

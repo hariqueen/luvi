@@ -153,7 +153,7 @@ export interface InvitationConfig {
   /** 배경음악 파일 (없으면 빈 문자열) */
   bgm: string;
 
-  /** 꽃잎/발자국 낙하 연출 노출 여부 */
+  /** 떨어지는 효과 노출 여부 (모양·양은 아래 petals) */
   showPetals: boolean;
 
   /** 낙하 연출의 모양·양 (on/off 는 showPetals) */
