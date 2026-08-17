@@ -12,13 +12,16 @@ FIREBASE_PROJECT_ID = "wedding-f328e"
 # 아래 id 를 발급받은 값으로 채우세요.
 [[kv_namespaces]]
 binding = "LUVI_KV"
-id = "REPLACE_ME"
+id = "7a0086f850444b0b99ea23e24200c795"
 
 # R2 — 업로드된 이미지·오디오 (egress 무료)
 # 생성:  npx wrangler r2 bucket create luvi-assets
-[[r2_buckets]]
-binding = "LUVI_ASSETS"
-bucket_name = "luvi-assets"
+# ⚠️ 2026-08-17 로그인-우선 배포를 위해 임시 주석 처리 (R2 계정 미활성).
+#    R2 활성화 후 아래 3줄 주석 해제 + `wrangler r2 bucket create luvi-assets` 하고 재배포하면
+#    /api/assets/* 업로드가 살아난다.
+# [[r2_buckets]]
+# binding = "LUVI_ASSETS"
+# bucket_name = "luvi-assets"
 
 [observability]
 enabled = true

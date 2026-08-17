@@ -827,11 +827,38 @@ app.post('/api/claim', async (c) => {
 // ─────────────────────────── 인증 ───────────────────────────
 
 /**
- * 카카오·네이버 로그인. 둘 다 Firebase Auth 기본 제공자가 아니라 커스텀 토큰으로 처리합니다.
- * 흐름이 동일해서 라우트를 하나로 묶었습니다 — 제공자가 더 늘어도 이 핸들러는 그대로입니다.
+ * 로그인 관련 라우트 — 모두 `/api/auth/:provider` 하나로 받습니다.
+ *
+ * Hono 라우터가 이 경로 그룹에서 정적 라우트(`/api/auth/session`)에 우선권을 주지 않아,
+ * 따로 등록해도 `:provider` 가 먼저 가로챕니다(가로채면 404). 그래서 갈래를 이 핸들러
+ * 안에서 직접 나눕니다:
+ *  - `session` : 구글·이메일 로그인 후 사용자 문서 생성·갱신 (인증은 Firebase 가 직접)
+ *  - `kakao`·`naver` : Firebase 기본 제공자가 아니라 커스텀 토큰으로 브릿지
  */
 app.post('/api/auth/:provider', async (c) => {
   const provider = c.req.param('provider');
+
+  // 구글·이메일: 클라이언트가 Firebase 로 로그인한 뒤 사용자 문서만 동기화합니다
+  if (provider === 'session') {
+    const uid = requireUid(c);
+    const body = await readJson<{
+      email: string | null;
+      displayName: string | null;
+      photoURL: string | null;
+      provider: string;
+    }>(c.req);
+
+    await usersRepo.upsertUser(firestore(c.env), {
+      uid,
+      email: body.email ?? null,
+      displayName: body.displayName ?? null,
+      photoURL: body.photoURL ?? null,
+      provider: body.provider ?? 'password',
+    });
+
+    return c.json(ok({ uid }));
+  }
+
   if (provider !== 'kakao' && provider !== 'naver') {
     throw new HttpError({ code: 'not_found', message: '지원하지 않는 로그인 방식입니다' });
   }
@@ -900,30 +927,6 @@ app.post('/api/auth/:provider', async (c) => {
   }
 
   return c.json(ok(result));
-});
-
-/**
- * 구글·이메일 로그인은 Firebase Auth 가 클라이언트에서 직접 처리하므로 브릿지가 필요 없습니다.
- * 대신 로그인 후 이 라우트를 한 번 호출해 사용자 문서를 만듭니다.
- */
-app.post('/api/auth/session', async (c) => {
-  const uid = requireUid(c);
-  const body = await readJson<{
-    email: string | null;
-    displayName: string | null;
-    photoURL: string | null;
-    provider: string;
-  }>(c.req);
-
-  await usersRepo.upsertUser(firestore(c.env), {
-    uid,
-    email: body.email ?? null,
-    displayName: body.displayName ?? null,
-    photoURL: body.photoURL ?? null,
-    provider: body.provider ?? 'password',
-  });
-
-  return c.json(ok({ uid }));
 });
 
 // ─────────────────────────── 예약 · 문의 ───────────────────────────
