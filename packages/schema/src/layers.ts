@@ -52,7 +52,8 @@ export function alignTransform(align: LayerAlign): string {
 export const FONT_STACK: Record<LayerFont, string> = {
   sans: '"Pretendard Variable", Pretendard, system-ui, sans-serif',
   serif: '"Nanum Myeongjo", "Noto Serif KR", serif',
-  script: 'Parisienne, cursive',
+  // 한글·영문 모두 손글씨로 렌더 (index.html 에서 웹폰트 로드). Parisienne 는 한글 글리프가 없어 제외
+  script: '"Nanum Pen Script", cursive',
 };
 
 export const FONT_LABEL: Record<LayerFont, string> = {

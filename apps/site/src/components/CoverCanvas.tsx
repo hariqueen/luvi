@@ -77,6 +77,9 @@ export function CoverCanvas({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, layer: TextLayer) => {
       e.stopPropagation();
+      // 선택은 무슨 일이 있어도 먼저 실행한다 — 아래 setPointerCapture 가 실패해도
+      // (일부 환경에서 던짐) 선택/툴바가 뜨지 않는 일이 없어야 한다.
+      onSelect(layer.id);
       const px = layerToPx(layer, size);
       drag.current = {
         id: layer.id,
@@ -87,8 +90,11 @@ export function CoverCanvas({
         moved: false,
       };
       // 빠르게 끌 때 포인터가 요소를 벗어나도 이벤트를 계속 받는다
-      e.currentTarget.setPointerCapture(e.pointerId);
-      onSelect(layer.id);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* 캡처 실패해도 선택·드래그에는 지장 없음 */
+      }
     },
     [size, onSelect],
   );
@@ -113,52 +119,49 @@ export function CoverCanvas({
     [size, onChange],
   );
 
-  const handlePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      const d = drag.current;
-      drag.current = null;
-      if (!d) return;
-
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    try {
       e.currentTarget.releasePointerCapture?.(e.pointerId);
-      // 움직이지 않았으면 탭 — 이미 선택된 레이어였다면 문구 편집으로 들어간다
-      if (!d.moved && selectedId === d.id) onEditText(d.id);
-    },
-    [selectedId, onEditText],
-  );
+    } catch {
+      /* noop */
+    }
+  }, []);
 
-  // ── 사진이 없으면 편집 자체를 막는다 ──
-  if (!photoUrl) {
-    return (
-      <div className="relative h-full w-full overflow-hidden bg-ink-deep">
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <div>
-            <p className="font-script text-[30px] leading-none text-gold">Start here</p>
-            <p className="mt-2 text-sm font-semibold text-paper">대표 사진을 먼저 골라주세요</p>
-          </div>
-          <button
-            type="button"
-            onClick={onPickPhoto}
-            className="rounded-full bg-paper px-5 py-2.5 text-[12.5px] font-semibold text-ink-deep"
-          >
-            앨범에서 올리기
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // 사진이 없어도 편집을 막지 않는다 — 어두운 배경 위에서 텍스트를 편집하고,
+  // 배경 사진은 원할 때 올린다. (뷰어도 사진 없이 텍스트를 렌더하므로 화면이 일치한다)
   return (
     <div
       ref={canvasRef}
       // touch-action:none 이 없으면 모바일에서 드래그가 페이지 스크롤로 먹힌다
       className="relative h-full w-full touch-none select-none overflow-hidden bg-ink-deep"
       onPointerDown={() => onSelect(null)}
-      style={{
-        backgroundImage: `url(${photoUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
+      style={
+        photoUrl
+          ? {
+              backgroundImage: `url(${photoUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }
+          : { backgroundColor: '#15110f' }
+      }
     >
+      {/* 배경 사진이 없을 때 — 편집은 그대로 되고, 원하면 사진을 올릴 수 있게 */}
+      {!photoUrl && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPickPhoto();
+          }}
+          className="absolute right-2 top-2 z-10 rounded-full bg-paper/90 px-3 py-1.5 text-[11.5px] font-semibold text-ink-deep"
+        >
+          + 배경 사진
+        </button>
+      )}
+
       {layers.map((layer) => {
         const px = layerToPx(layer, size);
         const selected = layer.id === selectedId;
@@ -172,6 +175,15 @@ export function CoverCanvas({
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
+            // 포인터 로직과 별개로 선택/편집을 확실히 보장한다
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(layer.id);
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              onEditText(layer.id);
+            }}
             className={`absolute cursor-move whitespace-pre-wrap ${
               selected ? 'outline-dashed outline-2 outline-offset-4 outline-gold' : ''
             }`}

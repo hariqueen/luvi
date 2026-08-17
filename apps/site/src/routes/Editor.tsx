@@ -14,10 +14,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   CORE_SECTIONS,
   DEFAULT_SECTIONS,
+  FONT_LABEL,
+  LAYER_COLORS,
+  LAYER_SIZE_RANGE,
   createTextLayer,
   type AssetRef,
   type ContentDoc,
   type Features,
+  type LayerFont,
   type SectionDef,
   type SectionKey,
   type TextLayer,
@@ -331,8 +335,10 @@ export default function Editor() {
   const openSectionForm = useCallback(
     (key: SectionKey) => {
       if (key === 'cover') {
-        setPanel({ kind: 'sections' });
-        setSnap('peek');
+        // 커버는 가운데에 문구 편집 폼을 띄우고(다른 섹션과 동일한 경험),
+        // 오른쪽은 캔버스로 전환해 위치를 드래그로 잡을 수 있게 한다
+        openForm('cover');
+        setRightView('cover');
         return;
       }
       const formKey = SECTION_TO_FORM[key];
@@ -410,11 +416,97 @@ export default function Editor() {
     </div>
   );
 
+  const fontChoices: LayerFont[] = ['sans', 'serif', 'script'];
+
   const formBody = activeForm ? (
     <div className="flex max-w-[520px] flex-col gap-4">
       {activeForm.fields.map((f) => (
         <FieldRenderer key={f.path} field={f} />
       ))}
+
+      {/* 커버는 자유 배치 텍스트라 매니페스트 필드가 없다 — 여기서 문구/글꼴/색/크기를 직접 편집한다 */}
+      {activeForm.key === 'cover' && (
+        <div className="flex flex-col gap-3">
+          {layers.length === 0 && (
+            <p className="text-[13px] text-muted">아직 문구가 없어요. 아래 버튼으로 추가하세요.</p>
+          )}
+          {layers.map((layer, i) => (
+            <div key={layer.id} className="flex flex-col gap-2 rounded-xl border border-line bg-white p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted">문구 {i + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => removeLayer(layer.id)}
+                  className="text-[11.5px] text-gold-deep"
+                >
+                  삭제
+                </button>
+              </div>
+              <textarea
+                value={layer.text}
+                onChange={(e) => patchLayer(layer.id, { text: e.target.value })}
+                rows={2}
+                placeholder="문구를 입력하세요"
+                className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] outline-none focus:border-gold"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex gap-0.5 rounded-lg bg-surface-sunken p-0.5">
+                  {fontChoices.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => patchLayer(layer.id, { font: f })}
+                      className={`rounded-md px-2.5 py-1.5 text-[11.5px] ${
+                        layer.font === f ? 'bg-white font-semibold shadow-sm' : 'text-ink-soft'
+                      }`}
+                    >
+                      {FONT_LABEL[f]}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1 rounded-lg bg-surface-sunken px-1.5 py-1">
+                  {LAYER_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      aria-label={c.label}
+                      onClick={() => patchLayer(layer.id, { color: c.value })}
+                      className={`h-5 w-5 rounded-full border ${
+                        layer.color === c.value
+                          ? 'border-gold ring-2 ring-gold/40'
+                          : 'border-line-strong'
+                      }`}
+                      style={{ background: c.value }}
+                    />
+                  ))}
+                </div>
+                <label className="flex items-center gap-1.5 rounded-lg bg-surface-sunken px-2.5 py-1.5">
+                  <span className="text-[11px] text-muted">크기</span>
+                  <input
+                    type="range"
+                    min={LAYER_SIZE_RANGE.min * 1000}
+                    max={LAYER_SIZE_RANGE.max * 1000}
+                    value={layer.size * 1000}
+                    onChange={(e) => patchLayer(layer.id, { size: Number(e.target.value) / 1000 })}
+                    className="w-[72px] accent-gold"
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addLayer}
+            className="self-start rounded-lg bg-ink px-3 py-2 text-[12px] text-paper-soft"
+          >
+            + 문구 추가
+          </button>
+          <p className="text-[12px] leading-relaxed text-muted">
+            위치는 오른쪽 “커버 편집” 화면에서 문구를 끌어 옮길 수 있어요.
+          </p>
+        </div>
+      )}
+
       {/* 연출(꽃잎·배경음악)은 매니페스트 필드가 아니라 features 문서 필드라 여기서 직접 그린다 */}
       {activeForm.key === 'effects' && (
         <>
@@ -430,7 +522,7 @@ export default function Editor() {
           />
         </>
       )}
-      {activeForm.fields.length === 0 && activeForm.key !== 'effects' && (
+      {activeForm.fields.length === 0 && activeForm.key !== 'effects' && activeForm.key !== 'cover' && (
         <p className="text-[13px] text-muted">이 섹션은 켜고 끄는 것만 정할 수 있어요.</p>
       )}
     </div>
@@ -478,7 +570,7 @@ export default function Editor() {
         />
       )}
 
-      {photoUrl && !selectedLayer && !editingLayer && (
+      {!selectedLayer && !editingLayer && (
         <div className="flex flex-none items-center gap-2 border-t border-line bg-surface px-3 py-2.5">
           <button
             type="button"
@@ -493,7 +585,7 @@ export default function Editor() {
             onClick={() => coverInputRef.current?.click()}
             className="rounded-lg border border-line-strong bg-white px-3 py-2 text-[12px] disabled:opacity-50"
           >
-            {coverBusy ? '올리는 중…' : '사진 바꾸기'}
+            {coverBusy ? '올리는 중…' : photoUrl ? '사진 바꾸기' : '사진 올리기'}
           </button>
           <span className="ml-auto text-[11px] text-muted-soft">문구를 탭해서 옮기세요</span>
         </div>
@@ -586,7 +678,11 @@ export default function Editor() {
                 className={`absolute inset-0 lg:flex lg:items-center lg:justify-center lg:bg-ink-deep lg:p-5 ${rightView === 'cover' ? '' : 'hidden'}`}
               >
                 <div className="h-full w-full lg:h-[min(780px,calc(100dvh-190px))] lg:w-[calc(min(780px,100dvh-190px)*9/19)] lg:flex-none lg:rounded-phone-outer lg:bg-black lg:p-2 lg:shadow-[0_40px_90px_-44px_rgba(0,0,0,.9)]">
-                  <div className="h-full w-full overflow-hidden bg-surface lg:rounded-phone">{canvas}</div>
+                  {/* 활성일 때만 마운트한다 — 숨긴 채(display:none) 마운트하면 캔버스 크기를
+                    0 으로 재어 글자가 0px(안 보임)·클릭 불가가 된다 */}
+                <div className="h-full w-full overflow-hidden bg-surface lg:rounded-phone">
+                  {rightView === 'cover' && canvas}
+                </div>
                 </div>
               </div>
 
