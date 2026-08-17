@@ -331,6 +331,21 @@ export default function Editor() {
     [openForm],
   );
 
+  // 미리보기(iframe)에서 섹션을 클릭하면 해당 편집을 연다.
+  // 커버는 폼이 없으므로 우측을 "커버 편집" 캔버스로 전환한다.
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const data = e.data as { __luviSectionClick?: SectionKey } | null;
+      const key = data?.__luviSectionClick;
+      if (!key) return;
+      if (key === 'cover') setRightView('cover');
+      else openSectionForm(key);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [openSectionForm]);
+
   const sheetTitle = panel.kind === 'sections' ? '청첩장 구성' : (activeForm?.label ?? '편집');
   const title = (doc?.core.share.title ?? '') as string;
 
