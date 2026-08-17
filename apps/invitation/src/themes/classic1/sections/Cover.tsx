@@ -5,13 +5,18 @@
  * 한쪽만 바뀌면 편집 화면과 하객 화면의 글자 위치가 어긋나기 때문입니다.
  */
 import { useEffect, useRef, useState } from 'react';
-import { FONT_STACK, alignTransform, layerToPx } from '@luvi/schema';
+import { FONT_STACK, alignTransform, ensureFonts, layerToPx } from '@luvi/schema';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Cover() {
   const { cover } = useInvitation();
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+
+  // 이 청첩장이 실제로 쓰는 글꼴만 받아옵니다 — 목록 전체를 상시 로드하지 않는 이유는 fonts.ts 참고
+  useEffect(() => {
+    ensureFonts(cover.layers.map((l) => l.font));
+  }, [cover.layers]);
 
   useEffect(() => {
     const el = ref.current;

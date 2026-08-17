@@ -17,8 +17,70 @@ export interface AssetRef {
   alt?: string;
 }
 
-/** 커버 텍스트의 글꼴 선택지 */
-export type LayerFont = 'sans' | 'serif' | 'script';
+/**
+ * 커버 텍스트의 글꼴 선택지. 실제 정의(라벨·CSS·웹폰트 주소)는 `fonts.ts` 의 `FONTS` 입니다.
+ *
+ * 🔴 `sans` · `serif` · `script` 는 **이름을 바꾸거나 다른 글꼴에 재사용하면 안 됩니다.**
+ *    이미 발행된 청첩장 문서가 이 값을 저장하고 있어서, 뜻이 바뀌면 하객 화면의 글씨가 바뀝니다.
+ *    (각각 프리텐다드 · 나눔명조 · 나눔손글씨 펜)
+ */
+export type LayerFont =
+  // 고딕
+  | 'sans'
+  | 'gowun-dodum'
+  | 'freesentation'
+  | 'noto-sans'
+  // 명조 · 바탕
+  | 'serif'
+  | 'maru'
+  | 'gowun-batang'
+  | 'ridi'
+  | 'gyeonggi'
+  | 'hallym'
+  | 'bookend'
+  | 'kopub'
+  | 'songmyung'
+  | 'jeju'
+  | 'hahmlet'
+  | 'noto-serif'
+  // 손글씨 · 캘리그래피
+  | 'script'
+  | 'nanum-brush'
+  | 'butpen'
+  | 'kimjungchul'
+  | 'chusa'
+  | 'sinhon'
+  | 'baeeunhye'
+  | 'dasi'
+  | 'sonpyeonji'
+  | 'mingyeong'
+  | 'jangmi'
+  | 'onglyph-dagyeong'
+  | 'onglyph-siwoo'
+  | 'gabia-solmee'
+  | 'gabia-bombaram'
+  | 'cafe24-night'
+  | 'diary'
+  | 'nanum-barunpen'
+  // 영문 전용 (한글 글리프 없음)
+  | 'parisienne'
+  | 'great-vibes'
+  | 'pinyon'
+  | 'italianno'
+  | 'tangerine'
+  | 'sacramento'
+  | 'allura'
+  | 'labelle'
+  | 'cormorant'
+  | 'marcellus'
+  | 'playfair'
+  // 캐주얼
+  | 'gaegu'
+  | 'himelody'
+  | 'gamja'
+  | 'singleday'
+  | 'kirang'
+  | 'stylish';
 export type LayerAlign = 'left' | 'center' | 'right';
 
 /**

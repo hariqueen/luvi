@@ -5,7 +5,9 @@
  * 손가락이 캔버스를 가리지 않는 위치입니다.
  */
 import {
-  FONT_LABEL,
+  FONT_CATEGORY_LABEL,
+  FONT_GROUPS,
+  FONTS,
   LAYER_COLORS,
   LAYER_SIZE_RANGE,
   type LayerAlign,
@@ -18,8 +20,6 @@ const ALIGNS: { value: LayerAlign; label: string }[] = [
   { value: 'center', label: '↔' },
   { value: 'right', label: '⇥' },
 ];
-
-const FONTS: LayerFont[] = ['sans', 'serif', 'script'];
 
 interface Props {
   layer: TextLayer;
@@ -39,21 +39,28 @@ export function LayerToolbar({ layer, onChange, onEditText, onRemove }: Props) {
         문구 수정
       </button>
 
-      {/* 글꼴 */}
-      <div className="flex flex-none gap-0.5 rounded-lg bg-surface-sunken p-0.5">
-        {FONTS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => onChange({ font: f })}
-            className={`rounded-md px-2.5 py-1.5 text-[11.5px] ${
-              layer.font === f ? 'bg-white font-semibold shadow-sm' : 'text-ink-soft'
-            }`}
-          >
-            {FONT_LABEL[f]}
-          </button>
-        ))}
-      </div>
+      {/* 글꼴 — 목록은 이름만 기본 서체로 띄웁니다. 고르는 순간 그 글꼴만 받아와
+          캔버스의 실제 사진·문구에 반영되므로, 목록 자체는 로딩 비용이 없습니다. */}
+      <label className="flex flex-none items-center gap-1.5 rounded-lg bg-surface-sunken px-2 py-1">
+        <span className="text-[11px] text-muted">글꼴</span>
+        <select
+          value={layer.font}
+          aria-label="글꼴"
+          onChange={(e) => onChange({ font: e.target.value as LayerFont })}
+          className="max-w-[150px] rounded-md border border-line bg-white px-2 py-1 text-[13px] outline-none focus:border-gold"
+        >
+          {FONT_GROUPS.map((group) => (
+            <optgroup key={group.category} label={FONT_CATEGORY_LABEL[group.category]}>
+              {group.fonts.map((f) => (
+                <option key={f} value={f}>
+                  {FONTS[f].label}
+                  {FONTS[f].latinOnly ? ' (영문 전용)' : ''}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
 
       {/* 정렬 — align 은 좌표의 기준점도 바꾼다 */}
       <div className="flex flex-none gap-0.5 rounded-lg bg-surface-sunken p-0.5">

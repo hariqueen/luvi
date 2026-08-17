@@ -4,7 +4,7 @@
  * 에디터와 뷰어가 **반드시 같은 계산을 써야** 합니다. 한쪽만 바뀌면 편집 화면과
  * 하객이 보는 화면의 텍스트 위치가 달라집니다. 그래서 스키마 패키지에 둡니다.
  */
-import type { LayerAlign, LayerFont, TextLayer } from './content';
+import type { LayerAlign, TextLayer } from './content';
 
 /** 캔버스 실측 크기 (px) */
 export interface CanvasSize {
@@ -49,18 +49,7 @@ export function alignTransform(align: LayerAlign): string {
   return 'translate(0, -50%)';
 }
 
-export const FONT_STACK: Record<LayerFont, string> = {
-  sans: '"Pretendard Variable", Pretendard, system-ui, sans-serif',
-  serif: '"Nanum Myeongjo", "Noto Serif KR", serif',
-  // 한글·영문 모두 손글씨로 렌더 (index.html 에서 웹폰트 로드). Parisienne 는 한글 글리프가 없어 제외
-  script: '"Nanum Pen Script", cursive',
-};
-
-export const FONT_LABEL: Record<LayerFont, string> = {
-  sans: '고딕',
-  serif: '명조',
-  script: '필기체',
-};
+/* 글꼴 목록(FONTS)·스택·라벨·로더는 `fonts.ts` 로 옮겼습니다 — 글꼴을 늘리려면 그쪽을 보세요 */
 
 /** 사진 위에서 안전한 색만 제공합니다 — 아무 색이나 열어두면 안 보이는 조합이 나옵니다 */
 export const LAYER_COLORS = [

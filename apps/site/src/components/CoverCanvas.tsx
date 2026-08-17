@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FONT_STACK,
   alignTransform,
+  ensureFonts,
   layerToPx,
   pxToLayerPosition,
   type TextLayer,
@@ -49,6 +50,17 @@ export function CoverCanvas({
 }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+
+  /**
+   * 배치된 레이어가 쓰는 글꼴을 받아온다.
+   *
+   * 🔴 편집 화면과 하객 화면이 **같은 글꼴**로 보여야 합니다. 예전에는 에디터가
+   *    나눔명조를 로드하지 않아 '명조'를 골라도 시스템 폴백으로 그려졌고,
+   *    발행하면 글씨가 달라 보였습니다.
+   */
+  useEffect(() => {
+    ensureFonts(layers.map((l) => l.font));
+  }, [layers]);
 
   /** 캔버스 실측. 창 크기·시트 높이가 바뀌면 다시 재야 한다 */
   useEffect(() => {

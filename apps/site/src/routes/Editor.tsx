@@ -14,7 +14,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   CORE_SECTIONS,
   DEFAULT_SECTIONS,
-  FONT_LABEL,
+  FONT_CATEGORY_LABEL,
+  FONT_GROUPS,
+  FONTS,
   LAYER_COLORS,
   LAYER_SIZE_RANGE,
   createTextLayer,
@@ -416,8 +418,6 @@ export default function Editor() {
     </div>
   );
 
-  const fontChoices: LayerFont[] = ['sans', 'serif', 'script'];
-
   const formBody = activeForm ? (
     <div className="flex max-w-[520px] flex-col gap-4">
       {activeForm.fields.map((f) => (
@@ -450,20 +450,23 @@ export default function Editor() {
                 className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] outline-none focus:border-gold"
               />
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex gap-0.5 rounded-lg bg-surface-sunken p-0.5">
-                  {fontChoices.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => patchLayer(layer.id, { font: f })}
-                      className={`rounded-md px-2.5 py-1.5 text-[11.5px] ${
-                        layer.font === f ? 'bg-white font-semibold shadow-sm' : 'text-ink-soft'
-                      }`}
-                    >
-                      {FONT_LABEL[f]}
-                    </button>
+                <select
+                  value={layer.font}
+                  aria-label="글꼴"
+                  onChange={(e) => patchLayer(layer.id, { font: e.target.value as LayerFont })}
+                  className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-gold"
+                >
+                  {FONT_GROUPS.map((group) => (
+                    <optgroup key={group.category} label={FONT_CATEGORY_LABEL[group.category]}>
+                      {group.fonts.map((f) => (
+                        <option key={f} value={f}>
+                          {FONTS[f].label}
+                          {FONTS[f].latinOnly ? ' (영문 전용)' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
-                </div>
+                </select>
                 <div className="flex items-center gap-1 rounded-lg bg-surface-sunken px-1.5 py-1">
                   {LAYER_COLORS.map((c) => (
                     <button

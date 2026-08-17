@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#F7F5F1" />
 
-    <!-- 커버 편집 캔버스의 '필기체' 옵션용 한글 손글씨 폰트 (Nanum Pen Script) -->
+    <!-- 커버 글꼴은 여기서 상시 로드하지 않습니다 — 레이어가 실제로 쓰는 것만
+         packages/schema 의 ensureFonts() 가 런타임에 붙입니다. 이유는 fonts.ts 주석 참고.
+         preconnect 는 그 지연 로드를 빠르게 하려고 남겨둡니다. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" />
 
     <title>Luvi · 내 손으로 만드는 청첩장</title>
     <meta name="description" content="내 손으로 만들고, 보낸 뒤에도 고칠 수 있는 모바일 청첩장. AI가 만드는 식전영상까지." />
