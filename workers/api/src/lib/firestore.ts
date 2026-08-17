@@ -373,7 +373,7 @@ export class Firestore {
     if (writes.length > 500) {
       throw new FirestoreError('commit 한 번에 500개까지만 쓸 수 있습니다', 400);
     }
-    await this.json(`POST`, `${this.databaseUrl}:commit`, { writes });
+    await this.json(`POST`, `${this.documentsUrl}:commit`, { writes });
   }
 
   async query(parentPath: string, structuredQuery: FsQuery): Promise<FsDocument[]> {
