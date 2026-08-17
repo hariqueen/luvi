@@ -137,6 +137,7 @@ export const CORE_SECTIONS: SectionDef[] = [
     required: true,
     fields: [
       { path: 'core.greeting.message', type: 'textarea', label: '인사말', hint: '줄바꿈이 그대로 보입니다', rows: 8, required: true, maxLength: 1000 },
+      { path: 'core.greeting.showBubble', type: 'toggle', label: '말풍선 표시', hint: '끄면 강아지 말풍선(아이콘+문구)이 청첩장에서 사라집니다' },
       { path: 'core.greeting.bubbleText', type: 'textarea', label: '말풍선 문구', rows: 2, maxLength: 100 },
       { path: 'core.greeting.bubbleImage', type: 'image', label: '말풍선 아이콘', hint: '배경이 투명한 PNG를 권합니다' },
     ],

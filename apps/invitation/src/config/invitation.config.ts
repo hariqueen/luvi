@@ -88,6 +88,8 @@ export interface InvitationConfig {
     dogBubble: string;
     /** 반려견 아이콘 이미지 */
     dogImage: string;
+    /** 반려견 말풍선(아이콘+문구) 노출 여부 */
+    dogBubbleVisible: boolean;
     /** 인사말 본문 (\n 줄바꿈) */
     message: string;
   };
@@ -206,6 +208,7 @@ export const invitation: InvitationConfig = {
   greeting: {
     dogBubble: '멍! 두 분의 결혼식에\n놀러 와주실 거죠? 🐾',
     dogImage: '/assets/embedded/img_001.png',
+    dogBubbleVisible: true,
     message:
       '서로의 이름을 처음 부르던 날처럼\n설레는 마음으로 인사드립니다.\n\n' +
       '한 곳을 바라보며 걸어온 두 사람이\n이제 평생을 함께하기로 약속합니다.\n\n' +

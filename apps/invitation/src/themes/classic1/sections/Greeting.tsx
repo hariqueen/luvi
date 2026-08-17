@@ -8,15 +8,17 @@ export function Greeting() {
 
   return (
     <section className="relative bg-white px-8 py-[60px] text-center">
-      {/* 반려견 말풍선 */}
-      <div className="mb-[30px] flex items-center justify-center gap-2.5">
-        <div className="flex h-[50px] w-[50px] flex-none animate-wobble items-center justify-center overflow-hidden rounded-full bg-cream">
-          <img src={greeting.dogImage} alt="반려견" className="w-14" />
+      {/* 반려견 말풍선 — 에디터에서 끌 수 있음 */}
+      {greeting.dogBubbleVisible && (
+        <div className="mb-[30px] flex items-center justify-center gap-2.5">
+          <div className="flex h-[50px] w-[50px] flex-none animate-wobble items-center justify-center overflow-hidden rounded-full bg-cream">
+            <img src={greeting.dogImage} alt="반려견" className="w-14" />
+          </div>
+          <div className="whitespace-pre-line rounded-[6px_16px_16px_16px] bg-cream px-[15px] py-[11px] text-left text-[13px] font-semibold leading-[1.5] text-ink">
+            {greeting.dogBubble}
+          </div>
         </div>
-        <div className="whitespace-pre-line rounded-[6px_16px_16px_16px] bg-cream px-[15px] py-[11px] text-left text-[13px] font-semibold leading-[1.5] text-ink">
-          {greeting.dogBubble}
-        </div>
-      </div>
+      )}
 
       <Eyebrow className="mb-6">🐾 INVITATION</Eyebrow>
 

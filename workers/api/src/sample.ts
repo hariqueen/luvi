@@ -29,7 +29,7 @@ export function emptyContent(): ContentDoc {
       couple: { groom: person(), bride: person() },
       weddingAt: '',
       cover: { image: null, layers: [] },
-      greeting: { message: '', bubbleText: '', bubbleImage: null },
+      greeting: { message: '', bubbleText: '', bubbleImage: null, showBubble: true },
       gallery: [],
       location: {
         venue: '',
@@ -88,6 +88,7 @@ export function sampleContent(): ContentDoc {
           '귀한 걸음으로 축복해 주시면\n더없는 기쁨으로 간직하겠습니다.',
         bubbleText: '멍! 두 분의 결혼식에\n놀러 와주실 거죠? 🐾',
         bubbleImage: null,
+        showBubble: true,
       },
       gallery: [],
       location: {

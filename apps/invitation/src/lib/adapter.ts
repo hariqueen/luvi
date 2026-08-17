@@ -65,6 +65,10 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
     greeting: {
       dogImage: url(c.greeting.bubbleImage) || FALLBACK.dog,
       dogBubble: c.greeting.bubbleText,
+      // 이미 발행된 KV 스냅샷은 mergeContent 를 거치지 않은 '그때의 JSON' 이라
+      // showBubble 이 생기기 전 스냅샷에는 이 키가 없습니다. 없으면 켜진 것으로 봅니다
+      // — undefined 를 그대로 쓰면 재발행 전까지 말풍선이 사라집니다.
+      dogBubbleVisible: c.greeting.showBubble !== false,
       message: c.greeting.message,
     },
 

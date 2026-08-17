@@ -110,6 +110,8 @@ export interface CoreContent {
     message: string;
     bubbleText: string;
     bubbleImage: AssetRef | null;
+    /** 반려견 말풍선(아이콘+문구) 노출 여부. 끄면 인사말 본문만 남는다 */
+    showBubble: boolean;
   };
   /** 첫 항목이 대표 이미지 */
   gallery: AssetRef[];
