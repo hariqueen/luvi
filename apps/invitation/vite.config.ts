@@ -54,13 +54,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     // 폰트/이미지 등 public/ 자산은 그대로 복사됩니다.
-    rollupOptions: {
-      output: {
-        // Firebase는 무거우므로 별도 청크로 분리해 초기 로드를 가볍게 유지
-        manualChunks: {
-          firebase: ['firebase/app', 'firebase/firestore'],
-        },
-      },
-    },
+    //
+    // 예전에는 Firebase 를 별도 청크로 뺐습니다. 이제 방명록·랭킹을 워커 REST API 로
+    // 받아오므로 뷰어에 Firebase SDK 가 아예 없습니다 (gzip 80KB 감소).
   },
 });

@@ -67,6 +67,15 @@ export interface InvitationConfig {
    */
   themeId: ThemeId;
 
+  /**
+   * 방명록·랭킹 API 호출에 쓰는 청첩장 ID.
+   *
+   * **빈 문자열이면 원격 저장을 하지 않고 localStorage 로만 동작합니다.** 두 경우에 비어 있습니다:
+   * 에디터 라이브 미리보기(테스트 글이 하객 방명록에 섞이면 안 됨), 그리고 이 필드가
+   * 생기기 전에 발행된 옛 KV 스냅샷(어느 청첩장인지 알 수 없으므로 남의 방명록에 쓰지 않음).
+   */
+  invitationId: string;
+
   groom: Person;
   bride: Person;
 
@@ -176,6 +185,8 @@ export interface InvitationConfig {
 
 export const invitation: InvitationConfig = {
   themeId: 'classic1',
+  // 이 파일은 스냅샷이 없을 때 쓰는 예시 데이터입니다 — 원격 저장 없이 로컬로만 동작합니다
+  invitationId: '',
 
   groom: {
     name: '이호석',

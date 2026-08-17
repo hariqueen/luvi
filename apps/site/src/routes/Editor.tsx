@@ -218,7 +218,17 @@ export default function Editor() {
   // 편집 중인 초안을 iframe(실제 뷰어)에 실시간으로 보내 우측에 그대로 그려지게 한다.
   const postPreview = useCallback(() => {
     if (!doc) return;
-    const pub = { slug: 'preview', themeId, sections, features, content: doc, cdnBase: env.cdnBase };
+    // invitationId 를 비워 보냅니다 — 미리보기에서 방명록·랭킹을 쓰면 하객 글 사이에
+    // 내 테스트 기록이 실제로 저장됩니다. 뷰어는 빈 ID 를 '로컬 전용' 으로 해석합니다.
+    const pub = {
+      slug: 'preview',
+      invitationId: '',
+      themeId,
+      sections,
+      features,
+      content: doc,
+      cdnBase: env.cdnBase,
+    };
     document
       .querySelectorAll<HTMLIFrameElement>('iframe[data-luvi-preview]')
       .forEach((f) => f.contentWindow?.postMessage({ __luviPreview: true, pub }, window.location.origin));

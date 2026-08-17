@@ -53,6 +53,10 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
   return {
     themeId: pub.themeId,
 
+    // 옛 스냅샷에는 이 키가 없습니다 — 없으면 빈 값(= 로컬 전용)으로 둡니다.
+    // 슬러그로 대체 추론하면 안 됩니다: 방명록 경로는 문서 ID 기준이라 엉뚱한 곳에 씁니다.
+    invitationId: pub.invitationId ?? '',
+
     groom: c.couple.groom,
     bride: c.couple.bride,
     weddingAt,

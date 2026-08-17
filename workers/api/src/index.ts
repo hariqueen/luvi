@@ -431,6 +431,7 @@ app.post('/api/invitations/:id/publish', async (c) => {
   // 하객 화면이 바뀌는 지점은 **여기** 입니다 (Firestore 가 아니라 KV)
   const snapshot: PublicInvitation = {
     slug,
+    invitationId: id,
     themeId: invitation.themeId,
     sections: invitation.sections,
     features: invitation.features,
@@ -1009,6 +1010,7 @@ app.get('/api/public/i/:slug', async (c) => {
   return c.json(
     ok<PublicInvitation>({
       slug: invitation.slug,
+      invitationId: invitation.id,
       themeId: invitation.themeId,
       sections: invitation.sections,
       features: invitation.features,

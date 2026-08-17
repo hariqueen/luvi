@@ -235,6 +235,15 @@ export interface CreateBookingBody {
  */
 export interface PublicInvitation {
   slug: string;
+  /**
+   * 청첩장 문서 ID. 뷰어가 방명록·랭킹 API(`/api/invitations/{id}/…`)를 부르는 데 씁니다.
+   *
+   * 슬러그가 아니라 ID 를 싣는 이유: 슬러그는 바뀔 수 있어서 방명록이 글과 끊깁니다.
+   *
+   * ⚠️ 이 필드가 생기기 전에 발행된 KV 스냅샷에는 값이 없습니다. 읽는 쪽은 빈 값을
+   * 견뎌야 합니다 (뷰어는 원격 저장을 끄고 로컬로만 동작 — 남의 청첩장에 쓰는 것보다 낫습니다).
+   */
+  invitationId: string;
   themeId: ThemeId;
   /** 담긴 섹션 — 배열 순서가 곧 렌더 순서 */
   sections: SectionKey[];

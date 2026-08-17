@@ -73,10 +73,13 @@ export default function App() {
     };
   }, []);
 
-  const config = useMemo(
-    () => (load.state === 'ready' && isThemeId(load.pub.themeId) ? adaptInvitation(load.pub) : null),
-    [load],
-  );
+  const config = useMemo(() => {
+    if (load.state !== 'ready' || !isThemeId(load.pub.themeId)) return null;
+    const adapted = adaptInvitation(load.pub);
+    // 에디터가 invitationId 를 비워 보내지만, 여기서 한 번 더 지웁니다 — 미리보기에서
+    // 남긴 테스트 방명록·랭킹이 하객 기록에 섞이는 건 되돌리기 어렵습니다.
+    return isPreview ? { ...adapted, invitationId: '' } : adapted;
+  }, [load]);
 
   // 로드되면 탭 제목을 맞추고, ?calendar=1 로 들어온 경우 구글 캘린더로 넘깁니다
   useEffect(() => {
