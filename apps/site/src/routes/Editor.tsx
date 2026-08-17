@@ -673,32 +673,25 @@ export default function Editor() {
             </div>
 
             <div className="relative min-h-0 flex-1">
-              {/* 커버 편집 (사진 위 문구 드래그 배치) */}
-              <div
-                className={`absolute inset-0 lg:flex lg:items-center lg:justify-center lg:bg-ink-deep lg:p-5 ${rightView === 'cover' ? '' : 'hidden'}`}
-              >
-                <div className="h-full w-full lg:h-[min(780px,calc(100dvh-190px))] lg:w-[calc(min(780px,100dvh-190px)*9/19)] lg:flex-none lg:rounded-phone-outer lg:bg-black lg:p-2 lg:shadow-[0_40px_90px_-44px_rgba(0,0,0,.9)]">
-                  {/* 활성일 때만 마운트한다 — 숨긴 채(display:none) 마운트하면 캔버스 크기를
+              {/* 커버 편집 (사진 위 문구 드래그 배치)
+                  폰 목업 테두리를 두면 편집 영역이 좁아진다 — 우측 열을 그대로 채운다 */}
+              <div className={`absolute inset-0 ${rightView === 'cover' ? '' : 'hidden'}`}>
+                {/* 활성일 때만 마운트한다 — 숨긴 채(display:none) 마운트하면 캔버스 크기를
                     0 으로 재어 글자가 0px(안 보임)·클릭 불가가 된다 */}
-                <div className="h-full w-full overflow-hidden bg-surface lg:rounded-phone">
+                <div className="h-full w-full overflow-hidden bg-surface">
                   {rightView === 'cover' && canvas}
-                </div>
                 </div>
               </div>
 
               {/* 라이브 미리보기 (실제 하객 뷰어를 iframe 으로, 초안 실시간 반영) */}
-              <div
-                className={`absolute inset-0 lg:flex lg:items-center lg:justify-center lg:bg-ink-deep lg:p-5 ${rightView === 'preview' ? '' : 'hidden'}`}
-              >
-                <div className="h-full w-full lg:h-[min(780px,calc(100dvh-190px))] lg:w-[calc(min(780px,100dvh-190px)*9/19)] lg:flex-none lg:rounded-phone-outer lg:bg-black lg:p-2 lg:shadow-[0_40px_90px_-44px_rgba(0,0,0,.9)]">
-                  <div className="h-full w-full overflow-hidden bg-ivory lg:rounded-phone">
-                    <iframe
-                      data-luvi-preview
-                      src="/i/?preview=1"
-                      title="청첩장 미리보기"
-                      className="h-full w-full border-0"
-                    />
-                  </div>
+              <div className={`absolute inset-0 ${rightView === 'preview' ? '' : 'hidden'}`}>
+                <div className="h-full w-full overflow-hidden bg-ivory">
+                  <iframe
+                    data-luvi-preview
+                    src="/i/?preview=1"
+                    title="청첩장 미리보기"
+                    className="h-full w-full border-0"
+                  />
                 </div>
               </div>
             </div>
