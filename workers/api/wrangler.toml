@@ -3,7 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2024-09-23"
 
 [vars]
-CDN_BASE = "https://cdn.luv-ai.co.kr"
+# 에셋 서빙 베이스. R2 커스텀 도메인(cdn.luv-ai.co.kr)이 아직 없어서 워커의 /api/assets/* 경유로 서빙한다.
+# 나중에 R2 커스텀 도메인을 붙이면 이 값을 "https://cdn.luv-ai.co.kr" 로 바꾸고 재배포하면 된다.
+CDN_BASE = "https://luvi-api.hariqueen985813.workers.dev/api/assets"
 SITE_ORIGIN = "https://luv-ai.co.kr"
 FIREBASE_PROJECT_ID = "wedding-f328e"
 
@@ -14,14 +16,10 @@ FIREBASE_PROJECT_ID = "wedding-f328e"
 binding = "LUVI_KV"
 id = "7a0086f850444b0b99ea23e24200c795"
 
-# R2 — 업로드된 이미지·오디오 (egress 무료)
-# 생성:  npx wrangler r2 bucket create luvi-assets
-# ⚠️ 2026-08-17 로그인-우선 배포를 위해 임시 주석 처리 (R2 계정 미활성).
-#    R2 활성화 후 아래 3줄 주석 해제 + `wrangler r2 bucket create luvi-assets` 하고 재배포하면
-#    /api/assets/* 업로드가 살아난다.
-# [[r2_buckets]]
-# binding = "LUVI_ASSETS"
-# bucket_name = "luvi-assets"
+# R2 — 업로드된 이미지·오디오 (egress 무료). 2026-08-17 R2 활성화 + 버킷 생성 완료로 바인딩 켬.
+[[r2_buckets]]
+binding = "LUVI_ASSETS"
+bucket_name = "luvi-assets"
 
 [observability]
 enabled = true
