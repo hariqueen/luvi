@@ -6,8 +6,9 @@
  *  · **나머지 섹션** — 매니페스트에서 생성되는 폼 + 섹션 추가/제거/순서 변경
  *
  * 데이터 흐름: 진입 시 `api.invitations.get(id)` 로 초안(ContentDoc)을 불러오고,
- * 편집은 전부 `setField(path, value)` 하나로 모읍니다. 그 변경분을 디바운스로 묶어
- * `api.invitations.updateDraft` 로 자동저장합니다 — **발행 전이라 하객 화면은 그대로입니다.**
+ * 편집은 전부 `setField(path, value)` 하나로 모읍니다. 모인 변경분은 **저장을 누를 때만**
+ * `api.invitations.updateDraft` 로 올라갑니다 (자동저장 없음 — 아래 '저장' 절 참고).
+ * 저장해도 하객 화면은 그대로입니다. 그건 발행이 바꿉니다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -77,7 +78,6 @@ function ToggleRow({
   );
 }
 
-const DEBOUNCE_MS = 900;
 const pad = (n: number) => String(n).padStart(2, '0');
 const timeLabel = (iso: string) => {
   const d = new Date(iso);
@@ -136,21 +136,35 @@ export default function Editor() {
     };
   }, [id]);
 
-  // ─────────────── 자동저장 엔진 ───────────────
+  // ─────────────── 저장 (자동저장 없음) ───────────────
+  /**
+   * 편집은 **화면 상태만** 바꿉니다. 서버 초안은 저장을 눌러야 바뀝니다.
+   *
+   * 예전에는 900ms 디바운스 자동저장이었습니다. 그러면 실수가 곧바로 원본에 새겨집니다 —
+   * 초안이 유일한 원본이라 잘못 지운 문구를 되찾을 지점이 남지 않습니다. 실제로 테스트가
+   * 인사말을 덮어쓴 뒤 그대로 발행돼 하객 화면까지 나간 사고가 있었습니다.
+   *
+   * 대신 우측 미리보기는 저장 여부와 무관하게 즉시 반영됩니다(로컬 상태를 iframe 에 보냅니다).
+   * 저장하지 않은 변경은 **새로고침·탭 닫기·화면 이탈에서 경고 후 사라집니다.**
+   */
   const pendingPatch = useRef<Record<string, unknown>>({});
   const pendingSections = useRef<SectionKey[] | null>(null);
   const pendingFeatures = useRef<Partial<Features> | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const flush = useCallback(async () => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
+  /** 저장할 게 남았는지. 저장 버튼·이탈 경고가 이 값을 보므로 ref 가 아니라 state 입니다 */
+  const [dirty, setDirty] = useState(false);
+
+  const markDirty = useCallback(() => {
+    setDirty(true);
+    setSaveStatus('dirty');
+  }, []);
+
+  /** 저장. 성공 여부를 돌려줍니다 — 발행 화면으로 넘기기 전에 확인해야 합니다 */
+  const save = useCallback(async (): Promise<boolean> => {
     const patch = pendingPatch.current;
     const secs = pendingSections.current;
     const feats = pendingFeatures.current;
-    if (Object.keys(patch).length === 0 && !secs && !feats) return;
+    if (Object.keys(patch).length === 0 && !secs && !feats) return true;
 
     pendingPatch.current = {};
     pendingSections.current = null;
@@ -163,62 +177,76 @@ export default function Editor() {
 
     const res = await api.invitations.updateDraft(id, body);
     if (res.ok) {
+      setDirty(false);
       setSaveStatus('saved');
       setSavedAt(timeLabel(res.data.updatedAt));
-    } else {
-      // 실패한 변경분을 되돌려 넣어 재시도(또는 다음 편집)에 다시 반영되게 합니다
-      pendingPatch.current = { ...patch, ...pendingPatch.current };
-      if (secs && !pendingSections.current) pendingSections.current = secs;
-      if (feats) pendingFeatures.current = { ...feats, ...(pendingFeatures.current ?? {}) };
-      setSaveStatus('error');
+      return true;
     }
-  }, [id]);
 
-  const schedule = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => void flush(), DEBOUNCE_MS);
-  }, [flush]);
+    // 실패한 변경분을 되돌려 넣습니다 — 다시 저장을 누르면 그대로 올라갑니다
+    pendingPatch.current = { ...patch, ...pendingPatch.current };
+    if (secs && !pendingSections.current) pendingSections.current = secs;
+    if (feats) pendingFeatures.current = { ...feats, ...(pendingFeatures.current ?? {}) };
+    setSaveStatus('error');
+    return false;
+  }, [id]);
 
   const setField = useCallback(
     (path: string, value: unknown) => {
       setDoc((d) => (d ? setPath(d, path, value) : d));
       pendingPatch.current[path] = value;
-      schedule();
+      markDirty();
     },
-    [schedule],
+    [markDirty],
   );
 
   const queueSections = useCallback(
     (next: SectionKey[]) => {
       setSections(next);
       pendingSections.current = next;
-      schedule();
+      markDirty();
     },
-    [schedule],
+    [markDirty],
   );
 
   const queueFeature = useCallback(
     (key: keyof Features, value: boolean) => {
       setFeatures((f) => ({ ...f, [key]: value }));
       pendingFeatures.current = { ...(pendingFeatures.current ?? {}), [key]: value };
-      schedule();
+      markDirty();
     },
-    [schedule],
+    [markDirty],
   );
 
-  // 화면을 떠날 때 남은 변경분을 흘려보냅니다 (발행 화면이 최신 초안을 읽도록)
+  // 저장하지 않은 채 새로고침·탭 닫기를 막습니다 (자동저장이 없으니 그대로 사라집니다)
   useEffect(() => {
-    return () => {
-      void flush();
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // 문구는 브라우저가 정한 것으로 대체됩니다. 값을 넣어야 옛 브라우저에서도 뜹니다
+      e.returnValue = '';
     };
-  }, [flush]);
-
-  // 전체 새로고침·탭 닫기 방어
-  useEffect(() => {
-    const handler = () => void flush();
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [flush]);
+  }, [dirty]);
+
+  /** 화면을 벗어나기 전 확인 — 링크 이동은 beforeunload 가 잡지 못합니다 */
+  const confirmLeave = useCallback(() => {
+    if (!dirty) return true;
+    return window.confirm('저장하지 않은 변경이 있습니다.\n지금 나가면 사라집니다. 나갈까요?');
+  }, [dirty]);
+
+  // ⌘S · Ctrl+S — 문서 편집기의 손버릇이 그대로 통해야 합니다
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        void save();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [save]);
 
   // ─────────────── 라이브 미리보기 전송 ───────────────
   // 편집 중인 초안을 iframe(실제 뷰어)에 실시간으로 보내 우측에 그대로 그려지게 한다.
@@ -605,7 +633,14 @@ export default function Editor() {
     <EditorProvider value={editorValue}>
       <div className="flex h-dvh flex-col overflow-hidden bg-bg">
         <header className="z-30 flex h-[52px] flex-none items-center gap-2 border-b border-line bg-ink-deep px-2.5 text-paper">
-          <Link to="/app" aria-label="대시보드로" className="px-2 py-1.5 text-[15px] text-muted">
+          <Link
+            to="/app"
+            aria-label="대시보드로"
+            onClick={(e) => {
+              if (!confirmLeave()) e.preventDefault();
+            }}
+            className="px-2 py-1.5 text-[15px] text-muted"
+          >
             ←
           </Link>
           <input
@@ -614,11 +649,34 @@ export default function Editor() {
             placeholder="제목 없음"
             className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm font-semibold text-paper outline-none focus:border-gold focus:bg-ink-mid"
           />
-          <SaveState status={saveStatus} savedAt={savedAt} onRetry={() => void flush()} />
+          <SaveState status={saveStatus} savedAt={savedAt} onRetry={() => void save()} />
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={!dirty || saveStatus === 'saving'}
+            className={`flex-none rounded-md px-3.5 py-2 text-[12px] font-semibold ${
+              dirty
+                ? 'bg-gold text-ink-deep'
+                : 'border border-line-strong/40 text-muted-faint'
+            } disabled:cursor-default`}
+          >
+            {saveStatus === 'saving' ? '저장 중…' : '저장'}
+          </button>
           <button
             type="button"
             onClick={async () => {
-              await flush();
+              // 발행은 **서버에 저장된 초안**을 내보냅니다. 저장하지 않은 변경을 두고 넘어가면
+              // "고쳤는데 왜 안 바뀌지?" 가 그대로 재발합니다 → 저장부터 시킵니다.
+              if (dirty) {
+                const go = window.confirm(
+                  '저장하지 않은 변경이 있습니다.\n저장하고 발행 화면으로 갈까요?',
+                );
+                if (!go) return;
+                if (!(await save())) {
+                  window.alert('저장에 실패해 이동하지 않았습니다. 잠시 뒤 다시 시도해주세요.');
+                  return;
+                }
+              }
               navigate(`/app/i/${id}/publish`);
             }}
             className="flex-none rounded-md bg-paper px-3.5 py-2 text-[12px] font-semibold text-ink-deep"

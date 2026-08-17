@@ -89,6 +89,10 @@ try {
   const page = await context.newPage();
   const consoleErrors = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 160)); });
+  // 자동저장이 없어 에디터가 '저장 안 된 채 나가기' 를 막습니다. Playwright 의 기본 동작은
+  // 다이얼로그 취소라서 그대로 두면 goto 가 그 자리에 멈춥니다 → 이동을 허용합니다.
+  // (테스트는 이동 전에 저장을 누르므로, 이 핸들러가 삼키는 건 잔여 경고뿐입니다)
+  page.on('dialog', (d) => void d.accept().catch(() => {}));
 
   // 1. 이메일 로그인 ('로그인' 은 모드 탭에도 있어 submit 으로 특정)
   await page.goto(`${ORIGIN}/login`, { waitUntil: 'networkidle', timeout: 60000 });
@@ -119,15 +123,29 @@ try {
       : bad('섹션 클릭했지만 폼이 안 열림');
   } catch (e) { bad('섹션 클릭 실패', String(e).slice(0, 100)); }
 
-  // 4. 편집 → 자동저장 → 미리보기 실시간 반영
+  // 4. 편집 → 미리보기 실시간 반영 → **저장을 눌러야** 저장 (자동저장 없음)
   const marker = `E2E편집${Date.now().toString().slice(-5)}`;
-  await page.locator('textarea').first().fill(`${marker}\n자동저장 검증`);
-  await page.waitForTimeout(6000);
-  /✓/.test(await page.locator('body').innerText()) ? ok('자동저장 완료(✓)') : bad('자동저장 표시 없음');
+  await page.locator('textarea').first().fill(`${marker}\n저장 검증`);
+  await page.waitForTimeout(2000);
+
+  // 저장하지 않은 상태 표시
+  (await page.locator('body').innerText()).includes('저장 안 됨')
+    ? ok("편집 직후 '저장 안 됨' 표시")
+    : bad("편집했는데 '저장 안 됨' 표시가 없음 — 자동저장이 살아있나?");
+
   try {
     await frame.locator(`text=${marker}`).first().waitFor({ timeout: 15000 });
-    ok('편집 내용이 미리보기에 실시간 반영');
+    ok('편집 내용이 미리보기에 실시간 반영 (저장 전)');
   } catch { bad('미리보기에 편집 내용 없음'); }
+
+  const saveBtn = page.getByRole('button', { name: /^저장$/ }).first();
+  if ((await saveBtn.count()) === 0) {
+    bad('저장 버튼이 없음');
+  } else {
+    await saveBtn.click();
+    await page.waitForTimeout(4000);
+    /✓/.test(await page.locator('body').innerText()) ? ok('저장 완료(✓)') : bad('저장 표시 없음');
+  }
 
   // 4-b. 연출 — 낙하 양 슬라이더 + 떨어지는 이미지 필드
   try {
@@ -169,6 +187,13 @@ try {
       // 라이브 기본값과 같은 9로 돌려놓고 발행합니다
       await slider.fill('9');
       await page.waitForTimeout(2500);
+
+      // 자동저장이 없으므로 여기서 저장해야 발행에 반영됩니다
+      const saveEffects = page.getByRole('button', { name: /^저장$/ }).first();
+      if (await saveEffects.isEnabled()) {
+        await saveEffects.click();
+        await page.waitForTimeout(3500);
+      }
     }
   } catch (e) {
     bad('연출 폼 검증 실패', String(e).slice(0, 140));
