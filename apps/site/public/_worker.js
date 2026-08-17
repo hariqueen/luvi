@@ -20,8 +20,10 @@ export default {
     const p = url.pathname;
     const asset = (path) => env.ASSETS.fetch(new Request(new URL(path, url.origin), request));
 
-    const spa = async (indexPath) => {
-      const r = await asset(indexPath);
+    // ⚠️ '/i/index.html' 을 직접 요청하면 Pages 가 308(정규화)로 응답해 빈 바디가 된다.
+    //    디렉터리 경로('/i/', '/')로 요청해야 인덱스 HTML 본문이 200 으로 온다.
+    const spa = async (dirPath) => {
+      const r = await asset(dirPath);
       const h = new Headers(r.headers);
       h.set('Cache-Control', 'no-cache');
       return new Response(r.body, { status: 200, headers: h });
@@ -33,9 +35,9 @@ export default {
     };
 
     // ── 뷰어(/i/) ──
-    if (p === '/i' || p === '/i/') return spa('/i/index.html');
+    if (p === '/i' || p === '/i/') return spa('/i/');
     if (p.startsWith('/i/')) {
-      if (!hasExt(p)) return spa('/i/index.html'); // /i/{slug}
+      if (!hasExt(p)) return spa('/i/'); // /i/{slug}
       const r = await asset(p);
       return p.startsWith('/i/assets/') ? immutable(r) : r;
     }
@@ -43,7 +45,7 @@ export default {
     // ── 사이트(루트) ──
     if (!hasExt(p)) {
       const r = await asset(p);
-      return r.status === 404 ? spa('/index.html') : r;
+      return r.status === 404 ? spa('/') : r;
     }
     const r = await asset(p);
     return p.startsWith('/assets/') ? immutable(r) : r;
