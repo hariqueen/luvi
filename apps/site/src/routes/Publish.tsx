@@ -53,6 +53,8 @@ export default function Publish() {
 
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  /** 발행된 주소를 바꿀 때만 쓰는 확인 체크 — 실수로 QR 을 죽이지 않게 한 번 더 묻습니다 */
+  const [slugChangeAck, setSlugChangeAck] = useState(false);
   const [result, setResult] = useState<PublishResult | null>(null);
   const [qr, setQr] = useState<string>('');
   const [copied, setCopied] = useState(false);
@@ -106,7 +108,19 @@ export default function Publish() {
   const missing = diff?.missing ?? [];
   const changes = diff?.changes ?? [];
   const slugOk = !err && avail?.available === true;
-  const canPublish = slugOk && missing.length === 0 && !checking && !publishing;
+
+  /**
+   * 이미 하객에게 나간 주소.
+   *
+   * 🔴 발행 시 슬러그를 바꾸면 서버가 **옛 스냅샷을 지웁니다**(writeSnapshot 의 previousSlug).
+   * 인쇄된 청첩장·QR 은 옛 주소를 가리키므로 그 순간 종이 청첩장이 전부 404 가 됩니다.
+   * 되돌릴 수 없는 종류의 사고라, 바꾸려면 체크를 한 번 받습니다.
+   */
+  const publishedSlug = load.state === 'ready' && load.inv.status === 'published' ? load.inv.slug : '';
+  const slugChanged = publishedSlug !== '' && slug !== publishedSlug;
+
+  const canPublish =
+    slugOk && missing.length === 0 && !checking && !publishing && (!slugChanged || slugChangeAck);
 
   const onPublish = async () => {
     setPublishing(true);
@@ -285,6 +299,40 @@ export default function Publish() {
                   </span>
                 )}
               </div>
+              {/* 발행된 주소를 바꾸려는 경우 — 인쇄된 QR 이 끊긴다 */}
+              {slugChanged && (
+                <div className="mt-3 rounded-xl border border-gold bg-cream px-4 py-3.5">
+                  <p className="text-[12.5px] font-semibold text-gold-deep">
+                    ⚠️ 이미 하객에게 나간 주소를 바꾸려고 해요
+                  </p>
+                  <p className="mt-1.5 text-[12px] leading-[1.6] text-ink-soft">
+                    지금 발행된 주소는 <b className="font-semibold">luv-ai.co.kr/i/{publishedSlug}</b>
+                    입니다. 주소를 바꿔 발행하면 <b className="font-semibold">옛 주소는 즉시 접속이 끊깁니다</b> —
+                    인쇄한 청첩장이나 이미 보낸 카톡·QR 코드로 들어오는 하객은 청첩장을 볼 수 없게 됩니다.
+                  </p>
+                  <label className="mt-2.5 flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={slugChangeAck}
+                      onChange={(e) => setSlugChangeAck(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 flex-none accent-gold"
+                    />
+                    <span className="text-[12px] font-medium text-ink">
+                      옛 주소({publishedSlug})가 끊기는 것을 알고 있고, 그래도 바꿉니다
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSlug(publishedSlug);
+                      setSlugChangeAck(false);
+                    }}
+                    className="mt-2 text-[12px] text-gold-deep underline"
+                  >
+                    원래 주소로 되돌리기
+                  </button>
+                </div>
+              )}
             </section>
 
             {/* 필수 항목 누락 */}
