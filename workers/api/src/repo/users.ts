@@ -37,9 +37,13 @@ export async function upsertUser(db: Firestore, input: UpsertUserInput): Promise
   const existing = await db.get(userPath(input.uid));
 
   const fields = {
-    email: encode(input.email),
-    displayName: encode(input.displayName),
-    photoURL: encode(input.photoURL),
+    // email·displayName·photoURL 도 "값이 있을 때만" 씁니다. 소셜 로그인 직후
+    // 클라이언트가 이어서 호출하는 /api/auth/session 동기화는 커스텀토큰(카카오·네이버)
+    // 계정의 idToken 에 email·이름이 없어 null 을 보내는데, 그대로 덮으면 방금 소셜에서
+    // 저장한 email·이름이 지워집니다 (아래 phone 과 똑같은 이유).
+    ...(input.email ? { email: encode(input.email) } : {}),
+    ...(input.displayName ? { displayName: encode(input.displayName) } : {}),
+    ...(input.photoURL ? { photoURL: encode(input.photoURL) } : {}),
     lastLoginAt: fsTimestamp(now),
     // 값이 있을 때만 씁니다. null 로 덮으면 네이버로 한 번 받아둔 번호가
     // 다음에 카카오로 로그인하는 순간 지워집니다
