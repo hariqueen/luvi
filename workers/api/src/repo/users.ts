@@ -4,6 +4,7 @@
  * `role` 은 **여기서만** 읽습니다. 클라이언트가 보낸 값이나 토큰 클레임으로 판단하면
  * 커스텀 토큰을 발급하는 우리 코드가 곧 권한 부여 지점이 되어버립니다.
  */
+import type { UserRole } from '@luvi/schema';
 import { decodeFields, encode, fsTimestamp, type Firestore } from '../lib/firestore';
 
 const COLLECTION = 'users';
@@ -75,7 +76,49 @@ export async function upsertUser(db: Firestore, input: UpsertUserInput): Promise
 
 /** 운영자 권한. 소유권 검사가 실패한 뒤에만 호출해 읽기를 아낍니다 */
 export async function isAdmin(db: Firestore, uid: string): Promise<boolean> {
+  return (await readRole(db, uid)) === 'admin';
+}
+
+/** 로그인 응답에 실어 보낼 권한. 문서가 없으면 일반 사용자로 봅니다 */
+export async function readRole(db: Firestore, uid: string): Promise<UserRole> {
   const doc = await db.get(userPath(uid));
-  if (!doc) return false;
-  return decodeFields(doc.fields).role === 'admin';
+  if (!doc) return 'user';
+  return decodeFields(doc.fields).role === 'admin' ? 'admin' : 'user';
+}
+
+export interface OwnerProfile {
+  uid: string;
+  displayName: string | null;
+  email: string | null;
+  providers: string[];
+}
+
+/**
+ * 소유자 표시용 프로필 여러 건.
+ *
+ * 운영자 목록에서 "누구 청첩장인지"를 보여주려면 uid 만으로는 부족합니다.
+ * 청첩장 수만큼이 아니라 **서로 다른 소유자 수만큼만** 읽습니다 (같은 사람이 여러 장 가질 수 있음).
+ */
+export async function readOwnerProfiles(
+  db: Firestore,
+  uids: string[],
+): Promise<Map<string, OwnerProfile>> {
+  const unique = [...new Set(uids)];
+  const entries = await Promise.all(
+    unique.map(async (uid) => {
+      const doc = await db.get(userPath(uid));
+      const f = doc ? decodeFields(doc.fields) : {};
+      const providers = Array.isArray(f.providers)
+        ? f.providers.filter((p): p is string => typeof p === 'string')
+        : [];
+      const profile: OwnerProfile = {
+        uid,
+        displayName: typeof f.displayName === 'string' ? f.displayName : null,
+        email: typeof f.email === 'string' ? f.email : null,
+        providers,
+      };
+      return [uid, profile] as const;
+    }),
+  );
+  return new Map(entries);
 }

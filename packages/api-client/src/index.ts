@@ -6,6 +6,7 @@
  * 클라이언트를 만들 때 한 번 넣어두면 안 된다.
  */
 import type {
+  AdminInvitationSummary,
   ApiError,
   ApiResult,
   ClaimBody,
@@ -24,6 +25,7 @@ import type {
   PublishBody,
   PublishResult,
   RankEntry,
+  SessionResult,
   SignUploadBody,
   SignUploadResult,
   SlugAvailability,
@@ -106,6 +108,11 @@ export function createClient(opts: ClientOptions) {
     slugs: {
       check: (slug: string) =>
         get<SlugAvailability>(`/slugs/${encodeURIComponent(slug)}/available`),
+    },
+
+    admin: {
+      /** 모든 계정의 청첩장. 운영자가 아니면 서버가 403(forbidden) 을 돌려준다 */
+      invitations: () => get<AdminInvitationSummary[]>('/admin/invitations'),
     },
 
     guestbook: {
@@ -204,7 +211,7 @@ export function createClient(opts: ClientOptions) {
         displayName: string | null;
         photoURL: string | null;
         provider: string;
-      }) => post<{ uid: string }>('/auth/session', body),
+      }) => post<SessionResult>('/auth/session', body),
     },
 
     contact: {

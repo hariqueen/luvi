@@ -26,6 +26,7 @@ const NewInvitation = lazy(() => import('@/routes/NewInvitation'));
 const Editor = lazy(() => import('@/routes/Editor'));
 const Publish = lazy(() => import('@/routes/Publish'));
 const Guestbook = lazy(() => import('@/routes/Guestbook'));
+const Admin = lazy(() => import('@/routes/Admin'));
 
 export default function App() {
   return (
@@ -58,6 +59,8 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="new" element={<NewInvitation />} />
           <Route path="i/:id/guestbook" element={<Guestbook />} />
+          {/* 운영자 전용. 화면은 누구나 열 수 있고, 목록은 서버가 403 으로 막습니다 */}
+          <Route path="admin" element={<Admin />} />
         </Route>
 
         {/*

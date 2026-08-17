@@ -15,6 +15,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type {
+  AdminInvitationSummary,
   ApiError,
   ClaimPreview,
   CreateInvitationBody,
@@ -25,6 +26,7 @@ import type {
   PublicInvitation,
   PublishResult,
   RankEntry,
+  SessionResult,
   SignUploadResult,
   SlugAvailability,
   SocialAuthBody,
@@ -316,6 +318,46 @@ app.get('/api/invitations', async (c) => {
 
   const invitations = await invitationsRepo.listByOwner(db, uid);
   return c.json(ok<InvitationSummary[]>(invitations.map(invitationsRepo.toSummary)));
+});
+
+/**
+ * 운영자 목록 — 모든 계정의 청첩장.
+ *
+ * 대시보드(`GET /api/invitations`)는 소유자 기준이라 운영자에게도 자기 것만 보입니다.
+ * 남의 청첩장을 대신 손봐주려면 ID 를 알아야 하는데, 그걸 알 방법이 없었습니다.
+ *
+ * `/api/invitations/:id` 보다 **먼저** 선언해야 합니다 — 뒤에 두면 'admin' 이
+ * 청첩장 ID 로 잡혀 404 가 됩니다.
+ */
+app.get('/api/admin/invitations', async (c) => {
+  const uid = requireUid(c);
+  const db = firestore(c.env);
+
+  if (!(await usersRepo.isAdmin(db, uid))) {
+    throw new HttpError({ code: 'forbidden', message: '운영자만 볼 수 있습니다' });
+  }
+
+  const invitations = await invitationsRepo.listAll(db);
+  const owners = await usersRepo.readOwnerProfiles(
+    db,
+    invitations.map((inv) => inv.ownerUid).filter((v): v is string => Boolean(v)),
+  );
+
+  return c.json(
+    ok<AdminInvitationSummary[]>(
+      invitations.map((inv) => {
+        const owner = inv.ownerUid ? owners.get(inv.ownerUid) : undefined;
+        return {
+          ...invitationsRepo.toSummary(inv),
+          ownerUid: inv.ownerUid,
+          ownerName: owner?.displayName ?? null,
+          ownerEmail: owner?.email ?? null,
+          ownerProviders: owner?.providers ?? [],
+          createdAt: inv.createdAt,
+        };
+      }),
+    ),
+  );
 });
 
 app.get('/api/invitations/:id', async (c) => {
@@ -849,7 +891,8 @@ app.post('/api/auth/:provider', async (c) => {
       provider: string;
     }>(c.req);
 
-    await usersRepo.upsertUser(firestore(c.env), {
+    const db = firestore(c.env);
+    await usersRepo.upsertUser(db, {
       uid,
       email: body.email ?? null,
       displayName: body.displayName ?? null,
@@ -857,7 +900,9 @@ app.post('/api/auth/:provider', async (c) => {
       provider: body.provider ?? 'password',
     });
 
-    return c.json(ok({ uid }));
+    // 권한을 함께 돌려줍니다 — 화면이 '운영자' 메뉴를 보여줄지 판단할 근거가 여기 말고 없습니다.
+    // (토큰 클레임으로 내려보내면 커스텀 토큰을 만드는 우리 코드가 권한 부여 지점이 됩니다)
+    return c.json(ok<SessionResult>({ uid, role: await usersRepo.readRole(db, uid) }));
   }
 
   if (provider !== 'kakao' && provider !== 'naver') {

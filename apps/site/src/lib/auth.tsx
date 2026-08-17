@@ -57,6 +57,12 @@ export interface AuthUser {
 export interface AuthContextValue {
   status: AuthStatus;
   user: AuthUser | null;
+  /**
+   * 운영자 여부. `POST /api/auth/session` 응답(= Firestore `users/{uid}.role`)이 유일한 근거입니다.
+   * 로그인 직후 한 박자 늦게 채워지므로, 이 값으로 **화면을 숨기는 용도로만** 씁니다 —
+   * 실제 접근 제어는 서버가 매 요청마다 다시 판단합니다.
+   */
+  isAdmin: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
@@ -80,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     firebaseConfigured() ? 'loading' : 'unconfigured',
   );
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   /** 구독을 두 번 걸지 않기 위한 표시 (StrictMode 는 effect 를 두 번 실행합니다) */
   const subscribed = useRef(false);
@@ -119,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setSessionHint(false);
             syncedUid.current = null;
             setUser(null);
+            setIsAdmin(false);
             setStatus('signed-out');
             return;
           }
@@ -135,14 +143,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setStatus('signed-in');
 
           // 사용자 문서 생성·갱신. 실패해도 로그인을 막지 않습니다 (다음 로그인에 다시 시도됩니다)
+          // 응답에 담긴 role 로 운영자 메뉴 노출을 결정합니다.
           if (syncedUid.current !== next.uid) {
             syncedUid.current = next.uid;
-            void api.auth.session({
-              email: next.email,
-              displayName: next.displayName,
-              photoURL: next.photoURL,
-              provider: next.provider,
-            });
+            void api.auth
+              .session({
+                email: next.email,
+                displayName: next.displayName,
+                photoURL: next.photoURL,
+                provider: next.provider,
+              })
+              .then((res) => {
+                if (res.ok) setIsAdmin(res.data.role === 'admin');
+              });
           }
         });
 
@@ -226,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       user,
+      isAdmin,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
@@ -236,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       status,
       user,
+      isAdmin,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,

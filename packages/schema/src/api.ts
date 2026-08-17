@@ -28,6 +28,17 @@ export interface ApiError {
   fields?: { path: string; message: string }[];
 }
 
+// ─────────────────────────── 계정 · 권한 ───────────────────────────
+
+/** `users/{uid}.role`. 서버의 Firestore 문서만이 근거입니다 (토큰 클레임을 믿지 않습니다) */
+export type UserRole = 'user' | 'admin';
+
+/** POST /api/auth/session — 로그인 직후 사용자 문서를 갱신하고 권한을 알려준다 */
+export interface SessionResult {
+  uid: string;
+  role: UserRole;
+}
+
 // ─────────────────────────── 청첩장 ───────────────────────────
 
 /** GET /api/invitations — 내 청첩장 목록 (대시보드) */
@@ -44,6 +55,23 @@ export interface InvitationSummary {
   /** 발행본과 초안이 다른 항목 수. 0이면 '발행됨', 1 이상이면 '발행됨 · 변경 N건' */
   unpublishedChanges: number;
   updatedAt: string;
+}
+
+/**
+ * GET /api/admin/invitations — 운영자 목록 (모든 계정의 청첩장).
+ *
+ * 대시보드(`InvitationSummary`)와 달리 **소유자가 누구인지**가 핵심 정보입니다.
+ * 운영자는 남의 청첩장을 대신 손봐주는 입장이라, 어느 계정 것인지 모르면
+ * 잘못된 청첩장을 고칠 위험이 있습니다.
+ */
+export interface AdminInvitationSummary extends InvitationSummary {
+  ownerUid: string | null;
+  /** 소유자 표시 이름 — 소셜 로그인은 선택 동의라 없을 수 있습니다 */
+  ownerName: string | null;
+  ownerEmail: string | null;
+  /** 'google.com' | 'kakao' | 'naver' | 'password' … 가입 경로 */
+  ownerProviders: string[];
+  createdAt: string;
 }
 
 /** POST /api/invitations */

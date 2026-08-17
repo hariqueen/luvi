@@ -155,6 +155,22 @@ export async function listByOwner(db: Firestore, uid: string): Promise<StoredInv
     .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
 }
 
+/**
+ * 전체 목록 (운영자 전용).
+ *
+ * `where` 없이 컬렉션을 훑습니다 — 운영자 화면에서만 부르는 경로라 청첩장 수만큼 읽기가
+ * 발생합니다. 대시보드처럼 자주 열리는 화면에서 쓰면 무료 읽기 한도를 태웁니다.
+ */
+export async function listAll(db: Firestore, limit = 200): Promise<StoredInvitation[]> {
+  const docs = await db.query('', {
+    from: [{ collectionId: INVITATIONS }],
+    limit,
+  });
+  return docs
+    .map(toInvitation)
+    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
+}
+
 /** 슬러그 → 청첩장. `slugs/{slug}` 문서 ID 가 슬러그라 조회가 한 번입니다 */
 export async function findBySlug(db: Firestore, slug: string): Promise<StoredInvitation | null> {
   const reservation = await db.get(slugPath(slug));

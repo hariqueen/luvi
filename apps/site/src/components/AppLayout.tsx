@@ -8,6 +8,8 @@ import { useAuth } from '@/lib/auth';
 // 청첩장 수정은 **로그인한 소유자 계정으로만** 가능합니다. 코드로 소유권을 넘겨받는
 // '청첩장 받기(클레임)' 기능은 이 원칙에 어긋나 제거했습니다.
 const TABS = [{ to: '/app', label: '내 청첩장', end: true }] as const;
+/** 운영자에게만 붙는 탭. 숨김은 편의일 뿐이고 실제 차단은 서버가 합니다 */
+const ADMIN_TAB = { to: '/app/admin', label: '전체 청첩장', end: false } as const;
 
 /**
  * 카카오 프로필 이미지는 `http://k.kakaocdn.net/...` 로 오는 경우가 있습니다.
@@ -18,8 +20,9 @@ function secureImageUrl(url: string): string {
 }
 
 export function AppLayout() {
-  const { user, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
+  const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
 
   const onSignOut = () => {
     void (async () => {
@@ -36,11 +39,11 @@ export function AppLayout() {
             Luvi
           </Link>
           <nav className="no-scrollbar flex flex-1 items-center gap-1 overflow-x-auto">
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <NavLink
                 key={t.to}
                 to={t.to}
-                end={'end' in t ? t.end : false}
+                end={t.end}
                 className={({ isActive }) =>
                   `whitespace-nowrap rounded-lg px-3 py-2 text-[12.5px] ${
                     isActive ? 'bg-surface-sunken text-ink' : 'text-muted'
