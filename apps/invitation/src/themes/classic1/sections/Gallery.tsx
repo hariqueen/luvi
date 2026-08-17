@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { invitation } from '@/config/invitation.config';
 import { SectionHeading } from '@/components/common/SectionHeading';
 import { Lightbox } from '@/components/common/Lightbox';
+import { useInvitation } from '@/lib/invitationContext';
 
 export function Gallery() {
-  const { gallery } = invitation;
+  const { gallery } = useInvitation();
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   const [hero, ...rest] = gallery;

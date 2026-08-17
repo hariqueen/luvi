@@ -10,7 +10,7 @@
  * 그래서 버튼은 자기 도메인(`?calendar=1`)을 가리키고,
  * 그 페이지에서 구글 캘린더로 넘기는 방식을 씁니다.
  */
-import { invitation } from '@/config/invitation.config';
+import type { InvitationConfig } from '@/config/invitation.config';
 
 const KST_OFFSET_MIN = 9 * 60;
 
@@ -56,9 +56,9 @@ export function googleCalendarUrl(ev: CalendarEvent): string {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-/** 설정 파일의 예식 정보로 캘린더 일정을 구성합니다 (단일 소스) */
-export function weddingCalendarEvent(): CalendarEvent {
-  const { share, location, weddingAt } = invitation;
+/** 청첩장 설정으로 캘린더 일정을 구성합니다 (단일 소스) */
+export function weddingCalendarEvent(cfg: InvitationConfig): CalendarEvent {
+  const { share, location, weddingAt } = cfg;
   const baseUrl = share.url || window.location.origin + '/';
 
   return {
@@ -75,24 +75,4 @@ export function calendarRedirectUrl(baseUrl: string): string {
   const url = new URL(baseUrl);
   url.searchParams.set(CALENDAR_PARAM, '1');
   return url.href;
-}
-
-/**
- * `?calendar=1`로 접속한 경우 구글 캘린더로 즉시 넘깁니다.
- * 청첩장을 그리기 전에(main.tsx 최상단) 호출하세요.
- *
- * @returns 이동을 시작했으면 true — 호출부는 렌더를 건너뛰면 됩니다.
- */
-export function redirectToCalendarIfRequested(): boolean {
-  if (!new URLSearchParams(window.location.search).has(CALENDAR_PARAM)) return false;
-
-  try {
-    // replace를 쓰면 뒤로 가기 시 이 경유 페이지로 돌아오지 않습니다.
-    window.location.replace(googleCalendarUrl(weddingCalendarEvent()));
-    return true;
-  } catch (e) {
-    // 일정 정보가 잘못돼도 청첩장 자체는 보여야 하므로 렌더를 계속합니다.
-    console.warn('[wed] 캘린더 이동 실패 — 청첩장을 그대로 표시합니다.', e);
-    return false;
-  }
 }

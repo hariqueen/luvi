@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { invitation } from '@/config/invitation.config';
 import { useCopy } from '@/hooks/useCopy';
 import { SectionHeading } from '@/components/common/SectionHeading';
 import { CheckIcon, CopyIcon } from '@/components/common/icons';
+import { useInvitation } from '@/lib/invitationContext';
+import { BASE } from '@/lib/env';
 
-const KAKAOPAY_ICON = '/assets/kakaopay_icon.png';
+const KAKAOPAY_ICON = `${BASE}assets/kakaopay_icon.png`;
 
 export function Account() {
-  const { account } = invitation;
+  const { account } = useInvitation();
   const { copy, isCopied } = useCopy();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 

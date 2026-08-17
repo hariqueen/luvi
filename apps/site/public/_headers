@@ -2,6 +2,10 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# 뷰어(/i/) 번들·폰트·이미지도 동일하게 영구 캐시 (파일명 해시/고정)
+/i/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
 # index.html 은 항상 새로 받아야 새 배포가 즉시 반영된다.
 /index.html
   Cache-Control: no-cache

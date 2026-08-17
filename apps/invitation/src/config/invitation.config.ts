@@ -8,7 +8,7 @@
  *     여러 건을 서비스하려면 발행 스냅샷을 런타임에 받아와야 합니다.
  * ─────────────────────────────────────────────────────────────
  */
-import type { ThemeId } from '@luvi/schema';
+import { defaultCoverLayers, type TextLayer, type ThemeId } from '@luvi/schema';
 
 export interface Person {
   /** 표시 이름 (예: 이호석) */
@@ -74,11 +74,13 @@ export interface InvitationConfig {
   weddingAt: string;
 
   cover: {
-    eyebrow: string;
-    dateLabel: string;
-    venueLabel: string;
-    /** 배경 이미지 */
+    /** 배경 이미지 (절대 URL 또는 루트 경로) */
     image: string;
+    /**
+     * 사진 위에 자유 배치되는 텍스트 레이어. 에디터가 편집한 좌표(비율)를 그대로 렌더합니다.
+     * 에디터(CoverCanvas)와 같은 계산(@luvi/schema 의 layers.ts)을 씁니다.
+     */
+    layers: TextLayer[];
   };
 
   greeting: {
@@ -193,10 +195,12 @@ export const invitation: InvitationConfig = {
   weddingAt: '2026-10-24T13:00:00',
 
   cover: {
-    eyebrow: 'The Wedding of',
-    dateLabel: '2026. 10. 24 SAT · PM 1:00',
-    venueLabel: '포항 더퀸컨벤션 · 6F 갤럭시홀',
     image: '/assets/embedded/img_002.jpg',
+    layers: defaultCoverLayers({
+      eyebrow: 'The Wedding of',
+      names: '호석 · 송희',
+      dateLabel: '2026. 10. 24 SAT · PM 1:00',
+    }),
   },
 
   greeting: {

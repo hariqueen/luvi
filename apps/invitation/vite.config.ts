@@ -1,52 +1,43 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
-import { invitation } from './src/config/invitation.config';
 
 /**
- * <title>·description·og 태그를 invitation.config.ts에서 생성해 <head>에 주입합니다.
+ * 기본 <title>·og 태그를 <head>에 심습니다.
  *
- * index.html에 직접 적으면 카카오 공유(config를 읽음)와 URL 붙여넣기 미리보기(og 태그)가
- * 서로 다른 문구를 보여주게 되므로, 두 경로 모두 config 한 곳만 바라보게 합니다.
+ * 이 뷰어는 이제 **런타임 멀티테넌트**입니다 (슬러그마다 다른 청첩장을 API 로 받습니다).
+ * 그래서 청첩장별 문구를 빌드 시점에 정적으로 넣을 수 없습니다 — 여기서는 브랜드 기본값만 넣고,
+ * 로드 후 실제 제목은 App 이 `document.title` 로 맞춥니다. (URL 붙여넣기 미리보기는 이 기본값을 씁니다.)
+ *
+ * ⚠️ config 를 import 하지 않습니다 — vite.config 로드 시점에 @luvi/schema(.ts)를 끌어와
+ *    Node 가 .ts 를 못 읽는 문제가 생기기 때문입니다.
  */
 function ogTags(): Plugin {
-  const { share } = invitation;
-  const abs = (path: string): string => new URL(path, share.url).href;
-  // 카카오 피드는 줄바꿈을 살리지만 og 미리보기는 한 줄이라 · 로 잇습니다.
-  const description = share.description.split('\n').join(' · ');
-
   const og: Record<string, string> = {
     'og:type': 'website',
-    'og:site_name': share.siteName,
-    'og:url': share.url,
-    'og:title': share.title,
-    'og:description': description,
-    'og:image': abs(share.image),
-    'og:image:width': String(share.imageWidth),
-    'og:image:height': String(share.imageHeight),
+    'og:site_name': 'Luvi',
+    'og:title': '모바일 청첩장',
+    'og:description': '우리의 결혼식에 초대합니다',
   };
 
   return {
     name: 'invitation-og-tags',
     transformIndexHtml: () => [
-      { tag: 'title', children: share.title, injectTo: 'head' },
-      { tag: 'meta', attrs: { name: 'description', content: description }, injectTo: 'head' },
+      { tag: 'title', children: '모바일 청첩장', injectTo: 'head' },
       ...Object.entries(og).map(([property, content]) => ({
         tag: 'meta',
         attrs: { property, content },
         injectTo: 'head' as const,
       })),
-      {
-        tag: 'meta',
-        attrs: { name: 'twitter:card', content: 'summary_large_image' },
-        injectTo: 'head' as const,
-      },
     ],
   };
 }
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // luvi-site(luv-ai.co.kr) 배포의 /i/ 하위에 얹혀 서빙됩니다.
+  // 이 base 가 있어야 번들·에셋 URL 이 /i/assets/… 로 나가 메인 사이트의 /assets 와 충돌하지 않습니다.
+  base: '/i/',
   plugins: [react(), ogTags()],
   // `.env` 는 모노레포 루트에 하나만 둡니다. 없으면 Vite 가 이 앱 폴더만 찾아 값이 조용히 비워집니다
   envDir: fileURLToPath(new URL('../..', import.meta.url)),

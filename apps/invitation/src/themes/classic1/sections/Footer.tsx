@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { invitation } from '@/config/invitation.config';
 import { useCopy } from '@/hooks/useCopy';
 import { calendarRedirectUrl } from '@/lib/calendar';
 import { hasKakao, shareToKakao } from '@/lib/kakao';
+import { useInvitation } from '@/lib/invitationContext';
 
 export function Footer() {
-  const { footer, groom, bride, share } = invitation;
+  const { footer, groom, bride, share } = useInvitation();
   const { copy, isCopied } = useCopy();
   const [sharing, setSharing] = useState(false);
 

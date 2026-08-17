@@ -1,10 +1,10 @@
-import { invitation } from '@/config/invitation.config';
 import { useCopy } from '@/hooks/useCopy';
 import { SectionHeading } from '@/components/common/SectionHeading';
 import { CheckIcon, CopyIcon, PhoneIcon } from '@/components/common/icons';
+import { useInvitation } from '@/lib/invitationContext';
 
 export function Location() {
-  const { location } = invitation;
+  const { location } = useInvitation();
   const { copy, isCopied } = useCopy();
 
   return (

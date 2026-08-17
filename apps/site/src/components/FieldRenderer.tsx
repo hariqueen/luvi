@@ -1,17 +1,29 @@
 /**
- * 필드 타입 → 입력 컨트롤 매핑.
+ * 필드 타입 → 입력 컨트롤 매핑 (+ 값 바인딩).
  *
  * **화면에 필드를 하드코딩하지 않는 것이 이 파일의 존재 이유입니다.**
- * 테마 매니페스트(`FieldDef`)가 폼을 정의하고, 여기서는 타입별 렌더링만 담당합니다.
- * 새 테마를 추가할 때 에디터 화면을 고칠 필요가 없어야 합니다.
+ * 테마 매니페스트(`FieldDef`)가 폼을 정의하고, 여기서는 타입별 렌더링과 값 바인딩만 담당합니다.
  *
- * 현재는 표현(껍데기)만 있고 값 바인딩은 없습니다 — 상태 관리가 붙을 때
- * `value`/`onChange` 를 props 로 받도록 확장하세요.
+ * 두 가지 바인딩 모드:
+ *  · **최상위** — `field.path`(예 'core.greeting.message')로 에디터 doc 을 직접 읽고 씁니다.
+ *  · **제어(하위)** — repeat 항목 안의 칸처럼 doc 경로가 없는 경우, 부모가 `value`/`onChange`를 줍니다.
  */
-import type { FieldDef } from '@luvi/schema';
+import { useRef, useState } from 'react';
+import type { AssetRef, FieldDef } from '@luvi/schema';
+import { assetUrl } from '@/lib/env';
+import { useEditor, type EditorContextValue } from '@/lib/editorContext';
 
 const inputClass =
   'w-full rounded-lg border border-line-strong bg-white px-3.5 py-3 outline-none transition-colors focus:border-gold';
+
+/** 배열 원소를 from→to 로 옮긴 새 배열 */
+function move<T>(arr: T[], from: number, to: number): T[] {
+  if (to < 0 || to >= arr.length) return arr;
+  const next = [...arr];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item as T);
+  return next;
+}
 
 function Label({ field }: { field: FieldDef }) {
   return (
@@ -25,43 +37,350 @@ function Label({ field }: { field: FieldDef }) {
   );
 }
 
-/** 이미지 업로더. 업로드 → **최적화 중** → 완료 단계가 실재합니다 (브라우저에서 WebP 변환). */
-function ImageField({ field, multiple }: { field: FieldDef; multiple?: boolean }) {
+/** datetime-local 은 초를 안 받으므로 'YYYY-MM-DDTHH:mm' 로 자르고, 저장은 초까지 채웁니다 */
+function toLocalInput(iso: unknown): string {
+  return typeof iso === 'string' ? iso.slice(0, 16) : '';
+}
+function fromLocalInput(v: string): string {
+  return v ? (v.length === 16 ? `${v}:00` : v) : '';
+}
+
+interface Binding {
+  value: unknown;
+  set: (v: unknown) => void;
+}
+
+// ───────────────────────── 이미지 (단일) ─────────────────────────
+
+function ImageField({
+  field,
+  bound,
+  editor,
+}: {
+  field: FieldDef;
+  bound: Binding;
+  editor: EditorContextValue;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const asset = (bound.value as AssetRef | null) ?? null;
+
+  const onPick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await editor.uploadImage(field.path, file);
+      bound.set(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '업로드에 실패했습니다');
+    } finally {
+      setBusy(false);
+      if (ref.current) ref.current.value = '';
+    }
+  };
+
   return (
     <div>
       <Label field={field} />
-      <button
-        type="button"
-        className="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong bg-surface py-7 text-center"
-      >
-        <span className="text-[18px]">🖼️</span>
-        <span className="text-[12.5px] text-ink-soft">
-          {multiple ? '사진 여러 장 고르기' : '사진 고르기'}
-        </span>
-        <span className="text-[11px] text-muted-faint">
-          {field.aspect ? `${field.aspect} 권장` : '탭해서 앨범에서 선택'}
-          {field.max ? ` · 최대 ${field.max}장` : ''}
-        </span>
-      </button>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void onPick(e.target.files?.[0])}
+      />
+      {asset ? (
+        <div className="relative overflow-hidden rounded-xl border border-line">
+          <img src={assetUrl(asset.key)} alt="" className="max-h-56 w-full object-cover" />
+          <div className="flex gap-2 border-t border-line bg-surface px-3 py-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => ref.current?.click()}
+              className="rounded-lg border border-line-strong bg-white px-3 py-1.5 text-[12px] disabled:opacity-50"
+            >
+              {busy ? '올리는 중…' : '바꾸기'}
+            </button>
+            <button
+              type="button"
+              onClick={() => bound.set(null)}
+              className="rounded-lg px-3 py-1.5 text-[12px] text-muted"
+            >
+              삭제
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => ref.current?.click()}
+          className="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong bg-surface py-7 text-center disabled:opacity-60"
+        >
+          <span className="text-[18px]">🖼️</span>
+          <span className="text-[12.5px] text-ink-soft">{busy ? '올리는 중…' : '사진 고르기'}</span>
+          <span className="text-[11px] text-muted-faint">
+            {field.aspect ? `${field.aspect} 권장` : '탭해서 앨범에서 선택'}
+          </span>
+        </button>
+      )}
+      {error && <p className="mt-1.5 text-[11.5px] text-gold-deep">{error}</p>}
     </div>
   );
 }
 
-/** 반복 항목 (교통편 등). 모바일에서는 카드 하나씩 세로로 쌓습니다. */
-function RepeatField({ field }: { field: FieldDef }) {
+// ───────────────────────── 이미지 (여러 장 · 갤러리) ─────────────────────────
+
+function ImagesField({
+  field,
+  bound,
+  editor,
+}: {
+  field: FieldDef;
+  bound: Binding;
+  editor: EditorContextValue;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const items = (bound.value as AssetRef[] | undefined) ?? [];
+  const max = field.max ?? 30;
+
+  const onAdd = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    setError(null);
+    const room = Math.max(0, max - items.length);
+    const picked = Array.from(files).slice(0, room);
+    const added: AssetRef[] = [];
+    try {
+      // 순차 업로드 — 한 장이 실패해도 앞서 성공한 것들은 살립니다
+      for (const file of picked) {
+        added.push(await editor.uploadImage(field.path, file));
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '일부 사진을 올리지 못했습니다');
+    } finally {
+      if (added.length) bound.set([...items, ...added]);
+      setBusy(false);
+      if (ref.current) ref.current.value = '';
+    }
+  };
+
+  const removeAt = (i: number) => bound.set(items.filter((_, idx) => idx !== i));
+  const reorder = (from: number, to: number) => bound.set(move(items, from, to));
+
+  return (
+    <div>
+      <Label field={field} />
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => void onAdd(e.target.files)}
+      />
+
+      {items.length > 0 && (
+        <div className="mb-2 grid grid-cols-3 gap-2">
+          {items.map((asset, i) => (
+            <div
+              key={asset.key}
+              draggable
+              onDragStart={() => setDragIndex(i)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => {
+                if (dragIndex !== null && dragIndex !== i) reorder(dragIndex, i);
+                setDragIndex(null);
+              }}
+              className={`group relative aspect-square overflow-hidden rounded-lg border ${
+                i === 0 ? 'border-gold' : 'border-line'
+              } ${dragIndex === i ? 'opacity-40' : ''}`}
+            >
+              <img src={assetUrl(asset.key)} alt="" className="size-full cursor-move object-cover" />
+              {i === 0 && (
+                <span className="absolute left-1 top-1 rounded bg-gold px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                  대표
+                </span>
+              )}
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/45 px-1 py-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  type="button"
+                  onClick={() => reorder(i, i - 1)}
+                  className="px-1 text-[13px] leading-none text-white disabled:opacity-30"
+                  disabled={i === 0}
+                  aria-label="앞으로"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeAt(i)}
+                  className="px-1 text-[11px] leading-none text-white"
+                  aria-label="삭제"
+                >
+                  ✕
+                </button>
+                <button
+                  type="button"
+                  onClick={() => reorder(i, i + 1)}
+                  className="px-1 text-[13px] leading-none text-white disabled:opacity-30"
+                  disabled={i === items.length - 1}
+                  aria-label="뒤로"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        disabled={busy || items.length >= max}
+        onClick={() => ref.current?.click()}
+        className="w-full rounded-lg border border-dashed border-line-strong py-3 text-[12.5px] text-ink-soft disabled:opacity-50"
+      >
+        {busy
+          ? '올리는 중…'
+          : items.length >= max
+            ? `최대 ${max}장까지예요`
+            : `+ 사진 추가 (${items.length}/${max})`}
+      </button>
+      {error && <p className="mt-1.5 text-[11.5px] text-gold-deep">{error}</p>}
+    </div>
+  );
+}
+
+// ───────────────────────── 오디오 ─────────────────────────
+
+function AudioField({
+  field,
+  bound,
+  editor,
+}: {
+  field: FieldDef;
+  bound: Binding;
+  editor: EditorContextValue;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const asset = (bound.value as AssetRef | null) ?? null;
+
+  const onPick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      bound.set(await editor.uploadAudio(file));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '업로드에 실패했습니다');
+    } finally {
+      setBusy(false);
+      if (ref.current) ref.current.value = '';
+    }
+  };
+
+  return (
+    <div>
+      <Label field={field} />
+      <input
+        ref={ref}
+        type="file"
+        accept="audio/mpeg"
+        className="hidden"
+        onChange={(e) => void onPick(e.target.files?.[0])}
+      />
+      <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-3">
+        {asset ? (
+          <audio controls src={assetUrl(asset.key)} className="h-9 min-w-0 flex-1" />
+        ) : (
+          <span className="flex-1 truncate text-[12.5px] text-muted">
+            {busy ? '올리는 중…' : '선택된 음원 없음'}
+          </span>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => ref.current?.click()}
+          className="flex-none text-[12px] text-gold-deep disabled:opacity-50"
+        >
+          {asset ? '바꾸기' : '고르기'}
+        </button>
+        {asset && (
+          <button
+            type="button"
+            onClick={() => bound.set(null)}
+            className="flex-none text-[12px] text-muted"
+          >
+            삭제
+          </button>
+        )}
+      </div>
+      {error && <p className="mt-1.5 text-[11.5px] text-gold-deep">{error}</p>}
+    </div>
+  );
+}
+
+// ───────────────────────── 반복 항목 ─────────────────────────
+
+/** 하위 필드 정의로 빈 항목 하나를 만듭니다 (icon 은 첫 선택지, 반복은 빈 배열) */
+function emptyItem(fields: FieldDef[]): Record<string, unknown> {
+  const item: Record<string, unknown> = {};
+  for (const f of fields) {
+    if (f.type === 'repeat' || f.type === 'repeatGroup') item[f.path] = [];
+    else if (f.type === 'icon') item[f.path] = f.options?.[0]?.value ?? '';
+    else if (f.type === 'toggle') item[f.path] = false;
+    else item[f.path] = '';
+  }
+  return item;
+}
+
+function RepeatField({ field, bound }: { field: FieldDef; bound: Binding }) {
+  const items = (bound.value as Record<string, unknown>[] | undefined) ?? [];
+  const subFields = field.fields ?? [];
+
+  const patchItem = (i: number, key: string, value: unknown) =>
+    bound.set(items.map((it, idx) => (idx === i ? { ...it, [key]: value } : it)));
+  const removeAt = (i: number) => bound.set(items.filter((_, idx) => idx !== i));
+  const reorder = (from: number, to: number) => bound.set(move(items, from, to));
+
   return (
     <div>
       <Label field={field} />
       <div className="flex flex-col gap-2">
-        <div className="rounded-xl border border-line bg-white p-3">
-          <div className="flex flex-col gap-3">
-            {field.fields?.map((sub) => (
-              <FieldRenderer key={sub.path} field={sub} compact />
-            ))}
+        {items.map((item, i) => (
+          <div key={i} className="rounded-xl border border-line bg-white p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-muted-faint">#{i + 1}</span>
+              <div className="flex items-center gap-1 text-[13px] text-muted">
+                <button type="button" disabled={i === 0} onClick={() => reorder(i, i - 1)} className="px-1 disabled:opacity-30" aria-label="위로">↑</button>
+                <button type="button" disabled={i === items.length - 1} onClick={() => reorder(i, i + 1)} className="px-1 disabled:opacity-30" aria-label="아래로">↓</button>
+                <button type="button" onClick={() => removeAt(i)} className="px-1 text-gold-deep" aria-label="삭제">✕</button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              {subFields.map((sub) => (
+                <FieldRenderer
+                  key={sub.path}
+                  field={sub}
+                  compact
+                  value={item[sub.path]}
+                  onChange={(v) => patchItem(i, sub.path, v)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        ))}
         <button
           type="button"
+          onClick={() => bound.set([...items, emptyItem(subFields)])}
           className="rounded-lg border border-dashed border-line-strong py-2.5 text-[12.5px] text-ink-soft"
         >
           + 추가
@@ -71,7 +390,27 @@ function RepeatField({ field }: { field: FieldDef }) {
   );
 }
 
-export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: boolean }) {
+// ───────────────────────── 진입점 ─────────────────────────
+
+export function FieldRenderer({
+  field,
+  compact,
+  value,
+  onChange,
+}: {
+  field: FieldDef;
+  compact?: boolean;
+  /** 제어 모드 값 (repeat 하위 필드). 없으면 field.path 로 doc 을 바인딩합니다 */
+  value?: unknown;
+  onChange?: (value: unknown) => void;
+}) {
+  const editor = useEditor();
+  const bound: Binding = onChange
+    ? { value, set: onChange }
+    : { value: editor.get(field.path), set: (v) => editor.set(field.path, v) };
+
+  const str = typeof bound.value === 'string' ? bound.value : '';
+
   switch (field.type) {
     case 'textarea':
       return (
@@ -80,13 +419,11 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
           <textarea
             rows={field.rows ?? 3}
             maxLength={field.maxLength}
+            value={str}
+            onChange={(e) => bound.set(e.target.value)}
             placeholder={field.label}
             className={`${inputClass} resize-none leading-relaxed`}
           />
-          {/*
-            모바일에서 시트 안 3줄 textarea 는 쓰기 어렵습니다.
-            긴 글은 전체화면 편집 모드로 띄우세요 (docs/05-design-brief.md M3).
-          */}
         </div>
       );
 
@@ -94,8 +431,12 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
       return (
         <div>
           <Label field={field} />
-          {/* 모바일에서는 네이티브 피커가 가장 쓰기 좋다 */}
-          <input type="datetime-local" className={inputClass} />
+          <input
+            type="datetime-local"
+            value={toLocalInput(bound.value)}
+            onChange={(e) => bound.set(fromLocalInput(e.target.value))}
+            className={inputClass}
+          />
         </div>
       );
 
@@ -103,7 +444,13 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
       return (
         <div>
           <Label field={field} />
-          <input type="number" inputMode="numeric" className={inputClass} />
+          <input
+            type="number"
+            inputMode="numeric"
+            value={typeof bound.value === 'number' ? bound.value : ''}
+            onChange={(e) => bound.set(e.target.value === '' ? 0 : Number(e.target.value))}
+            className={inputClass}
+          />
         </div>
       );
 
@@ -111,7 +458,12 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
       return (
         <label className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-3.5 py-3">
           <span className="text-[13px] font-medium">{field.label}</span>
-          <input type="checkbox" className="h-5 w-9 accent-gold" />
+          <input
+            type="checkbox"
+            checked={bound.value === true}
+            onChange={(e) => bound.set(e.target.checked)}
+            className="h-5 w-9 accent-gold"
+          />
         </label>
       );
 
@@ -124,7 +476,10 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
               <button
                 key={o.value}
                 type="button"
-                className="flex-1 rounded-md py-2 text-[12.5px] text-ink-soft"
+                onClick={() => bound.set(o.value)}
+                className={`flex-1 rounded-md py-2 text-[12.5px] ${
+                  bound.value === o.value ? 'bg-white font-semibold text-ink shadow-sm' : 'text-ink-soft'
+                }`}
               >
                 {o.label}
               </button>
@@ -143,7 +498,10 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
                 key={o.value}
                 type="button"
                 title={o.label}
-                className="flex-none rounded-lg border border-line-strong bg-white px-3 py-2 text-[15px]"
+                onClick={() => bound.set(o.value)}
+                className={`flex-none rounded-lg border bg-white px-3 py-2 text-[15px] ${
+                  bound.value === o.value ? 'border-gold ring-1 ring-gold' : 'border-line-strong'
+                }`}
               >
                 {o.value}
               </button>
@@ -153,54 +511,28 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
       );
 
     case 'image':
-      return <ImageField field={field} />;
+      return <ImageField field={field} bound={bound} editor={editor} />;
     case 'images':
-      return <ImageField field={field} multiple />;
-
+      return <ImagesField field={field} bound={bound} editor={editor} />;
     case 'audio':
-      return (
-        <div>
-          <Label field={field} />
-          <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-3">
-            <button type="button" className="text-[15px]" aria-label="미리듣기">
-              ▶
-            </button>
-            <span className="flex-1 truncate text-[12.5px] text-muted">선택된 음원 없음</span>
-            <button type="button" className="text-[12px] text-gold-deep">
-              고르기
-            </button>
-          </div>
-        </div>
-      );
+      return <AudioField field={field} bound={bound} editor={editor} />;
 
     case 'repeat':
     case 'repeatGroup':
-      return <RepeatField field={field} />;
-
-    case 'slug':
-      return (
-        <div>
-          <Label field={field} />
-          {/* 접두어를 입력칸 안에 고정 표시해 "주소가 이렇게 된다"를 즉시 보여준다 */}
-          <div className="flex items-center overflow-hidden rounded-lg border border-line-strong bg-white focus-within:border-gold">
-            <span className="flex-none pl-3.5 text-[12.5px] text-muted-faint">
-              luv-ai.co.kr/i/
-            </span>
-            <input
-              placeholder="our-wedding"
-              spellCheck={false}
-              autoCapitalize="none"
-              className="min-w-0 flex-1 bg-transparent py-3 pl-0.5 pr-3.5 outline-none"
-            />
-          </div>
-        </div>
-      );
+      return <RepeatField field={field} bound={bound} />;
 
     case 'url':
       return (
         <div>
           <Label field={field} />
-          <input type="url" inputMode="url" placeholder="https://" className={inputClass} />
+          <input
+            type="url"
+            inputMode="url"
+            value={str}
+            onChange={(e) => bound.set(e.target.value)}
+            placeholder="https://"
+            className={inputClass}
+          />
         </div>
       );
 
@@ -208,9 +540,19 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
       return (
         <div>
           <Label field={field} />
-          <input type="tel" inputMode="tel" className={inputClass} />
+          <input
+            type="tel"
+            inputMode="tel"
+            value={str}
+            onChange={(e) => bound.set(e.target.value)}
+            className={inputClass}
+          />
         </div>
       );
+
+    case 'slug':
+      // 슬러그는 발행 화면에서만 편집합니다 (문서 필드라 doc 패치 대상이 아님)
+      return null;
 
     case 'text':
     default:
@@ -226,6 +568,8 @@ export function FieldRenderer({ field, compact }: { field: FieldDef; compact?: b
           <input
             type="text"
             maxLength={field.maxLength}
+            value={str}
+            onChange={(e) => bound.set(e.target.value)}
             placeholder={field.label}
             className={inputClass}
           />

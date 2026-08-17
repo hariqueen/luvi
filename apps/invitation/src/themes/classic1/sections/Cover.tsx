@@ -1,20 +1,42 @@
-import { invitation } from '@/config/invitation.config';
+/**
+ * 커버 — 사진 위에 에디터가 배치한 텍스트 레이어를 그대로 렌더합니다.
+ *
+ * 좌표·폰트 크기 계산은 에디터(CoverCanvas)와 **같은 함수**(@luvi/schema 의 layers.ts)를 씁니다.
+ * 한쪽만 바뀌면 편집 화면과 하객 화면의 글자 위치가 어긋나기 때문입니다.
+ */
+import { useEffect, useRef, useState } from 'react';
+import { FONT_STACK, alignTransform, layerToPx } from '@luvi/schema';
+import { useInvitation } from '@/lib/invitationContext';
 
 export function Cover() {
-  const { cover, groom, bride } = invitation;
+  const { cover } = useInvitation();
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <section className="relative flex min-h-[94vh] flex-col items-center justify-center overflow-hidden px-7 py-10 text-center">
+    <section
+      ref={ref}
+      className="relative flex min-h-[94vh] flex-col overflow-hidden"
+      style={{ backgroundColor: '#15110f' }}
+    >
       {/* 배경 사진 */}
-      <div
-        className="absolute inset-0 bg-cover"
-        style={{
-          backgroundImage: `url("${cover.image}")`,
-          backgroundPosition: 'center 28%',
-          backgroundColor: '#15110f',
-        }}
-      />
-      {/* 가독성용 그라디언트 오버레이 */}
+      {cover.image && (
+        <div
+          className="absolute inset-0 bg-cover"
+          style={{ backgroundImage: `url("${cover.image}")`, backgroundPosition: 'center 28%' }}
+        />
+      )}
+      {/* 가독성용 그라디언트 */}
       <div
         className="absolute inset-0"
         style={{
@@ -23,27 +45,32 @@ export function Cover() {
         }}
       />
 
-      <div
-        className="relative z-[2] text-white"
-        style={{ textShadow: '0 2px 16px rgba(0,0,0,.5)' }}
-      >
-        <div className="text-[11px] font-semibold uppercase tracking-[0.36em] opacity-90">
-          {cover.eyebrow}
-        </div>
-        <h1 className="my-6 mb-2 font-cormorant text-[58px] font-medium leading-[1.02] tracking-[0.01em] text-white">
-          {groom.nameEn}
-          <br />
-          <span className="text-[26px] font-normal italic opacity-90">and</span>
-          <br />
-          {bride.nameEn}
-        </h1>
-        <div className="mt-4 font-myeongjo text-base tracking-[0.34em]">
-          {groom.name} · {bride.name}
-        </div>
-        <div className="mx-auto my-[26px] h-px w-[34px] bg-white/70" />
-        <div className="text-[13.5px] tracking-[0.12em] opacity-95">{cover.dateLabel}</div>
-        <div className="mt-1.5 text-xs tracking-[0.04em] opacity-80">{cover.venueLabel}</div>
-      </div>
+      {/* 자유 배치 텍스트 레이어 */}
+      {cover.layers.map((layer) => {
+        const px = layerToPx(layer, size);
+        return (
+          <div
+            key={layer.id}
+            className="absolute whitespace-pre-wrap"
+            style={{
+              left: px.left,
+              top: px.top,
+              transform: alignTransform(layer.align),
+              fontSize: px.fontSize,
+              fontFamily: FONT_STACK[layer.font],
+              fontWeight: layer.weight,
+              lineHeight: layer.lineHeight,
+              letterSpacing: `${layer.letterSpacing}em`,
+              color: layer.color,
+              textAlign: layer.align,
+              textShadow: layer.shadow ? '0 1px 12px rgba(0,0,0,.45)' : 'none',
+              maxWidth: '86%',
+            }}
+          >
+            {layer.text}
+          </div>
+        );
+      })}
 
       <div className="absolute bottom-[22px] left-1/2 z-[2] -translate-x-1/2 animate-floatY text-[10px] tracking-[0.3em] text-white opacity-85">
         SCROLL ↓

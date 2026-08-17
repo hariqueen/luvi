@@ -1,6 +1,6 @@
-import { invitation } from '@/config/invitation.config';
 import { useCountdown } from '@/hooks/useCountdown';
 import { Eyebrow } from '@/components/common/SectionHeading';
+import { useInvitation } from '@/lib/invitationContext';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -40,6 +40,7 @@ function CountBox({ value, label, primary }: { value: number; label: string; pri
 }
 
 export function Calendar() {
+  const invitation = useInvitation();
   const { calendar, weddingAt, groom, bride } = invitation;
   const cd = useCountdown(weddingAt);
 

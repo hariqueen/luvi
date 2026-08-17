@@ -1,7 +1,8 @@
-import { invitation } from '@/config/invitation.config';
 import { Eyebrow } from '@/components/common/SectionHeading';
+import { useInvitation } from '@/lib/invitationContext';
 
 export function Greeting() {
+  const invitation = useInvitation();
   const { greeting, groom, bride } = invitation;
   const parents = [groom, bride];
 

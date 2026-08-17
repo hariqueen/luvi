@@ -6,10 +6,10 @@
  * 여러 테마가 함께 쓰는 것(Petals·MusicToggle·Lightbox 등)만
  * src/components/common/ 에 둡니다.
  */
-import { invitation } from '@/config/invitation.config';
 import { useBgm } from '@/hooks/useBgm';
 import { MusicToggle } from '@/components/common/MusicToggle';
 import { Petals } from '@/components/common/Petals';
+import { useInvitation } from '@/lib/invitationContext';
 import { Cover } from './sections/Cover';
 import { Greeting } from './sections/Greeting';
 import { Calendar } from './sections/Calendar';
@@ -21,6 +21,7 @@ import { Guestbook } from './sections/Guestbook';
 import { Footer } from './sections/Footer';
 
 export default function Classic1Theme() {
+  const invitation = useInvitation();
   const { audioRef, musicOn, toggle } = useBgm();
 
   return (

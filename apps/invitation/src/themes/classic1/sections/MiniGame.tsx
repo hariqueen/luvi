@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { invitation } from '@/config/invitation.config';
 import { CatchGame, type GameResult } from '@/game/catchGame';
 import { useRankings } from '@/hooks/useRankings';
+import { useInvitation } from '@/lib/invitationContext';
 
 type Phase = 'idle' | 'playing' | 'over';
 
@@ -13,7 +13,7 @@ const pushBtn =
   'active:translate-y-1 active:shadow-[0_4px_0_#A65A6E,0_8px_14px_rgba(199,123,139,.4)]';
 
 export function MiniGame() {
-  const { game } = invitation;
+  const { game } = useInvitation();
   const { rows, hasBoard, register, myRank } = useRankings();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);

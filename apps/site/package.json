@@ -6,7 +6,7 @@
   "description": "Luvi 메인 사이트 — 브랜드 · 대시보드 · 에디터",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && npm run build --workspace @luvi/invitation && rm -rf dist/i && cp -r ../invitation/dist dist/i",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx"
@@ -16,11 +16,13 @@
     "@luvi/schema": "*",
     "@luvi/ui": "*",
     "firebase": "^10.12.5",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

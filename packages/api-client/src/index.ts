@@ -93,7 +93,11 @@ export function createClient(opts: ClientOptions) {
       /** 자동저장 — 초안만 갱신. 하객 화면은 발행할 때까지 그대로다 */
       updateDraft: (id: string, body: UpdateDraftBody) =>
         patch<{ updatedAt: string }>(`/invitations/${id}`, body),
-      diff: (id: string) => get<DraftDiff>(`/invitations/${id}/diff`),
+      /** 발행 화면에서 새 슬러그를 고르는 중이면 그 슬러그로 필수 검사를 미리 돌려본다 */
+      diff: (id: string, slug?: string) =>
+        get<DraftDiff>(
+          `/invitations/${id}/diff${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`,
+        ),
       publish: (id: string, body: PublishBody) =>
         post<PublishResult>(`/invitations/${id}/publish`, body),
       remove: (id: string) => del<{ id: string }>(`/invitations/${id}`),
