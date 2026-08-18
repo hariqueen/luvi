@@ -6,9 +6,8 @@
  * 여러 테마가 함께 쓰는 것(Petals·MusicToggle·Lightbox 등)만
  * src/components/common/ 에 둡니다.
  */
-import type { MouseEvent, ReactNode } from 'react';
-import type { SectionKey } from '@luvi/schema';
 import { useBgm } from '@/hooks/useBgm';
+import { IS_PREVIEW, Slot, notifySectionClick } from '@/components/common/PreviewSlot';
 import { MusicToggle } from '@/components/common/MusicToggle';
 import { Petals } from '@/components/common/Petals';
 import { useInvitation } from '@/lib/invitationContext';
@@ -21,33 +20,6 @@ import { Location } from './sections/Location';
 import { Account } from './sections/Account';
 import { Guestbook } from './sections/Guestbook';
 import { Footer } from './sections/Footer';
-
-/**
- * 에디터 미리보기(iframe, ?preview=1)일 때만 각 섹션을 클릭 대상으로 감쌉니다.
- * 클릭하면 부모(에디터)에게 어떤 섹션인지 알려 해당 편집을 열게 합니다.
- * 하객 화면에는 이 래퍼가 붙지 않으므로 레이아웃/동작에 영향이 없습니다.
- */
-const IS_PREVIEW =
-  typeof window !== 'undefined' &&
-  new URLSearchParams(window.location.search).has('preview');
-
-function Slot({ section, children }: { section: SectionKey; children: ReactNode }) {
-  if (!IS_PREVIEW) return <>{children}</>;
-  return (
-    <div
-      data-preview-section={section}
-      className="relative cursor-pointer outline-offset-[-2px] transition-[outline-color] hover:outline hover:outline-2 hover:outline-gold"
-    >
-      {children}
-    </div>
-  );
-}
-
-function notifySectionClick(e: MouseEvent) {
-  const el = (e.target as HTMLElement).closest('[data-preview-section]');
-  const key = el?.getAttribute('data-preview-section');
-  if (key) window.parent?.postMessage({ __luviSectionClick: key }, window.location.origin);
-}
 
 export default function Classic1Theme() {
   const invitation = useInvitation();

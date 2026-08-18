@@ -36,6 +36,7 @@ import type {
   SocialAuthResult,
   UpdateDraftBody,
 } from '@luvi/schema';
+import { parseThemeId } from '@luvi/schema';
 
 import { createCustomToken } from './lib/customToken';
 import { resolveSocialProfile } from './lib/social';
@@ -450,7 +451,8 @@ app.post('/api/invitations', async (c) => {
   const db = firestore(c.env);
   const body = await readJson<CreateInvitationBody>(c.req);
 
-  const themeId = body.themeId === 'classic2' ? 'classic2' : 'classic1';
+  // 모르는 디자인 이름은 기본 디자인으로 떨어집니다 (카탈로그가 판정합니다)
+  const themeId = parseThemeId(body.themeId);
 
   // 빈 폼이 아니라 샘플로 채운 초안을 줍니다 — 완성된 화면을 먼저 보여주는 쪽이 이탈이 훨씬 적습니다
   const invitation = await invitationsRepo.createInvitation(db, {

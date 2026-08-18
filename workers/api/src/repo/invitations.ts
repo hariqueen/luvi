@@ -13,7 +13,7 @@ import type {
   SectionKey,
   ThemeId,
 } from '@luvi/schema';
-import { DEFAULT_SECTIONS, SCHEMA_VERSION } from '@luvi/schema';
+import { DEFAULT_SECTIONS, SCHEMA_VERSION, parseThemeId } from '@luvi/schema';
 import {
   encode,
   encodeFields,
@@ -111,7 +111,7 @@ export function toInvitation(doc: FsDocument): StoredInvitation {
   return {
     id: doc.id,
     ownerUid: typeof f.ownerUid === 'string' ? f.ownerUid : null,
-    themeId: (f.themeId === 'classic2' ? 'classic2' : 'classic1') as ThemeId,
+    themeId: parseThemeId(f.themeId),
     schemaVersion: typeof f.schemaVersion === 'number' ? f.schemaVersion : SCHEMA_VERSION,
     status: (['draft', 'published', 'archived'] as const).includes(f.status as InvitationStatus)
       ? (f.status as InvitationStatus)

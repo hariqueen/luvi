@@ -23,6 +23,24 @@ export default {
           soft: '#857569', // 원본 --ink2
         },
         line: '#ece1d7',
+
+        /**
+         * classic2(세이지 가든) 전용 팔레트.
+         *
+         * classic1 의 색(rose·cream…)과 **섞지 않습니다** — 한 이름을 두 디자인이 나눠 쓰면
+         * 한쪽 색을 고치는 순간 다른 청첩장의 화면이 함께 바뀝니다.
+         * 값 출처: 저장소 밖 `classic2/index.html` 의 CSS 변수.
+         */
+        c2: {
+          ivory: '#FCFAF6',
+          cream: '#F2EDE3',
+          sage: '#8E9C84',
+          'sage-deep': '#5E6B54',
+          gold: '#B49A63',
+          ink: '#3E3A33',
+          'ink-soft': '#8A8175',
+          line: '#E7E0D3',
+        },
       },
       fontFamily: {
         sans: [
@@ -37,6 +55,8 @@ export default {
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
         cormorant: ['Cormorant Garamond', 'serif'],
         myeongjo: ['Nanum Myeongjo', 'serif'],
+        // classic2 의 장식 영문. 웹폰트는 상시 로드하지 않고 테마가 ensureFonts(['pinyon']) 로 붙입니다
+        pinyon: ['Pinyon Script', 'cursive'],
       },
       borderRadius: {
         none: '0',
