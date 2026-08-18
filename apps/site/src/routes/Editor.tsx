@@ -33,6 +33,7 @@ import {
 } from '@luvi/schema';
 import { api } from '@/lib/api';
 import { assetUrl, env } from '@/lib/env';
+import { logEvent } from '@/lib/log';
 import { setPath } from '@/lib/paths';
 import { uploadAudio, uploadImageForPath } from '@/lib/upload';
 import { EditorProvider, type EditorContextValue } from '@/lib/editorContext';
@@ -176,6 +177,13 @@ export default function Editor() {
     if (feats) body.features = feats;
 
     const res = await api.invitations.updateDraft(id, body);
+    logEvent({
+      kind: res.ok ? 'click' : 'error',
+      name: 'draft_save',
+      ok: res.ok,
+      invitationId: id,
+      detail: res.ok ? `${Object.keys(patch).length}개 항목` : `${res.error.code} ${res.error.message}`,
+    });
     if (res.ok) {
       setDirty(false);
       setSaveStatus('saved');

@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Luvi REST API 클라이언트",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./events": "./src/events.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

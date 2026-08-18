@@ -16,6 +16,19 @@ FIREBASE_PROJECT_ID = "wedding-f328e"
 binding = "LUVI_KV"
 id = "7a0086f850444b0b99ea23e24200c795"
 
+# D1 — 사용자 이벤트 로그(누가 무엇을 눌러 무엇이 실패했나). 스키마는 migrations/0001_events.sql.
+# 보관 14일, 초과분은 아래 [triggers] 의 Cron 이 매일 지웁니다.
+# 코드에서 이 바인딩은 **선택**입니다 (Env.LUVI_LOGS?) — D1 이 죽어도 청첩장은 그대로 열립니다.
+[[d1_databases]]
+binding = "LUVI_LOGS"
+database_name = "luvi-logs"
+database_id = "b2329e44-d329-4dbf-afc8-47dac0c93a63"
+
+# 이벤트 로그 정리 — 매일 03:17 UTC (한국 12:17). 정확한 시각은 중요하지 않아 정시를 피했습니다
+# (정시는 전 세계 Cron 이 몰립니다).
+[triggers]
+crons = ["17 3 * * *"]
+
 # R2 — 업로드된 이미지·오디오 (egress 무료). 2026-08-17 R2 활성화 + 버킷 생성 완료로 바인딩 켬.
 [[r2_buckets]]
 binding = "LUVI_ASSETS"

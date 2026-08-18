@@ -17,6 +17,9 @@ import { cors } from 'hono/cors';
 import type {
   AdminInvitationSummary,
   ApiError,
+  EventLogBody,
+  EventLogItem,
+  EventLogRow,
   ClaimPreview,
   CreateInvitationBody,
   DraftDiff,
@@ -38,6 +41,7 @@ import { createCustomToken } from './lib/customToken';
 import { resolveSocialProfile } from './lib/social';
 import { verifyIdToken } from './lib/idToken';
 import { Firestore, fsTimestamp, isPreconditionFailure } from './lib/firestore';
+import * as eventsRepo from './repo/events';
 import { computeDiff } from './lib/diff';
 import { PatchError, prepareDraftPatch } from './lib/patch';
 import {
@@ -65,6 +69,11 @@ import { sampleContent } from './sample';
 export interface Env {
   /** 발행 스냅샷 · 호스트/슬러그 매핑 */
   LUVI_KV: KVNamespace;
+  /**
+   * 이벤트 로그 (D1). **없어도 서비스는 정상 동작합니다** — 로그만 조용히 버려집니다.
+   * 바인딩을 필수로 만들면 D1 장애가 청첩장 장애가 됩니다.
+   */
+  LUVI_LOGS?: D1Database;
   /** 업로드된 이미지·오디오 */
   LUVI_ASSETS: R2Bucket;
   /** 에셋 서빙 베이스 */
@@ -311,6 +320,76 @@ app.get('/health', (c) =>
 );
 
 // ─────────────────────────── 청첩장 ───────────────────────────
+
+/**
+ * 클라이언트 이벤트 로그. **비로그인 하객도 보냅니다.**
+ *
+ * 카카오 공유·음원 재생처럼 서버를 거치지 않는 동작은 실패해도 서버 로그에 안 남습니다.
+ * 그래서 화면이 알려주게 합니다. 다만 이 경로는 인증이 없으므로 다음을 지킵니다:
+ *
+ *  · 배치 최대 20건, 필드 길이 제한 — 로그로 D1 를 채우는 장난을 막습니다
+ *  · 시각·IP·UA 는 **서버가** 채웁니다 (클라이언트 값을 믿지 않습니다)
+ *  · 실패해도 항상 200 — 로그 실패가 화면 동작을 방해하면 안 됩니다
+ */
+app.post('/api/events', async (c) => {
+  const body = await readJson<EventLogBody>(c.req).catch(() => ({ events: [] }));
+  const items = Array.isArray(body?.events) ? body.events.slice(0, eventsRepo.MAX_BATCH) : [];
+  if (items.length === 0) return c.json(ok({ stored: 0 }));
+
+  const at = new Date().toISOString();
+  const ua = (c.req.header('User-Agent') ?? '').slice(0, 200);
+  const ipHash = await hashIp(c.env.APP_SECRET, clientIp(c)).catch(() => null);
+  const uid = c.get('uid');
+
+  const kind = (v: unknown): string =>
+    v === 'click' || v === 'error' || v === 'view' ? v : 'click';
+  const str = (v: unknown, max: number): string | null =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
+
+  const rows = items
+    .filter((e): e is EventLogItem => Boolean(e) && typeof e.name === 'string')
+    .map((e) => ({
+      at,
+      kind: kind(e.kind),
+      name: String(e.name).slice(0, 60),
+      ok: e.ok === true ? 1 : e.ok === false ? 0 : null,
+      detail: str(e.detail, 500),
+      invitationId: str(e.invitationId, 60),
+      slug: str(e.slug, 60),
+      session: str(e.session, 40),
+      uid,
+      path: str(e.path, 200),
+      ua,
+      ipHash,
+    }));
+
+  const stored = await eventsRepo.insertEvents(c.env.LUVI_LOGS, rows);
+  return c.json(ok({ stored }));
+});
+
+/** 운영자 로그 조회. 보관은 14일이고 그 뒤는 Cron 이 지웁니다 */
+app.get('/api/admin/events', async (c) => {
+  const uid = requireUid(c);
+  const db = firestore(c.env);
+  if (!(await usersRepo.isAdmin(db, uid))) {
+    throw new HttpError({ code: 'forbidden', message: '운영자만 볼 수 있습니다' });
+  }
+
+  const limitRaw = Number(c.req.query('limit') ?? '200');
+  const rows = await eventsRepo.listEvents(c.env.LUVI_LOGS, {
+    limit: Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 500) : 200,
+    name: c.req.query('name') || undefined,
+    slug: c.req.query('slug') || undefined,
+    failedOnly: c.req.query('failed') === '1',
+  });
+
+  // IP 해시는 내려보내지 않습니다 — 화면에서 쓸 데가 없고, 없는 게 안전합니다
+  return c.json(
+    ok<EventLogRow[]>(
+      rows.map(({ ipHash: _ipHash, ...rest }) => rest),
+    ),
+  );
+});
 
 app.get('/api/invitations', async (c) => {
   const uid = requireUid(c);
@@ -1072,4 +1151,14 @@ app.get('/api/public/host/:hostname', async (c) => {
   return c.json(ok({ slug }));
 });
 
-export default app;
+/**
+ * 매일 03:17 UTC (한국 12:17) — 보관 기간(14일)이 지난 이벤트 로그를 지웁니다.
+ *
+ * 로그를 영구 보관하면 언젠가 개인정보 문제가 되고 용량도 계속 늡니다. 지우는 일을
+ * 사람 손에 맡기면 안 지워집니다 — Cron 이 하게 둡니다. (`wrangler.toml` 의 [triggers])
+ */
+async function scheduled(_event: ScheduledController, env: Env): Promise<void> {
+  await eventsRepo.purgeOld(env.LUVI_LOGS);
+}
+
+export default { fetch: app.fetch, scheduled };

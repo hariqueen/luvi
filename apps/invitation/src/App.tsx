@@ -16,6 +16,7 @@ import { InvitationProvider } from '@/lib/invitationContext';
 import { adaptInvitation } from '@/lib/adapter';
 import { googleCalendarUrl, weddingCalendarEvent } from '@/lib/calendar';
 import { BASE, env } from '@/lib/env';
+import { logEvent, setLogContext } from '@/lib/log';
 
 /** 현재 경로에서 슬러그를 뽑습니다 ('/i/our-wedding' → 'our-wedding') */
 function slugFromPath(): string {
@@ -62,10 +63,25 @@ export default function App() {
           | { ok: true; data: PublicInvitation }
           | { ok: false; error: { message: string } };
         if (!alive) return;
-        if (res.ok && json.ok) setLoad({ state: 'ready', pub: json.data });
-        else setLoad({ state: 'error', message: json.ok ? '불러오기 실패' : json.error.message });
-      } catch {
+        if (res.ok && json.ok) {
+          setLoad({ state: 'ready', pub: json.data });
+          setLogContext({ invitationId: json.data.invitationId, slug: json.data.slug });
+          // 하객이 열었다는 사실 — "몇 명이 봤나" 와 "언제부터 안 열리나" 를 알 수 있는 유일한 기록
+          logEvent({ kind: 'view', name: 'invitation_open', ok: true, slug: json.data.slug });
+        } else {
+          const message = json.ok ? '불러오기 실패' : json.error.message;
+          setLoad({ state: 'error', message });
+          logEvent({ kind: 'error', name: 'invitation_open', ok: false, detail: `${res.status} ${message}`, slug });
+        }
+      } catch (e) {
         if (alive) setLoad({ state: 'error', message: '청첩장을 불러오지 못했습니다.' });
+        logEvent({
+          kind: 'error',
+          name: 'invitation_open',
+          ok: false,
+          detail: e instanceof Error ? e.message : 'network',
+          slug,
+        });
       }
     })();
     return () => {

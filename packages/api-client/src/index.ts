@@ -18,6 +18,7 @@ import type {
   CreateInvitationBody,
   CreateRankBody,
   DraftDiff,
+  EventLogRow,
   GuestbookEntry,
   Invitation,
   InvitationSummary,
@@ -113,6 +114,16 @@ export function createClient(opts: ClientOptions) {
     admin: {
       /** 모든 계정의 청첩장. 운영자가 아니면 서버가 403(forbidden) 을 돌려준다 */
       invitations: () => get<AdminInvitationSummary[]>('/admin/invitations'),
+      /** 이벤트 로그 (보관 14일). failedOnly 로 '막힌 것만' 좁혀 본다 */
+      events: (q: { limit?: number; name?: string; slug?: string; failedOnly?: boolean } = {}) => {
+        const p = new URLSearchParams();
+        if (q.limit) p.set('limit', String(q.limit));
+        if (q.name) p.set('name', q.name);
+        if (q.slug) p.set('slug', q.slug);
+        if (q.failedOnly) p.set('failed', '1');
+        const qs = p.toString();
+        return get<EventLogRow[]>(`/admin/events${qs ? `?${qs}` : ''}`);
+      },
     },
 
     guestbook: {
@@ -227,3 +238,5 @@ export function createClient(opts: ClientOptions) {
 }
 
 export type LuviClient = ReturnType<typeof createClient>;
+
+export { createEventLogger, type EventLogger, type EventLoggerOptions } from './events';

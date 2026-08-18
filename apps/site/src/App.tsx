@@ -27,6 +27,7 @@ const Editor = lazy(() => import('@/routes/Editor'));
 const Publish = lazy(() => import('@/routes/Publish'));
 const Guestbook = lazy(() => import('@/routes/Guestbook'));
 const Admin = lazy(() => import('@/routes/Admin'));
+const AdminLogs = lazy(() => import('@/routes/AdminLogs'));
 
 export default function App() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="i/:id/guestbook" element={<Guestbook />} />
           {/* 운영자 전용. 화면은 누구나 열 수 있고, 목록은 서버가 403 으로 막습니다 */}
           <Route path="admin" element={<Admin />} />
+          <Route path="admin/logs" element={<AdminLogs />} />
         </Route>
 
         {/*

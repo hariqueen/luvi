@@ -9,6 +9,7 @@ import {
   shareToKakaoNow,
 } from '@/lib/kakao';
 import { useInvitation } from '@/lib/invitationContext';
+import { logEvent } from '@/lib/log';
 
 export function Footer() {
   const { footer, groom, bride, share } = useInvitation();
@@ -43,6 +44,12 @@ export function Footer() {
     // 준비돼 있으면 await 없이 곧바로 — 이 경로만 팝업 차단을 피합니다
     if (kakaoReady()) {
       const result = shareToKakaoNow(payload);
+      logEvent({
+        kind: 'click',
+        name: 'kakao_share',
+        ok: result.ok,
+        detail: result.ok ? 'ready' : `${result.reason ?? 'unknown'} ${result.message ?? ''}`.trim(),
+      });
       if (result.ok) return;
       copy(shareUrl, 'link');
       setShareNote('카카오톡 공유가 막혀서 링크를 복사했어요. 붙여넣어 보내주세요.');
@@ -53,6 +60,13 @@ export function Footer() {
     setSharing(true);
     const result = await shareToKakao(payload);
     setSharing(false);
+    logEvent({
+      kind: 'click',
+      name: 'kakao_share',
+      ok: result.ok,
+      // 'after_await' 면 성공으로 보고됐지만 팝업이 막혔을 수 있습니다 — 구분해서 남깁니다
+      detail: `${result.reason ?? 'unknown'} ${result.message ?? ''}`.trim(),
+    });
     if (!result.ok) {
       copy(shareUrl, 'link');
       setShareNote('카카오톡 공유가 막혀서 링크를 복사했어요. 붙여넣어 보내주세요.');
@@ -92,7 +106,10 @@ export function Footer() {
             </button>
           )}
           <button
-            onClick={() => copy(shareUrl, 'link')}
+            onClick={() => {
+              copy(shareUrl, 'link');
+              logEvent({ kind: 'click', name: 'copy_link', ok: true });
+            }}
             className="cursor-pointer rounded-full border border-white/60 bg-white/10 px-6 py-[11px] text-[13px] font-semibold text-white backdrop-blur-[4px]"
           >
             🔗 {isCopied('link') ? '링크 복사됨!' : '청첩장 링크 복사'}

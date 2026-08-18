@@ -39,6 +39,49 @@ export interface SessionResult {
   role: UserRole;
 }
 
+// ─────────────────────────── 이벤트 로그 ───────────────────────────
+
+/**
+ * POST /api/events — 클라이언트에서 일어난 일을 남깁니다 (비로그인 하객도 보냅니다).
+ *
+ * 카카오 공유처럼 **서버를 거치지 않는 동작**은 실패해도 서버 로그에 흔적이 없습니다.
+ * 문의가 들어왔을 때 "무엇을 눌렀고 어디서 막혔는지" 를 알려면 클라이언트가 알려줘야 합니다.
+ *
+ * 개인정보는 넣지 않습니다 — 이름·이메일·전화번호 금지. `session` 은 탭 단위 난수입니다.
+ */
+export interface EventLogItem {
+  kind: 'click' | 'error' | 'view';
+  /** 지점 이름. 'kakao_share' · 'draft_save' · 'publish' 처럼 고정 문자열을 씁니다 */
+  name: string;
+  /** 성공 여부. 해당 없으면 생략 */
+  ok?: boolean | null;
+  /** 실패 사유·에러 메시지 (서버가 500자로 자릅니다) */
+  detail?: string | null;
+  invitationId?: string | null;
+  slug?: string | null;
+  session?: string | null;
+  path?: string | null;
+}
+
+export interface EventLogBody {
+  events: EventLogItem[];
+}
+
+/** GET /api/admin/events — 운영자 로그 조회 (IP 해시는 내려보내지 않습니다) */
+export interface EventLogRow {
+  at: string;
+  kind: string;
+  name: string;
+  ok: number | null;
+  detail: string | null;
+  invitationId: string | null;
+  slug: string | null;
+  session: string | null;
+  uid: string | null;
+  path: string | null;
+  ua: string | null;
+}
+
 // ─────────────────────────── 청첩장 ───────────────────────────
 
 /** GET /api/invitations — 내 청첩장 목록 (대시보드) */

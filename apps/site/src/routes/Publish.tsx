@@ -14,6 +14,7 @@ import { Link, useParams } from 'react-router-dom';
 import { toDataURL } from 'qrcode';
 import type { DraftDiff, Invitation, PublishResult, SlugAvailability } from '@luvi/schema';
 import { api } from '@/lib/api';
+import { logEvent } from '@/lib/log';
 import { assetUrl, env } from '@/lib/env';
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
@@ -127,6 +128,14 @@ export default function Publish() {
     setPublishError(null);
     const res = await api.invitations.publish(id, { slug });
     setPublishing(false);
+    logEvent({
+      kind: res.ok ? 'click' : 'error',
+      name: 'publish',
+      ok: res.ok,
+      invitationId: id,
+      slug,
+      detail: res.ok ? null : `${res.error.code} ${res.error.message}`,
+    });
     if (res.ok) {
       setResult(res.data);
       try {
