@@ -31,6 +31,40 @@ export function Footer() {
   // 자기 도메인을 경유해 넘어가도록 합니다.
   const calendarUrl = calendarRedirectUrl(shareUrl);
 
+  /**
+   * OS 공유 시트 (Web Share API).
+   *
+   * 카카오 공유는 **앱 키에 등록된 도메인에서만** 동작합니다 — 주소가 바뀌면 콘솔에 등록하기
+   * 전까지 하객은 공유를 못 씁니다(Error 4019). OS 공유 시트는 그 제약이 없고 목록에
+   * 카카오톡이 그대로 나오므로, 막혔을 때 여기로 떨어뜨립니다.
+   *
+   * 반환값 true = 사용자에게 공유 수단을 건넸다(취소 포함). false = 이 기기에서 불가능.
+   */
+  const shareViaOs = async (): Promise<boolean> => {
+    if (typeof navigator === 'undefined' || !navigator.share) return false;
+    try {
+      await navigator.share({ title: share.title, text: share.description, url: shareUrl });
+      logEvent({ kind: 'click', name: 'os_share', ok: true });
+      return true;
+    } catch (e) {
+      // 사용자가 시트를 닫은 것도 여기로 옵니다 — 그건 실패가 아니라 취소입니다
+      const cancelled = e instanceof Error && e.name === 'AbortError';
+      logEvent({
+        kind: 'click',
+        name: 'os_share',
+        ok: cancelled,
+        detail: cancelled ? 'cancelled' : e instanceof Error ? e.message : String(e),
+      });
+      return cancelled;
+    }
+  };
+
+  /** 마지막 수단 — 링크를 복사하고 그 사실을 알립니다 */
+  const fallbackToCopy = () => {
+    copy(shareUrl, 'link');
+    setShareNote('카카오톡 공유가 막혀서 링크를 복사했어요. 붙여넣어 보내주세요.');
+  };
+
   const handleKakaoShare = async () => {
     const payload = {
       title: share.title,
@@ -51,8 +85,8 @@ export function Footer() {
         detail: result.ok ? 'ready' : `${result.reason ?? 'unknown'} ${result.message ?? ''}`.trim(),
       });
       if (result.ok) return;
-      copy(shareUrl, 'link');
-      setShareNote('카카오톡 공유가 막혀서 링크를 복사했어요. 붙여넣어 보내주세요.');
+      // 카카오가 거절했으면(도메인 미등록 등) OS 공유 시트 → 그것도 없으면 링크 복사
+      if (!(await shareViaOs())) fallbackToCopy();
       return;
     }
 
@@ -67,10 +101,7 @@ export function Footer() {
       // 'after_await' 면 성공으로 보고됐지만 팝업이 막혔을 수 있습니다 — 구분해서 남깁니다
       detail: `${result.reason ?? 'unknown'} ${result.message ?? ''}`.trim(),
     });
-    if (!result.ok) {
-      copy(shareUrl, 'link');
-      setShareNote('카카오톡 공유가 막혀서 링크를 복사했어요. 붙여넣어 보내주세요.');
-    }
+    if (!result.ok && !(await shareViaOs())) fallbackToCopy();
   };
 
   return (
