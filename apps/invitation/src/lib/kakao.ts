@@ -6,6 +6,12 @@
  *
  * 주의: 카카오 정책상 이 API로 보낸 메시지에만 버튼이 붙습니다.
  * 하객이 URL만 복사해 붙여넣으면 index.html의 og 태그 미리보기로 표시됩니다.
+ *
+ * 🔴 **`sendDefault` 는 클릭 핸들러와 같은 실행 흐름에서 불러야 합니다.** 공유창은 팝업(웹)
+ * 또는 앱 전환(모바일)이라, 중간에 `await` 가 끼면 브라우저가 사용자 제스처를 잃었다고 보고
+ * 막습니다 — 특히 iOS 사파리에서 **첫 클릭이 항상 실패**했습니다(SDK 86KB 를 그 자리에서
+ * 내려받았기 때문). 그래서 SDK 는 화면이 뜰 때 `preloadKakao()` 로 미리 받아두고,
+ * 클릭 시점에는 `shareToKakaoNow()` 로 **동기 호출**합니다.
  */
 
 const SDK_VERSION = '2.8.1';
@@ -44,6 +50,18 @@ declare global {
 
 /** 카카오 공유 사용 가능 여부 (JS 키 설정 여부) */
 export const hasKakao = (): boolean => Boolean(jsKey);
+
+/** SDK 가 준비됐는지 — 준비됐을 때만 클릭 흐름에서 바로 공유할 수 있습니다 */
+export const kakaoReady = (): boolean => Boolean(window.Kakao?.isInitialized());
+
+/**
+ * SDK 를 미리 받아둡니다. 화면이 뜰 때 한 번 부르세요.
+ * 실패해도 조용히 넘어갑니다 — 공유 버튼은 폴백(링크 복사)이 있습니다.
+ */
+export function preloadKakao(): void {
+  if (!jsKey) return;
+  void loadSdk();
+}
 
 let loading: Promise<KakaoSdk | null> | null = null;
 
@@ -101,14 +119,15 @@ export interface KakaoSharePayload {
   calendarUrl: string;
 }
 
-/**
- * 피드 템플릿으로 카카오톡 공유창을 엽니다.
- * 성공 여부를 반환하며, false면 호출부에서 링크 복사 등으로 폴백하세요.
- */
-export async function shareToKakao(payload: KakaoSharePayload): Promise<boolean> {
-  const sdk = await loadSdk();
-  if (!sdk) return false;
+/** 실패 이유를 호출부가 로그로 남길 수 있게 함께 돌려줍니다 */
+export interface KakaoShareResult {
+  ok: boolean;
+  /** 'no_key' | 'sdk_load_failed' | 'send_failed' | 'blocked_after_await' */
+  reason?: string;
+  message?: string;
+}
 
+function send(sdk: KakaoSdk, payload: KakaoSharePayload): KakaoShareResult {
   const link: KakaoLink = { mobileWebUrl: payload.url, webUrl: payload.url };
   const calendarLink: KakaoLink = {
     mobileWebUrl: payload.calendarUrl,
@@ -129,9 +148,34 @@ export async function shareToKakao(payload: KakaoSharePayload): Promise<boolean>
         { title: '일정 등록', link: calendarLink },
       ],
     });
-    return true;
+    return { ok: true };
   } catch (e) {
+    // 미등록 도메인이면 여기서 KOE006 / 4019 로 떨어집니다 (카카오 콘솔의 웹 도메인 2곳 확인)
     console.warn('[wed] 카카오 공유 실패', e);
-    return false;
+    return { ok: false, reason: 'send_failed', message: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * 공유창을 **await 없이** 엽니다. `kakaoReady()` 가 true 일 때만 성공합니다.
+ * 클릭 핸들러에서 이 경로를 우선 쓰세요 — 팝업 차단을 피하는 유일한 방법입니다.
+ */
+export function shareToKakaoNow(payload: KakaoSharePayload): KakaoShareResult {
+  const sdk = window.Kakao;
+  if (!sdk?.isInitialized()) return { ok: false, reason: 'not_ready' };
+  return send(sdk, payload);
+}
+
+/**
+ * SDK 를 기다렸다가 공유합니다 (미리 로드가 아직 안 끝난 경우의 차선책).
+ * 기다리는 사이 사용자 제스처가 끊겨 브라우저가 팝업을 막을 수 있습니다.
+ */
+export async function shareToKakao(payload: KakaoSharePayload): Promise<KakaoShareResult> {
+  if (!jsKey) return { ok: false, reason: 'no_key' };
+  const sdk = await loadSdk();
+  if (!sdk) return { ok: false, reason: 'sdk_load_failed' };
+  const result = send(sdk, payload);
+  if (!result.ok) return result;
+  // 성공으로 보고됐지만 제스처가 끊겨 창이 안 뜰 수 있습니다 — 호출부가 구분할 수 있게 알려줍니다
+  return { ok: true, reason: 'after_await' };
 }

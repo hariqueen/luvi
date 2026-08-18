@@ -1,13 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCopy } from '@/hooks/useCopy';
 import { calendarRedirectUrl } from '@/lib/calendar';
-import { hasKakao, shareToKakao } from '@/lib/kakao';
+import {
+  hasKakao,
+  kakaoReady,
+  preloadKakao,
+  shareToKakao,
+  shareToKakaoNow,
+} from '@/lib/kakao';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Footer() {
   const { footer, groom, bride, share } = useInvitation();
   const { copy, isCopied } = useCopy();
   const [sharing, setSharing] = useState(false);
+  /** 공유가 막혔을 때 하객에게 무슨 일이 났는지 알려줍니다 (조용히 링크만 복사되면 고장으로 보입니다) */
+  const [shareNote, setShareNote] = useState<string | null>(null);
+
+  // SDK 를 미리 받아둡니다 — 클릭한 뒤 받으면 그 사이 사용자 제스처가 끊겨
+  // 브라우저가 공유창(팝업·앱 전환)을 막습니다 (iOS 사파리에서 첫 클릭이 항상 실패했습니다)
+  useEffect(() => {
+    if (hasKakao()) preloadKakao();
+  }, []);
 
   const shareUrl = share.url || window.location.href;
   const imageUrl = new URL(share.image, shareUrl).href;
@@ -17,17 +31,32 @@ export function Footer() {
   const calendarUrl = calendarRedirectUrl(shareUrl);
 
   const handleKakaoShare = async () => {
-    setSharing(true);
-    const ok = await shareToKakao({
+    const payload = {
       title: share.title,
       description: share.description,
       imageUrl,
       url: shareUrl,
       calendarUrl,
-    });
+    };
+    setShareNote(null);
+
+    // 준비돼 있으면 await 없이 곧바로 — 이 경로만 팝업 차단을 피합니다
+    if (kakaoReady()) {
+      const result = shareToKakaoNow(payload);
+      if (result.ok) return;
+      copy(shareUrl, 'link');
+      setShareNote('카카오톡 공유가 막혀서 링크를 복사했어요. 붙여넣어 보내주세요.');
+      return;
+    }
+
+    // 아직 로딩 중이면 기다렸다 시도합니다 (차단될 수 있어 폴백을 함께 안내)
+    setSharing(true);
+    const result = await shareToKakao(payload);
     setSharing(false);
-    // 공유창이 열리지 않으면 최소한 링크는 건네줄 수 있게 폴백
-    if (!ok) copy(shareUrl, 'link');
+    if (!result.ok) {
+      copy(shareUrl, 'link');
+      setShareNote('카카오톡 공유가 막혀서 링크를 복사했어요. 붙여넣어 보내주세요.');
+    }
   };
 
   return (
@@ -69,6 +98,10 @@ export function Footer() {
             🔗 {isCopied('link') ? '링크 복사됨!' : '청첩장 링크 복사'}
           </button>
         </div>
+
+        {shareNote && (
+          <p className="mt-3 text-[12px] leading-relaxed text-white/90">{shareNote}</p>
+        )}
       </div>
     </section>
   );
