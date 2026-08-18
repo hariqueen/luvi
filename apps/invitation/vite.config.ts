@@ -53,6 +53,10 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    // 🔴 사이트와 같은 이유로 해시를 hex 로 고정합니다 — base64url 해시가 `-` 로 시작하면
+    //    `index--xxxx.js` 가 되고 Cloudflare Pages 가 그 파일을 서빙하지 못합니다
+    //    (200 으로 index.html 이 와서 화면이 빈다). 자세한 배경은 apps/site/vite.config.ts.
+    rollupOptions: { output: { hashCharacters: 'hex' } },
     // 폰트/이미지 등 public/ 자산은 그대로 복사됩니다.
     //
     // 예전에는 Firebase 를 별도 청크로 뺐습니다. 이제 방명록·랭킹을 워커 REST API 로
