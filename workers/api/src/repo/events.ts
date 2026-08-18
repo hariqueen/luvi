@@ -62,63 +62,6 @@ export async function insertEvents(db: D1Database | undefined, rows: EventRow[])
   }
 }
 
-export interface ListEventsQuery {
-  limit: number;
-  /** 지점 이름으로 좁히기 (예: 'kakao_share') */
-  name?: string;
-  /** 실패만 보기 */
-  failedOnly?: boolean;
-  slug?: string;
-}
-
-export async function listEvents(
-  db: D1Database | undefined,
-  q: ListEventsQuery,
-): Promise<EventRow[]> {
-  if (!db) return [];
-  const where: string[] = [];
-  const binds: unknown[] = [];
-  if (q.name) {
-    where.push('name = ?');
-    binds.push(q.name);
-  }
-  if (q.slug) {
-    where.push('slug = ?');
-    binds.push(q.slug);
-  }
-  if (q.failedOnly) where.push('ok = 0');
-
-  const sql = `SELECT at, kind, name, ok, detail, invitation_id, slug, session, uid, path, ua, ip_hash
-    FROM events
-    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-    ORDER BY at DESC, id DESC
-    LIMIT ?`;
-
-  try {
-    const res = await db
-      .prepare(sql)
-      .bind(...binds, q.limit)
-      .all<Record<string, unknown>>();
-    return (res.results ?? []).map((r) => ({
-      at: String(r.at ?? ''),
-      kind: String(r.kind ?? ''),
-      name: String(r.name ?? ''),
-      ok: r.ok === null || r.ok === undefined ? null : Number(r.ok),
-      detail: r.detail === null || r.detail === undefined ? null : String(r.detail),
-      invitationId: r.invitation_id ? String(r.invitation_id) : null,
-      slug: r.slug ? String(r.slug) : null,
-      session: r.session ? String(r.session) : null,
-      uid: r.uid ? String(r.uid) : null,
-      path: r.path ? String(r.path) : null,
-      ua: r.ua ? String(r.ua) : null,
-      ipHash: r.ip_hash ? String(r.ip_hash) : null,
-    }));
-  } catch (e) {
-    console.error('[api] 이벤트 로그 조회 실패', e);
-    return [];
-  }
-}
-
 /** 보관 기간이 지난 로그를 지웁니다. Cron 이 매일 부릅니다 */
 export async function purgeOld(db: D1Database | undefined, days = RETENTION_DAYS): Promise<number> {
   if (!db) return 0;

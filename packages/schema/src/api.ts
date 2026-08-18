@@ -67,21 +67,6 @@ export interface EventLogBody {
   events: EventLogItem[];
 }
 
-/** GET /api/admin/events — 운영자 로그 조회 (IP 해시는 내려보내지 않습니다) */
-export interface EventLogRow {
-  at: string;
-  kind: string;
-  name: string;
-  ok: number | null;
-  detail: string | null;
-  invitationId: string | null;
-  slug: string | null;
-  session: string | null;
-  uid: string | null;
-  path: string | null;
-  ua: string | null;
-}
-
 // ─────────────────────────── 청첩장 ───────────────────────────
 
 /** GET /api/invitations — 내 청첩장 목록 (대시보드) */

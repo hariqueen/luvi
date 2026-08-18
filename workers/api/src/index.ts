@@ -19,7 +19,6 @@ import type {
   ApiError,
   EventLogBody,
   EventLogItem,
-  EventLogRow,
   ClaimPreview,
   CreateInvitationBody,
   DraftDiff,
@@ -366,30 +365,6 @@ app.post('/api/events', async (c) => {
 
   const stored = await eventsRepo.insertEvents(c.env.LUVI_LOGS, rows);
   return c.json(ok({ stored }));
-});
-
-/** 운영자 로그 조회. 보관은 14일이고 그 뒤는 Cron 이 지웁니다 */
-app.get('/api/admin/events', async (c) => {
-  const uid = requireUid(c);
-  const db = firestore(c.env);
-  if (!(await usersRepo.isAdmin(db, uid))) {
-    throw new HttpError({ code: 'forbidden', message: '운영자만 볼 수 있습니다' });
-  }
-
-  const limitRaw = Number(c.req.query('limit') ?? '200');
-  const rows = await eventsRepo.listEvents(c.env.LUVI_LOGS, {
-    limit: Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 500) : 200,
-    name: c.req.query('name') || undefined,
-    slug: c.req.query('slug') || undefined,
-    failedOnly: c.req.query('failed') === '1',
-  });
-
-  // IP 해시는 내려보내지 않습니다 — 화면에서 쓸 데가 없고, 없는 게 안전합니다
-  return c.json(
-    ok<EventLogRow[]>(
-      rows.map(({ ipHash: _ipHash, ...rest }) => rest),
-    ),
-  );
 });
 
 app.get('/api/invitations', async (c) => {
