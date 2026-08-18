@@ -8,12 +8,12 @@ import {
   FONT_CATEGORY_LABEL,
   FONT_GROUPS,
   FONTS,
-  LAYER_COLORS,
   LAYER_SIZE_RANGE,
   type LayerAlign,
   type LayerFont,
   type TextLayer,
 } from '@luvi/schema';
+import { ColorControl } from './ColorControl';
 
 const ALIGNS: { value: LayerAlign; label: string }[] = [
   { value: 'left', label: '⇤' },
@@ -79,21 +79,8 @@ export function LayerToolbar({ layer, onChange, onEditText, onRemove }: Props) {
         ))}
       </div>
 
-      {/* 색 */}
-      <div className="flex flex-none items-center gap-1 rounded-lg bg-surface-sunken px-1.5 py-1">
-        {LAYER_COLORS.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            aria-label={c.label}
-            onClick={() => onChange({ color: c.value })}
-            className={`h-5 w-5 rounded-full border ${
-              layer.color === c.value ? 'border-gold ring-2 ring-gold/40' : 'border-line-strong'
-            }`}
-            style={{ background: c.value }}
-          />
-        ))}
-      </div>
+      {/* 색 — 추천 색 · 스포이드(색상표) · HEX 입력. `ColorControl` 참고 */}
+      <ColorControl value={layer.color} onChange={(color) => onChange({ color })} />
 
       {/* 크기 — 비율(0~1)이라 사용자에게는 백분율로 보여준다 */}
       <label className="flex flex-none items-center gap-1.5 rounded-lg bg-surface-sunken px-2.5 py-1.5">

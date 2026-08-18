@@ -51,13 +51,40 @@ export function alignTransform(align: LayerAlign): string {
 
 /* 글꼴 목록(FONTS)·스택·라벨·로더는 `fonts.ts` 로 옮겼습니다 — 글꼴을 늘리려면 그쪽을 보세요 */
 
-/** 사진 위에서 안전한 색만 제공합니다 — 아무 색이나 열어두면 안 보이는 조합이 나옵니다 */
+/**
+ * 사진 위에서 실패가 적은 **추천** 색입니다. 전부는 아닙니다 —
+ * 색은 스포이드(색상표)와 HEX 입력으로 자유롭게 고를 수 있고, 이 목록은
+ * "무슨 색을 골라야 하나" 를 고민하지 않게 하는 바로가기입니다.
+ */
 export const LAYER_COLORS = [
   { value: '#FFFFFF', label: '흰색' },
   { value: '#1A1917', label: '검정' },
   { value: '#C9A063', label: '골드' },
   { value: '#F7F3EC', label: '아이보리' },
 ] as const;
+
+/**
+ * 사용자가 입력한 색 문자열을 `#RRGGBB` 로 정규화합니다. 못 읽으면 `null`.
+ *
+ * 손으로 치는 값이라 형태가 제각각입니다 — `055AAF`, `#055aaf`, `#0af`, 앞뒤 공백.
+ * 저장 형태를 하나로 맞춰 두어야 프리셋 선택 상태(`layer.color === c.value`)와
+ * `<input type="color">`(소문자 `#rrggbb` 만 받습니다) 가 어긋나지 않습니다.
+ */
+export function normalizeHexColor(input: string): string | null {
+  const raw = input.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{3}$/.test(raw)) {
+    // #0af → #00AAFF (CSS 축약형과 같은 규칙으로 각 자리를 두 번 씁니다)
+    const [r, g, b] = raw.split('');
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(raw)) return `#${raw.toUpperCase()}`;
+  return null;
+}
+
+/** `<input type="color">` 에 넘길 값. 읽을 수 없는 색이면 흰색으로 시작합니다 */
+export function toColorInputValue(color: string): string {
+  return (normalizeHexColor(color) ?? '#FFFFFF').toLowerCase();
+}
 
 export const LAYER_SIZE_RANGE = { min: 0.035, max: 0.16 } as const;
 

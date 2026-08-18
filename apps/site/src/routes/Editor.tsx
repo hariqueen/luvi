@@ -18,7 +18,6 @@ import {
   FONT_CATEGORY_LABEL,
   FONT_GROUPS,
   FONTS,
-  LAYER_COLORS,
   LAYER_SIZE_RANGE,
   createTextLayer,
   type AssetRef,
@@ -38,6 +37,7 @@ import { setPath } from '@/lib/paths';
 import { uploadAudio, uploadImageForPath } from '@/lib/upload';
 import { EditorProvider, type EditorContextValue } from '@/lib/editorContext';
 import { BottomSheet, type SheetSnap } from '@/components/BottomSheet';
+import { ColorControl } from '@/components/ColorControl';
 import { CoverCanvas } from '@/components/CoverCanvas';
 import { FieldRenderer } from '@/components/FieldRenderer';
 import { LayerToolbar } from '@/components/LayerToolbar';
@@ -503,22 +503,10 @@ export default function Editor() {
                     </optgroup>
                   ))}
                 </select>
-                <div className="flex items-center gap-1 rounded-lg bg-surface-sunken px-1.5 py-1">
-                  {LAYER_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      aria-label={c.label}
-                      onClick={() => patchLayer(layer.id, { color: c.value })}
-                      className={`h-5 w-5 rounded-full border ${
-                        layer.color === c.value
-                          ? 'border-gold ring-2 ring-gold/40'
-                          : 'border-line-strong'
-                      }`}
-                      style={{ background: c.value }}
-                    />
-                  ))}
-                </div>
+                <ColorControl
+                  value={layer.color}
+                  onChange={(color) => patchLayer(layer.id, { color })}
+                />
                 <label className="flex items-center gap-1.5 rounded-lg bg-surface-sunken px-2.5 py-1.5">
                   <span className="text-[11px] text-muted">크기</span>
                   <input
