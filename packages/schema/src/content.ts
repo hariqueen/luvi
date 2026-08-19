@@ -18,6 +18,27 @@ export interface AssetRef {
 }
 
 /**
+ * 낙하 연출로 떨어지는 것 하나 — **이모지 아이콘이거나 올린 사진**입니다.
+ *
+ * 둘을 한 배열에 섞어 담습니다. "아이콘만 / 사진만 / 둘 다" 를 각각 다른 필드로 두면
+ * 조합마다 규칙이 갈려 화면과 설정이 어긋납니다 — 실제로 예전에는 사진이 없을 때 뷰어가
+ * 몰래 🐾 를 섞어서, 에디터에는 1개인데 화면에는 2종류가 떨어졌습니다.
+ */
+export type PetalItem =
+  | { kind: 'emoji'; value: string }
+  | { kind: 'image'; asset: AssetRef };
+
+/** 낙하 요소로 고를 수 있는 최대 개수 (아이콘·사진 합쳐서) */
+export const PETAL_ITEM_MAX = 3;
+
+/**
+ * 낙하 아이콘 프리셋. 업로드 없이 바로 쓸 수 있어야 해서 이모지로 둡니다
+ * (어느 기기에서나 뜨고, 용량이 0 이고, 배경 투명 걱정이 없습니다).
+ * 늘리려면 여기에 추가하면 에디터의 아이콘 칩이 자동으로 늘어납니다.
+ */
+export const PETAL_EMOJIS = ['🌸', '🌺', '🍃', '🍀', '❤️', '✨', '⭐', '🎈', '🕊️', '🐾'] as const;
+
+/**
  * 커버 텍스트의 글꼴 선택지. 실제 정의(라벨·CSS·웹폰트 주소)는 `fonts.ts` 의 `FONTS` 입니다.
  *
  * 🔴 `sans` · `serif` · `script` 는 **이름을 바꾸거나 다른 글꼴에 재사용하면 안 됩니다.**
@@ -202,7 +223,18 @@ export interface CoreContent {
    */
   effects: {
     petals: {
-      /** 떨어질 이미지. 비우면 인사말 말풍선 아이콘을 씁니다 */
+      /**
+       * 떨어질 것들 — 이모지 아이콘과 올린 사진을 **섞어서** 최대 `PETAL_ITEM_MAX` 개.
+       *
+       * 비워두면 인사말 말풍선 아이콘이 떨어집니다 (지금까지의 동작).
+       */
+      items: PetalItem[];
+      /**
+       * @deprecated `items` 이전의 단일 이미지 필드.
+       *
+       * ⚠️ **지우지 마세요.** 이미 발행된 스냅샷이 이 필드만 들고 있습니다.
+       *    읽는 쪽(`normalizePetalItems`)이 `items` 가 비었을 때 이 값을 items 로 올립니다.
+       */
       image: AssetRef | null;
       /** 동시에 떨어지는 개수 (0~30). 0 이면 아무것도 안 떨어집니다 */
       count: number;
@@ -330,3 +362,32 @@ export const SCHEMA_VERSION = 1;
  * **워커와 뷰어가 같은 값을 써야 하므로 여기서만 정의합니다.**
  */
 export const DEFAULT_PETAL_COUNT = 9;
+
+/**
+ * 낙하 요소 정규화 — **읽는 쪽은 반드시 이걸 통과시켜 쓰세요.**
+ *
+ * 스냅샷은 세 시대가 섞여 있습니다:
+ *   1. `effects` 자체가 없던 시절      → 인사말 말풍선 아이콘이 떨어지고 있었습니다
+ *   2. `effects.petals.image` 시절     → 그 이미지 한 종류
+ *   3. 지금(`effects.petals.items`)    → 아이콘·사진 섞어서 최대 3개
+ *
+ * 어느 시대의 문서를 읽어도 "지금 화면에 떨어지던 것" 이 유지되도록 한곳에서 결정합니다.
+ * 반환이 빈 배열이면 뷰어가 자기 번들 기본 이미지를 씁니다.
+ */
+export function normalizePetalItems(
+  petals: Partial<CoreContent['effects']['petals']> | null | undefined,
+  fallbackImage: AssetRef | null | undefined,
+): PetalItem[] {
+  const raw = Array.isArray(petals?.items) ? petals.items : [];
+  const items = raw.filter((it): it is PetalItem => {
+    if (!it || typeof it !== 'object') return false;
+    if (it.kind === 'emoji') return typeof it.value === 'string' && it.value.length > 0;
+    if (it.kind === 'image') return Boolean(it.asset?.key);
+    return false;
+  });
+  if (items.length > 0) return items.slice(0, PETAL_ITEM_MAX);
+
+  // 옛 문서 — 단일 이미지 → 인사말 말풍선 아이콘 순으로 물려받습니다
+  const legacy = petals?.image ?? fallbackImage ?? null;
+  return legacy ? [{ kind: 'image', asset: legacy }] : [];
+}

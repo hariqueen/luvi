@@ -9,7 +9,8 @@
  *  · **제어(하위)** — repeat 항목 안의 칸처럼 doc 경로가 없는 경우, 부모가 `value`/`onChange`를 줍니다.
  */
 import { useRef, useState } from 'react';
-import type { AssetRef, FieldDef } from '@luvi/schema';
+import type { AssetRef, FieldDef, PetalItem } from '@luvi/schema';
+import { PETAL_EMOJIS, PETAL_ITEM_MAX } from '@luvi/schema';
 import { assetUrl } from '@/lib/env';
 import { useEditor, type EditorContextValue } from '@/lib/editorContext';
 
@@ -358,6 +359,182 @@ function AudioField({
 // ───────────────────────── 반복 항목 ─────────────────────────
 
 /** 하위 필드 정의로 빈 항목 하나를 만듭니다 (icon 은 첫 선택지, 반복은 빈 배열) */
+// ─────────── 낙하 요소 (아이콘·사진을 섞어서 최대 3개) ───────────
+
+/**
+ * '떨어지는 것' 컨트롤.
+ *
+ * 아이콘과 사진을 **한 컨트롤에서** 고릅니다. 필드를 둘로 나누면 "아이콘 2개 + 사진 2개" 처럼
+ * 합계 제한을 두 곳에서 지켜야 하고, 사용자는 무엇이 떨어질지 두 칸을 합쳐 상상해야 합니다.
+ * 고른 것을 한 줄에 그대로 보여주는 편이 화면에 떨어질 것과 1:1 로 맞습니다.
+ */
+function PetalItemsField({
+  field,
+  bound,
+  editor,
+}: {
+  field: FieldDef;
+  bound: Binding;
+  editor: EditorContextValue;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const items = (bound.value as PetalItem[] | undefined) ?? [];
+  const max = field.max ?? PETAL_ITEM_MAX;
+  const full = items.length >= max;
+
+  /**
+   * 하나도 안 골랐을 때 **실제로 떨어지는** 것.
+   *
+   * 🔴 순서를 뷰어(`normalizePetalItems`)와 똑같이 맞춥니다 —
+   *    옛 단일 이미지(`…petals.image`) → 인사말 말풍선 아이콘.
+   *    여기가 어긋나면 "에디터엔 A 라는데 화면엔 B 가 떨어지는" 문제가 다시 생깁니다.
+   *    (옛 문서는 사진을 올려둔 채 `items` 가 비어 있습니다)
+   */
+  const legacyImage =
+    items.length === 0
+      ? ((editor.get(field.path.replace(/\.items$/, '.image')) as AssetRef | null) ?? null)
+      : null;
+  const inherited =
+    items.length === 0 && !legacyImage && field.inheritFrom
+      ? ((editor.get(field.inheritFrom) as AssetRef | null) ?? null)
+      : null;
+  const fallback = legacyImage ?? inherited;
+  const fallbackLabel = legacyImage ? '전에 올린 사진' : (field.inheritLabel ?? '기본 이미지');
+
+  const hasEmoji = (value: string) => items.some((it) => it.kind === 'emoji' && it.value === value);
+
+  const toggleEmoji = (value: string) => {
+    if (hasEmoji(value)) {
+      bound.set(items.filter((it) => !(it.kind === 'emoji' && it.value === value)));
+    } else if (!full) {
+      bound.set([...items, { kind: 'emoji', value }]);
+    }
+  };
+
+  const onAddPhotos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    setError(null);
+    // 남은 자리만큼만 받습니다 — 넘치게 올려두고 조용히 버리면 왜 안 들어갔는지 알 수 없습니다
+    const picked = Array.from(files).slice(0, Math.max(0, max - items.length));
+    const added: PetalItem[] = [];
+    try {
+      for (const file of picked) {
+        added.push({ kind: 'image', asset: await editor.uploadImage(field.path, file) });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '사진을 올리지 못했습니다');
+    } finally {
+      if (added.length) bound.set([...items, ...added]);
+      setBusy(false);
+      if (ref.current) ref.current.value = '';
+    }
+  };
+
+  const removeAt = (i: number) => bound.set(items.filter((_, idx) => idx !== i));
+
+  return (
+    <div>
+      <Label field={field} />
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => void onAddPhotos(e.target.files)}
+      />
+
+      <div className="rounded-xl border border-line bg-surface p-3">
+        {/* ── 고른 것 ── */}
+        <div className="mb-2.5 flex items-center justify-between">
+          <span className="text-[12px] font-semibold text-ink-soft">떨어질 것</span>
+          <span className={`text-[11.5px] ${full ? 'text-gold-deep' : 'text-muted'}`}>
+            {items.length} / {max}
+          </span>
+        </div>
+
+        {items.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {items.map((it, i) => (
+              <div
+                key={it.kind === 'emoji' ? `e-${it.value}` : `i-${it.asset.key}`}
+                className="relative size-14 overflow-hidden rounded-lg border border-line-strong bg-white"
+              >
+                {it.kind === 'emoji' ? (
+                  <span className="flex size-full items-center justify-center text-[26px] leading-none">
+                    {it.value}
+                  </span>
+                ) : (
+                  <img src={assetUrl(it.asset.key)} alt="" className="size-full object-cover" />
+                )}
+                <button
+                  type="button"
+                  aria-label="빼기"
+                  onClick={() => removeAt(i)}
+                  className="absolute right-0 top-0 flex size-5 items-center justify-center bg-black/50 text-[11px] leading-none text-white"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-lg bg-cream px-3 py-2 text-[11.5px] leading-[1.6] text-gold-deep">
+            아직 고른 것이 없어요 — 지금은 <b className="font-semibold">{fallbackLabel}</b> 그림이
+            그대로 떨어집니다. 아래에서 아이콘이나 사진을 고르면 그것만 떨어져요.
+          </p>
+        )}
+
+        {fallback && (
+          <img
+            src={assetUrl(fallback.key)}
+            alt=""
+            className="mt-2 size-14 rounded-lg border border-dashed border-line-strong bg-white object-cover"
+          />
+        )}
+
+        {/* ── 아이콘 고르기 ── */}
+        <p className="mb-1.5 mt-3.5 text-[12px] font-semibold text-ink-soft">아이콘</p>
+        <div className="flex flex-wrap gap-1.5">
+          {PETAL_EMOJIS.map((emoji) => {
+            const on = hasEmoji(emoji);
+            return (
+              <button
+                key={emoji}
+                type="button"
+                // 이미 다 골랐으면 '빼기'만 되게 둡니다 — 눌렀는데 아무 일도 없으면 고장으로 읽힙니다
+                disabled={!on && full}
+                onClick={() => toggleEmoji(emoji)}
+                className={`flex size-10 items-center justify-center rounded-lg border bg-white text-[19px] leading-none transition-colors ${
+                  on ? 'border-gold ring-1 ring-gold' : 'border-line-strong'
+                } disabled:opacity-35`}
+              >
+                {emoji}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── 사진 올리기 ── */}
+        <p className="mb-1.5 mt-3.5 text-[12px] font-semibold text-ink-soft">내 사진</p>
+        <button
+          type="button"
+          disabled={busy || full}
+          onClick={() => ref.current?.click()}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong bg-white py-3 text-[12.5px] text-ink-soft disabled:opacity-50"
+        >
+          <span>🖼️</span>
+          {busy ? '올리는 중…' : full ? `최대 ${max}개까지예요` : '사진 추가'}
+        </button>
+        {error && <p className="mt-1.5 text-[11.5px] text-gold-deep">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 function emptyItem(fields: FieldDef[]): Record<string, unknown> {
   const item: Record<string, unknown> = {};
   for (const f of fields) {
@@ -575,6 +752,9 @@ export function FieldRenderer({
           </div>
         </div>
       );
+
+    case 'petals':
+      return <PetalItemsField field={field} bound={bound} editor={editor} />;
 
     case 'image':
       return <ImageField field={field} bound={bound} editor={editor} />;

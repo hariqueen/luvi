@@ -8,6 +8,8 @@
  * 필드 타입은 디자인 산출물의 분기(f.isText / f.isArea / f.isRepeat …)와 1:1로 맞췄습니다.
  */
 
+import { PETAL_ITEM_MAX } from './content';
+
 export type FieldType =
   /** 한 줄 텍스트 */
   | 'text'
@@ -31,6 +33,8 @@ export type FieldType =
   | 'audio'
   /** 아이콘 선택 */
   | 'icon'
+  /** 낙하 요소 — 이모지 아이콘 칩 + 사진 업로드를 한 컨트롤에서 (최대 `PETAL_ITEM_MAX` 개) */
+  | 'petals'
   /** 반복 항목 (교통편 등) */
   | 'repeat'
   /** 중첩 반복 (계좌 그룹 → 계좌 N개) */
@@ -241,10 +245,11 @@ export const CORE_SECTIONS: SectionDef[] = [
     fields: [
       { path: 'core.bgm', type: 'audio', label: '배경음악', hint: '하객이 처음 화면을 누를 때 재생됩니다' },
       {
-        path: 'core.effects.petals.image',
-        type: 'image',
-        label: '떨어지는 이미지',
-        hint: '원하는 그림을 올리면 그게 떨어집니다 (꽃잎·반려견·하트 등). 배경이 투명한 PNG를 권합니다',
+        path: 'core.effects.petals.items',
+        type: 'petals',
+        label: '떨어지는 것',
+        hint: '아이콘과 사진을 섞어 최대 3개까지 고를 수 있어요. 사진은 배경이 투명한 PNG를 권합니다',
+        max: PETAL_ITEM_MAX,
         inheritFrom: 'core.greeting.bubbleImage',
         inheritLabel: '인사말 말풍선 아이콘',
       },

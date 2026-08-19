@@ -51,11 +51,7 @@ export default function Classic2Theme() {
 
       <MusicToggle musicOn={musicOn} onToggle={toggle} tone="light" />
       {invitation.showPetals && (
-        <Petals
-          image={invitation.petals.image}
-          count={invitation.petals.count}
-          custom={invitation.petals.custom}
-        />
+        <Petals items={invitation.petals.items} count={invitation.petals.count} />
       )}
 
       <Slot section="cover"><Cover /></Slot>

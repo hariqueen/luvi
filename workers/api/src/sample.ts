@@ -45,7 +45,7 @@ export function emptyContent(): ContentDoc {
       account: { description: '', groups: [] },
       footer: { image: null },
       bgm: null,
-      effects: { petals: { image: null, count: DEFAULT_PETAL_COUNT } },
+      effects: { petals: { items: [], image: null, count: DEFAULT_PETAL_COUNT } },
       share: { title: '', description: '', image: null, durationMinutes: 120 },
     },
     theme: {},
@@ -130,7 +130,7 @@ export function sampleContent(): ContentDoc {
       },
       footer: { image: null },
       bgm: null,
-      effects: { petals: { image: null, count: DEFAULT_PETAL_COUNT } },
+      effects: { petals: { items: [], image: null, count: DEFAULT_PETAL_COUNT } },
       share: {
         title: '호석 ♥ 송희 결혼합니다',
         description: '2026. 10. 24 SAT · PM 1:00\n포항 더퀸컨벤션 6F 갤럭시홀',

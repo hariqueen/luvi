@@ -9,6 +9,7 @@
  * 리렌더됩니다). 그래서 황금비 소수부로 겹치지 않게 퍼뜨립니다.
  */
 import { useMemo, type CSSProperties } from 'react';
+import type { PetalRenderItem } from '@/config/invitation.config';
 
 const GOLDEN = 0.618033988749895;
 /** 황금비 소수부 — i 가 커져도 값이 고르게 퍼지고, 같은 i 면 항상 같은 값 */
@@ -35,28 +36,28 @@ const DRIFT_PX = 46;
 const ROTATE_MARGIN = 0.4;
 
 interface PetalsProps {
-  /** 떨어질 이미지 URL */
-  image: string;
+  /**
+   * 떨어질 것들 (아이콘·이미지 섞어서 1~3종). 순서대로 돌려가며 배치합니다.
+   *
+   * 🔴 **여기 담긴 것만 떨어집니다.** 예전에는 "기본 이미지일 때만 🐾 를 섞는다" 는 규칙이
+   *    뷰어 안에 숨어 있어서, 에디터에서 1개를 골랐는데 화면에는 2종류가 떨어졌습니다.
+   */
+  items: PetalRenderItem[];
   /** 동시에 떨어지는 개수. 0 이면 아무것도 그리지 않습니다 */
   count: number;
-  /**
-   * 사용자가 직접 고른 이미지인지.
-   *
-   * 기본(=인사말 말풍선 아이콘)일 때는 예전처럼 🐾 발자국을 섞어 강아지 느낌을 살리고,
-   * 사용자가 꽃잎 같은 걸 직접 올렸다면 그 이미지만 떨어뜨립니다 — 꽃잎 사이에
-   * 발자국이 섞이면 이상합니다.
-   */
-  custom: boolean;
 }
 
-export function Petals({ image, count, custom }: PetalsProps) {
+export function Petals({ items: picked, count }: PetalsProps) {
   const items = useMemo(() => {
     const n = Math.max(0, Math.min(Math.round(count), 40));
+    if (picked.length === 0) return [];
     return Array.from({ length: n }, (_, i) => {
-      // 기본 연출은 이미지와 발자국을 번갈아 (예전 배열도 대략 이 비율이었습니다)
-      const isPaw = !custom && i % 2 === 1;
+      // 고른 것을 순서대로 돌려 씁니다 — 2종을 골랐으면 번갈아, 3종이면 셋씩 반복
+      const item = picked[i % picked.length]!;
+      const isEmoji = item.kind === 'emoji';
       const duration = 8 + spread(i, 7) * 8; // 8~16초
-      const size = isPaw ? 16 + spread(i, 5) * 12 : 24 + spread(i, 3) * 24;
+      // 이모지는 글리프에 여백이 있어 같은 값이면 그림보다 작아 보입니다 — 조금 키웁니다
+      const size = isEmoji ? 22 + spread(i, 5) * 16 : 24 + spread(i, 3) * 24;
       /**
        * 가로 위치. **퍼센트만 쓰면 오른쪽 것이 잘립니다** — `left: 92%` 는 이미지의 *왼쪽 끝*이
        * 92% 라는 뜻이어서, 제 몸집(size) + 회전 여유 + 낙하 드리프트만큼 띠 밖으로 나갑니다.
@@ -66,7 +67,7 @@ export function Petals({ image, count, custom }: PetalsProps) {
       const margin = Math.round(size * ROTATE_MARGIN);
       const reserve = margin * 2 + Math.round(size) + DRIFT_PX;
       return {
-        isPaw,
+        item,
         left: `calc(${margin}px + ${spread(i, 1).toFixed(4)} * max(0px, 100% - ${reserve}px))`,
         size,
         duration,
@@ -74,7 +75,7 @@ export function Petals({ image, count, custom }: PetalsProps) {
         delay: -spread(i, 11) * duration,
       };
     });
-  }, [count, custom]);
+  }, [count, picked]);
 
   if (items.length === 0) return null;
 
@@ -93,15 +94,20 @@ export function Petals({ image, count, custom }: PetalsProps) {
         const style: CSSProperties = {
           position: 'absolute',
           left: p.left,
-          top: p.isPaw ? '-6%' : '-8%',
+          top: '-8%',
           animation: `petalFall ${p.duration}s linear ${p.delay}s infinite`,
         };
-        return p.isPaw ? (
-          <span key={i} style={{ ...style, fontSize: p.size }}>
-            🐾
+        return p.item.kind === 'emoji' ? (
+          <span key={i} style={{ ...style, fontSize: p.size, lineHeight: 1 }}>
+            {p.item.value}
           </span>
         ) : (
-          <img key={i} src={image} alt="" style={{ ...style, width: p.size, filter: DROP_SHADOW }} />
+          <img
+            key={i}
+            src={p.item.src}
+            alt=""
+            style={{ ...style, width: p.size, filter: DROP_SHADOW }}
+          />
         );
       })}
     </div>

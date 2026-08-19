@@ -7,7 +7,7 @@
  * 🔴 여기가 "발행하면 그대로 뜬다"의 실제 지점입니다 — 스냅샷의 모든 값이 화면 값으로 1:1 매핑됩니다.
  */
 import type { AssetRef, PublicInvitation } from '@luvi/schema';
-import { DEFAULT_PETAL_COUNT } from '@luvi/schema';
+import { DEFAULT_PETAL_COUNT, normalizePetalItems } from '@luvi/schema';
 import type { InvitationConfig } from '@/config/invitation.config';
 import { BASE } from './env';
 
@@ -116,15 +116,21 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
     bgm: pub.features.bgm ? url(c.bgm) : '',
     showPetals: pub.features.petals,
 
-    // core.effects 는 나중에 생긴 필드라 옛 스냅샷에는 없습니다. 없을 때는
-    // **지금까지 화면에 보이던 것과 똑같이** — 인사말 말풍선 아이콘 9개 — 유지합니다.
+    /**
+     * 낙하 요소. 어느 시대의 스냅샷이든 `normalizePetalItems` 가 목록으로 정리해줍니다
+     * (items → 옛 단일 image → 인사말 말풍선 아이콘). 그래도 비면 번들 기본 이미지.
+     */
     petals: (() => {
       const p = c.effects?.petals;
-      const customImage = url(p?.image);
+      const items = normalizePetalItems(p, c.greeting.bubbleImage).map((it) =>
+        it.kind === 'emoji'
+          ? { kind: 'emoji' as const, value: it.value }
+          : { kind: 'image' as const, src: url(it.asset) },
+      );
+      const usable = items.filter((it) => it.kind === 'emoji' || it.src);
       return {
-        image: customImage || url(c.greeting.bubbleImage) || FALLBACK.dog,
+        items: usable.length > 0 ? usable : [{ kind: 'image' as const, src: FALLBACK.dog }],
         count: typeof p?.count === 'number' ? p.count : DEFAULT_PETAL_COUNT,
-        custom: Boolean(customImage),
       };
     })(),
 

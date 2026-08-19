@@ -16,7 +16,9 @@ const BY_PATH: Record<string, AssetKind> = {
   'core.greeting.bubbleImage': 'greeting',
   'core.share.image': 'og',
   'core.footer.image': 'footer',
+  // 옛 단일 이미지 필드 — 이미 저장된 문서를 여는 경우가 있어 남겨둡니다
   'core.effects.petals.image': 'effects',
+  'core.effects.petals.items': 'effects',
   'core.bgm': 'audio',
   'theme.classic1.game.fallingImages': 'game',
   'theme.classic1.game.idleImage': 'game',

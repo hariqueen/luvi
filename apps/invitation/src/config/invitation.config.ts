@@ -59,6 +59,11 @@ export type GameSpeed = 'easy' | 'normal' | 'hard';
 
 export type { ThemeId };
 
+/** 낙하 연출로 떨어지는 것 하나 — 이모지 아이콘 또는 이미지 URL */
+export type PetalRenderItem =
+  | { kind: 'emoji'; value: string }
+  | { kind: 'image'; src: string };
+
 export interface InvitationConfig {
   /**
    * 어떤 디자인으로 그릴지. src/themes/registry.ts 에 등록된 값이어야 합니다.
@@ -158,12 +163,16 @@ export interface InvitationConfig {
 
   /** 낙하 연출의 모양·양 (on/off 는 showPetals) */
   petals: {
-    /** 떨어질 이미지 URL */
-    image: string;
+    /**
+     * 떨어질 것들 — 이모지 아이콘과 이미지를 섞어 최대 3종.
+     *
+     * 예전에는 이미지 1장 + '기본 이미지면 🐾 를 섞는다' 는 규칙이었는데, 에디터에 보이는
+     * 것과 화면에 떨어지는 것이 달라져서(1개 설정 → 2종류 낙하) 목록으로 바꿨습니다.
+     * **여기 담긴 것만 떨어집니다.**
+     */
+    items: PetalRenderItem[];
     /** 동시에 떨어지는 개수 */
     count: number;
-    /** 사용자가 직접 올린 이미지인지 — 기본 이미지일 때만 🐾 를 섞는다 */
-    custom: boolean;
   };
 
   /**
@@ -365,9 +374,8 @@ export const invitation: InvitationConfig = {
 
   showPetals: true,
   petals: {
-    image: '/assets/embedded/img_001.png',
+    items: [{ kind: 'image', src: '/assets/embedded/img_001.png' }],
     count: 9,
-    custom: false,
   },
 
   share: {
