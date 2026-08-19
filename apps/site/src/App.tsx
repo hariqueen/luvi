@@ -5,12 +5,13 @@
  * 마케팅 화면(B*)은 즉시 로드하고, 로그인 뒤에만 쓰는 화면(C*)은 코드 분할합니다 —
  * 처음 방문한 사람이 에디터 번들을 받을 이유가 없습니다.
  */
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { SiteLayout } from '@/components/SiteLayout';
 import { AppLayout } from '@/components/AppLayout';
 import { RequireAuth } from '@/components/RequireAuth';
 import { ScreenFallback } from '@/components/ScreenFallback';
+import { lazyPage } from '@/lib/lazyPage';
 
 import Home from '@/routes/Home';
 import Invitation from '@/routes/Invitation';
@@ -19,14 +20,14 @@ import Card from '@/routes/Card';
 import Samples from '@/routes/Samples';
 import NotFound from '@/routes/NotFound';
 
-const Login = lazy(() => import('@/routes/Login'));
-const SocialCallback = lazy(() => import('@/routes/SocialCallback'));
-const Dashboard = lazy(() => import('@/routes/Dashboard'));
-const NewInvitation = lazy(() => import('@/routes/NewInvitation'));
-const Editor = lazy(() => import('@/routes/Editor'));
-const Publish = lazy(() => import('@/routes/Publish'));
-const Guestbook = lazy(() => import('@/routes/Guestbook'));
-const Admin = lazy(() => import('@/routes/Admin'));
+const Login = lazyPage(() => import('@/routes/Login'));
+const SocialCallback = lazyPage(() => import('@/routes/SocialCallback'));
+const Dashboard = lazyPage(() => import('@/routes/Dashboard'));
+const NewInvitation = lazyPage(() => import('@/routes/NewInvitation'));
+const Editor = lazyPage(() => import('@/routes/Editor'));
+const Publish = lazyPage(() => import('@/routes/Publish'));
+const Guestbook = lazyPage(() => import('@/routes/Guestbook'));
+const Admin = lazyPage(() => import('@/routes/Admin'));
 
 export default function App() {
   return (

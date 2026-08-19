@@ -7,13 +7,13 @@
  * lazy 로 불러오는 이유: 테마가 늘어나도 하객이 내려받는 양은 그대로여야 합니다.
  * 청첩장 한 장을 보려고 안 쓰는 테마 9개를 함께 받을 이유가 없습니다.
  */
-import { lazy } from 'react';
+import { lazyPage } from '@/lib/lazyPage';
 import type { ThemeId } from '@luvi/schema';
 import type { ThemeComponent } from './types';
 
 export const THEMES: Record<ThemeId, ThemeComponent> = {
-  classic1: lazy(() => import('./classic1')),
-  classic2: lazy(() => import('./classic2')),
+  classic1: lazyPage(() => import('./classic1')),
+  classic2: lazyPage(() => import('./classic2')),
 };
 
 /** 등록된 테마인지 확인 (API 가 모르는 값을 보내올 수 있습니다) */
