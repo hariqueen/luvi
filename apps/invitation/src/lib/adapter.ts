@@ -117,19 +117,21 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
     showPetals: pub.features.petals,
 
     /**
-     * 낙하 요소. 어느 시대의 스냅샷이든 `normalizePetalItems` 가 목록으로 정리해줍니다
-     * (items → 옛 단일 image → 인사말 말풍선 아이콘). 그래도 비면 번들 기본 이미지.
+     * 낙하 요소. `normalizePetalItems` 가 items(또는 옛 단일 image)를 목록으로 정리합니다.
+     * **비어 있으면 아무것도 떨어지지 않습니다** — 몰래 다른 그림을 끼워넣지 않습니다.
      */
     petals: (() => {
       const p = c.effects?.petals;
-      const items = normalizePetalItems(p, c.greeting.bubbleImage).map((it) =>
-        it.kind === 'emoji'
-          ? { kind: 'emoji' as const, value: it.value }
-          : { kind: 'image' as const, src: url(it.asset) },
-      );
-      const usable = items.filter((it) => it.kind === 'emoji' || it.src);
+      const items = normalizePetalItems(p)
+        .map((it) =>
+          it.kind === 'emoji'
+            ? { kind: 'emoji' as const, value: it.value }
+            : { kind: 'image' as const, src: url(it.asset) },
+        )
+        // 키가 비어 URL 이 안 만들어진 사진은 버립니다 (빈 <img> 가 떨어지면 이상합니다)
+        .filter((it) => it.kind === 'emoji' || it.src);
       return {
-        items: usable.length > 0 ? usable : [{ kind: 'image' as const, src: FALLBACK.dog }],
+        items,
         count: typeof p?.count === 'number' ? p.count : DEFAULT_PETAL_COUNT,
       };
     })(),

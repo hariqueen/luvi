@@ -45,7 +45,11 @@ export function emptyContent(): ContentDoc {
       account: { description: '', groups: [] },
       footer: { image: null },
       bgm: null,
-      effects: { petals: { items: [], image: null, count: DEFAULT_PETAL_COUNT } },
+      effects: {
+        // 새 청첩장은 낙하 효과가 켜져 있으니(features.petals) 떨어질 것을 하나 담아둡니다.
+        // 비워두면 '효과는 켜졌는데 아무것도 안 떨어지는' 상태로 시작합니다.
+        petals: { items: [{ kind: 'emoji', value: '🌸' }], image: null, count: DEFAULT_PETAL_COUNT },
+      },
       share: { title: '', description: '', image: null, durationMinutes: 120 },
     },
     theme: {},
@@ -130,7 +134,11 @@ export function sampleContent(): ContentDoc {
       },
       footer: { image: null },
       bgm: null,
-      effects: { petals: { items: [], image: null, count: DEFAULT_PETAL_COUNT } },
+      effects: {
+        // 새 청첩장은 낙하 효과가 켜져 있으니(features.petals) 떨어질 것을 하나 담아둡니다.
+        // 비워두면 '효과는 켜졌는데 아무것도 안 떨어지는' 상태로 시작합니다.
+        petals: { items: [{ kind: 'emoji', value: '🌸' }], image: null, count: DEFAULT_PETAL_COUNT },
+      },
       share: {
         title: '호석 ♥ 송희 결혼합니다',
         description: '2026. 10. 24 SAT · PM 1:00\n포항 더퀸컨벤션 6F 갤럭시홀',

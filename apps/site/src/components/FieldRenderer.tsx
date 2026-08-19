@@ -8,7 +8,7 @@
  *  · **최상위** — `field.path`(예 'core.greeting.message')로 에디터 doc 을 직접 읽고 씁니다.
  *  · **제어(하위)** — repeat 항목 안의 칸처럼 doc 경로가 없는 경우, 부모가 `value`/`onChange`를 줍니다.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AssetRef, FieldDef, PetalItem } from '@luvi/schema';
 import { PETAL_EMOJIS, PETAL_ITEM_MAX } from '@luvi/schema';
 import { assetUrl } from '@/lib/env';
@@ -385,23 +385,21 @@ function PetalItemsField({
   const full = items.length >= max;
 
   /**
-   * 하나도 안 골랐을 때 **실제로 떨어지는** 것.
+   * 옛 문서 승격 — `…petals.image` 만 들고 있는 문서를 열면 그 사진을 **실제 선택**으로 올립니다.
    *
-   * 🔴 순서를 뷰어(`normalizePetalItems`)와 똑같이 맞춥니다 —
-   *    옛 단일 이미지(`…petals.image`) → 인사말 말풍선 아이콘.
-   *    여기가 어긋나면 "에디터엔 A 라는데 화면엔 B 가 떨어지는" 문제가 다시 생깁니다.
-   *    (옛 문서는 사진을 올려둔 채 `items` 가 비어 있습니다)
+   * 뷰어도 같은 승격을 하므로(`normalizePetalItems`) 화면에는 이미 그 사진이 떨어지고 있습니다.
+   * 에디터에만 안 보이면 "설정에는 없는데 화면에는 떨어지는" 상태가 되고, 아이콘을 하나
+   * 고르는 순간 사진이 사라진 것처럼 보입니다 — 실제로 그 신고를 받았습니다.
+   * 초안이 '변경됨' 이 되지만 저장은 사용자가 누를 때만 일어납니다.
    */
-  const legacyImage =
-    items.length === 0
-      ? ((editor.get(field.path.replace(/\.items$/, '.image')) as AssetRef | null) ?? null)
-      : null;
-  const inherited =
-    items.length === 0 && !legacyImage && field.inheritFrom
-      ? ((editor.get(field.inheritFrom) as AssetRef | null) ?? null)
-      : null;
-  const fallback = legacyImage ?? inherited;
-  const fallbackLabel = legacyImage ? '전에 올린 사진' : (field.inheritLabel ?? '기본 이미지');
+  const promoted = useRef(false);
+  useEffect(() => {
+    if (promoted.current || items.length > 0) return;
+    const legacy = (editor.get(field.path.replace(/\.items$/, '.image')) as AssetRef | null) ?? null;
+    if (!legacy) return;
+    promoted.current = true;
+    bound.set([{ kind: 'image', asset: legacy }]);
+  }, [bound, editor, field.path, items.length]);
 
   const hasEmoji = (value: string) => items.some((it) => it.kind === 'emoji' && it.value === value);
 
@@ -483,17 +481,10 @@ function PetalItemsField({
           </div>
         ) : (
           <p className="rounded-lg bg-cream px-3 py-2 text-[11.5px] leading-[1.6] text-gold-deep">
-            아직 고른 것이 없어요 — 지금은 <b className="font-semibold">{fallbackLabel}</b> 그림이
-            그대로 떨어집니다. 아래에서 아이콘이나 사진을 고르면 그것만 떨어져요.
+            아직 고른 것이 없어서 <b className="font-semibold">아무것도 떨어지지 않아요.</b> 아래에서
+            아이콘이나 사진을 고르면 고른 것만 떨어집니다 — 섞어서 {max}개까지 (사진만 {max}개도
+            됩니다).
           </p>
-        )}
-
-        {fallback && (
-          <img
-            src={assetUrl(fallback.key)}
-            alt=""
-            className="mt-2 size-14 rounded-lg border border-dashed border-line-strong bg-white object-cover"
-          />
         )}
 
         {/* ── 아이콘 고르기 ── */}

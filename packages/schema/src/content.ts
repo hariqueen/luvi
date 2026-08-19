@@ -366,17 +366,16 @@ export const DEFAULT_PETAL_COUNT = 9;
 /**
  * 낙하 요소 정규화 — **읽는 쪽은 반드시 이걸 통과시켜 쓰세요.**
  *
- * 스냅샷은 세 시대가 섞여 있습니다:
- *   1. `effects` 자체가 없던 시절      → 인사말 말풍선 아이콘이 떨어지고 있었습니다
- *   2. `effects.petals.image` 시절     → 그 이미지 한 종류
- *   3. 지금(`effects.petals.items`)    → 아이콘·사진 섞어서 최대 3개
+ * 🔴 **고른 것만 떨어집니다.** 빈 배열이면 아무것도 떨어지지 않습니다.
+ *    예전에는 비어 있으면 뷰어가 인사말 말풍선 아이콘을 자동으로 떨어뜨렸는데,
+ *    그것이 에디터에는 "선택 안 함" 으로 보여서 (2026-08-19) 아이콘을 하나 고르면
+ *    보이던 사진이 사라지는 것처럼 읽혔습니다. 자동 대체를 없애 화면과 설정을 일치시킵니다.
  *
- * 어느 시대의 문서를 읽어도 "지금 화면에 떨어지던 것" 이 유지되도록 한곳에서 결정합니다.
- * 반환이 빈 배열이면 뷰어가 자기 번들 기본 이미지를 씁니다.
+ * 남은 승격은 하나뿐입니다: 옛 문서의 단일 이미지(`petals.image`) → 사진 1개.
+ * 그 문서를 열어도 하객 화면이 그대로 유지돼야 합니다.
  */
 export function normalizePetalItems(
   petals: Partial<CoreContent['effects']['petals']> | null | undefined,
-  fallbackImage: AssetRef | null | undefined,
 ): PetalItem[] {
   const raw = Array.isArray(petals?.items) ? petals.items : [];
   const items = raw.filter((it): it is PetalItem => {
@@ -387,7 +386,7 @@ export function normalizePetalItems(
   });
   if (items.length > 0) return items.slice(0, PETAL_ITEM_MAX);
 
-  // 옛 문서 — 단일 이미지 → 인사말 말풍선 아이콘 순으로 물려받습니다
-  const legacy = petals?.image ?? fallbackImage ?? null;
+  // 옛 문서 — 단일 이미지를 사진 1개로 승격합니다
+  const legacy = petals?.image ?? null;
   return legacy ? [{ kind: 'image', asset: legacy }] : [];
 }

@@ -248,10 +248,8 @@ export const CORE_SECTIONS: SectionDef[] = [
         path: 'core.effects.petals.items',
         type: 'petals',
         label: '떨어지는 것',
-        hint: '아이콘과 사진을 섞어 최대 3개까지 고를 수 있어요. 사진은 배경이 투명한 PNG를 권합니다',
+        hint: '아이콘·사진을 자유롭게 섞어 최대 3개까지 (사진만 3개도 됩니다). 사진은 배경이 투명한 PNG를 권합니다',
         max: PETAL_ITEM_MAX,
-        inheritFrom: 'core.greeting.bubbleImage',
-        inheritLabel: '인사말 말풍선 아이콘',
       },
       {
         path: 'core.effects.petals.count',
