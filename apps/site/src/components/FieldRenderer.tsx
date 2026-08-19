@@ -8,7 +8,7 @@
  *  · **최상위** — `field.path`(예 'core.greeting.message')로 에디터 doc 을 직접 읽고 씁니다.
  *  · **제어(하위)** — repeat 항목 안의 칸처럼 doc 경로가 없는 경우, 부모가 `value`/`onChange`를 줍니다.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AssetRef, FieldDef, PetalItem } from '@luvi/schema';
 import { PETAL_EMOJIS, PETAL_ITEM_MAX } from '@luvi/schema';
 import { assetUrl } from '@/lib/env';
@@ -359,32 +359,6 @@ function AudioField({
 // ───────────────────────── 반복 항목 ─────────────────────────
 
 /** 하위 필드 정의로 빈 항목 하나를 만듭니다 (icon 은 첫 선택지, 반복은 빈 배열) */
-/**
- * 초안 어딘가에 **이미 올라와 있는** 이미지를 모읍니다 (커버·인사말 아이콘·갤러리·푸터…).
- *
- * 낙하 요소로 쓰고 싶은 사진은 이미 청첩장 안에 있는 경우가 대부분입니다. 그때 파일을
- * 다시 찾아 올리게 하면 같은 사진이 R2 에 두 번 쌓이고, 원본 파일이 없으면 아예 못 씁니다.
- * (실제로 "예전에 떨어지던 아롱이 사진 어디 갔냐" 는 요청을 받았습니다.)
- *
- * AssetRef 는 `{key,w,h}` 모양이라 그것만 보고 찾습니다 — 필드 경로를 하나하나 적으면
- * 새 이미지 필드가 생길 때마다 여기도 고쳐야 합니다.
- */
-function collectUploadedImages(node: unknown, out = new Map<string, AssetRef>(), depth = 0): Map<string, AssetRef> {
-  if (!node || typeof node !== 'object' || depth > 8) return out;
-  if (Array.isArray(node)) {
-    for (const item of node) collectUploadedImages(item, out, depth + 1);
-    return out;
-  }
-  const rec = node as Record<string, unknown>;
-  if (typeof rec.key === 'string' && typeof rec.w === 'number' && typeof rec.h === 'number') {
-    // 배경음악도 AssetRef 지만 떨어뜨릴 수는 없습니다
-    if (!rec.key.includes('/audio/')) out.set(rec.key, rec as unknown as AssetRef);
-    return out;
-  }
-  for (const value of Object.values(rec)) collectUploadedImages(value, out, depth + 1);
-  return out;
-}
-
 // ─────────── 낙하 요소 (아이콘·사진을 섞어서 최대 3개) ───────────
 
 /**
@@ -426,12 +400,6 @@ function PetalItemsField({
     promoted.current = true;
     bound.set([{ kind: 'image', asset: legacy }]);
   }, [bound, editor, field.path, items.length]);
-
-  /** 이미 올린 사진 중 아직 안 고른 것 — 다시 업로드하지 않고 탭 한 번으로 담습니다 */
-  const uploaded = useMemo(() => [...collectUploadedImages(editor.doc).values()], [editor.doc]);
-  const pickable = uploaded.filter(
-    (a) => !items.some((it) => it.kind === 'image' && it.asset.key === a.key),
-  );
 
   const hasEmoji = (value: string) => items.some((it) => it.kind === 'emoji' && it.value === value);
 
@@ -544,25 +512,11 @@ function PetalItemsField({
         {/* ── 사진 올리기 ── */}
         <p className="mb-1.5 mt-3.5 text-[12px] font-semibold text-ink-soft">내 사진</p>
 
-        {pickable.length > 0 && (
-          <>
-            <p className="mb-1.5 text-[11px] text-muted">이미 올린 사진에서 고르기</p>
-            <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-              {pickable.map((asset) => (
-                <button
-                  key={asset.key}
-                  type="button"
-                  disabled={full}
-                  onClick={() => bound.set([...items, { kind: 'image', asset }])}
-                  className="relative size-12 flex-none overflow-hidden rounded-lg border border-line-strong bg-white disabled:opacity-35"
-                >
-                  <img src={assetUrl(asset.key)} alt="" className="size-full object-cover" />
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
+        {/*
+          '이미 올린 사진에서 고르기' 를 뒀다가 뺐습니다 (2026-08-19). 초안의 이미지를 다 모으면
+          커버·갤러리 같은 **배경 있는 결혼식 사진**이 후보로 올라오는데, 낙하 요소는 배경이
+          없는 스티커형이어야 해서 어울리지 않습니다. 목록이 방해만 됐습니다.
+        */}
         <button
           type="button"
           disabled={busy || full}
@@ -570,7 +524,7 @@ function PetalItemsField({
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong bg-white py-3 text-[12.5px] text-ink-soft disabled:opacity-50"
         >
           <span>🖼️</span>
-          {busy ? '올리는 중…' : full ? `최대 ${max}개까지예요` : '새 사진 올리기'}
+          {busy ? '올리는 중…' : full ? `최대 ${max}개까지예요` : '사진 올리기'}
         </button>
         {error && <p className="mt-1.5 text-[11.5px] text-gold-deep">{error}</p>}
       </div>
