@@ -8,7 +8,7 @@
  *     여러 건을 서비스하려면 발행 스냅샷을 런타임에 받아와야 합니다.
  * ─────────────────────────────────────────────────────────────
  */
-import { defaultCoverLayers, type TextLayer, type ThemeId } from '@luvi/schema';
+import { defaultCoverLayers, type SectionKey, type TextLayer, type ThemeId } from '@luvi/schema';
 
 export interface Person {
   /** 표시 이름 (예: 이호석) */
@@ -157,6 +157,14 @@ export interface InvitationConfig {
 
   /** 배경음악 파일 (없으면 빈 문자열) */
   bgm: string;
+
+  /**
+   * 화면에 담긴 섹션과 **그 순서**. 에디터의 '내 청첩장에 담긴 것' 목록이 이 배열입니다.
+   *
+   * 🔴 테마는 섹션을 이 순서로 그려야 합니다. 예전에는 테마가 순서를 하드코딩해서,
+   *    에디터에서 순서를 바꿔도 청첩장은 그대로였습니다 (2026-08-20 수정).
+   */
+  sections: SectionKey[];
 
   /** 떨어지는 효과 노출 여부 (모양·양은 아래 petals) */
   showPetals: boolean;
@@ -371,6 +379,18 @@ export const invitation: InvitationConfig = {
   },
 
   bgm: '/assets/embedded/audio_001.mp3',
+
+  sections: [
+    'cover',
+    'greeting',
+    'calendar',
+    'gallery',
+    'minigame',
+    'location',
+    'account',
+    'guestbook',
+    'footer',
+  ],
 
   showPetals: true,
   petals: {

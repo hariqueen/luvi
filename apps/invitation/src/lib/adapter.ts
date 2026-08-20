@@ -114,6 +114,9 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
     },
 
     bgm: pub.features.bgm ? url(c.bgm) : '',
+    // 담긴 섹션과 순서를 그대로 넘깁니다 — 그리는 순서는 테마가 이 배열을 따릅니다
+    sections: pub.sections,
+
     showPetals: pub.features.petals,
 
     /**
