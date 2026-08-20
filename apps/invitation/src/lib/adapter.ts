@@ -6,9 +6,9 @@
  *
  * 🔴 여기가 "발행하면 그대로 뜬다"의 실제 지점입니다 — 스냅샷의 모든 값이 화면 값으로 1:1 매핑됩니다.
  */
-import type { AssetRef, PublicInvitation } from '@luvi/schema';
-import { DEFAULT_PETAL_COUNT, normalizePetalItems } from '@luvi/schema';
-import type { InvitationConfig } from '@/config/invitation.config';
+import type { AssetRef, PetalItem, PublicInvitation } from '@luvi/schema';
+import { DEFAULT_PETAL_COUNT, normalizeGame, normalizePetalItems } from '@luvi/schema';
+import type { GameSprite, InvitationConfig } from '@/config/invitation.config';
 import { BASE } from './env';
 
 const MONTHS = [
@@ -41,14 +41,24 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
       } ${d.getHours() % 12 || 12}:${pad(d.getMinutes())}`
     : '';
 
-  const game = pub.content.theme.classic1?.game ?? {
-    petName: '',
-    fallingImages: [] as AssetRef[],
-    idleImage: null,
-    speed: 'normal' as const,
-    showLeaderboard: false,
+  /**
+   * 미니게임 설정. `normalizeGame` 이 빠진 필드를 채우고 옛 필드를 승격합니다 —
+   * 이미 발행된 스냅샷은 `mergeContent` 를 거치지 않은 '그때의 JSON' 이라, 뷰어도 같은
+   * 정규화를 해야 옛 청첩장의 게임이 그대로 동작합니다.
+   */
+  const game = normalizeGame(pub.content.theme.classic1?.game);
+
+  /** 아이콘은 그대로, 사진은 절대 URL 로. 키가 비어 URL 이 안 나오는 사진은 버립니다 */
+  const sprite = (item: PetalItem): GameSprite | null => {
+    if (item.kind === 'emoji') return { kind: 'emoji', value: item.value };
+    const src = url(item.asset);
+    return src ? { kind: 'image', src } : null;
   };
-  const fallingImages = game.fallingImages.map(url).filter(Boolean);
+  const spriteList = (items: PetalItem[]): GameSprite[] =>
+    items.map(sprite).filter((s): s is GameSprite => s !== null);
+
+  const fallingItems = spriteList(game.fallingItems);
+  const idleItem = spriteList(game.idleItems)[0];
   const shareImage = url(c.share.image) || url(c.cover.image);
 
   return {
@@ -85,11 +95,21 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
     gallery: c.gallery.map((g) => ({ thumb: url(g), full: url(g) })),
 
     game: {
+      gameId: game.gameId,
       petName: game.petName,
-      fallingImages: fallingImages.length ? fallingImages : FALLBACK.gameFalling,
-      idleImage: url(game.idleImage) || FALLBACK.gameIdle,
+      // 고른 것이 없으면 기본 강아지 그림 — 아무것도 떨어지지 않는 게임은 놀 수 없습니다
+      fallingItems: fallingItems.length
+        ? fallingItems
+        : FALLBACK.gameFalling.map((src) => ({ kind: 'image' as const, src })),
+      idleItem: idleItem ?? { kind: 'image', src: FALLBACK.gameIdle },
       speed: game.speed,
-      showLeaderboard: game.showLeaderboard && pub.sections.includes('minigame'),
+      intro: game.intro,
+      texts: game.texts,
+      leaderboard: {
+        ...game.leaderboard,
+        // 섹션을 빼면 게임 자체가 없으니 랭킹도 없습니다
+        show: game.leaderboard.show && pub.sections.includes('minigame'),
+      },
     },
 
     location: {

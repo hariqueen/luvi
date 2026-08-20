@@ -13,7 +13,7 @@ import type {
   SectionKey,
   ThemeId,
 } from '@luvi/schema';
-import { DEFAULT_SECTIONS, SCHEMA_VERSION, parseThemeId } from '@luvi/schema';
+import { DEFAULT_SECTIONS, SCHEMA_VERSION, normalizeGame, parseThemeId } from '@luvi/schema';
 import {
   encode,
   encodeFields,
@@ -73,7 +73,19 @@ function mergeContent(stored: unknown): ContentDoc {
     return out;
   };
 
-  return deepMerge(base, stored) as ContentDoc;
+  const merged = deepMerge(base, stored) as ContentDoc;
+
+  /**
+   * 미니게임은 딥머지만으로 부족합니다 — 옛 문서는 `fallingImages`·`showLeaderboard` 같은
+   * **옛 필드**에 값을 들고 있어서, 골격의 새 필드 기본값이 그대로 남으면 하객 화면이
+   * 바뀝니다 (예: 랭킹을 껐던 청첩장에 랭킹이 다시 나타남). 승격을 한 곳에 모아둔
+   * `normalizeGame` 을 통과시켜 옛 값이 새 필드로 올라오게 합니다.
+   */
+  merged.theme = {
+    ...merged.theme,
+    classic1: { ...merged.theme.classic1, game: normalizeGame(merged.theme.classic1?.game) },
+  };
+  return merged;
 }
 
 function asSections(value: unknown): SectionKey[] {

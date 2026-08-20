@@ -11,7 +11,7 @@
  *    그때 옛 문서에 없는 필드를 `undefined` 로 두면 **뷰어가 하객 앞에서 터집니다.**
  */
 import type { ContentDoc } from '@luvi/schema';
-import { DEFAULT_PETAL_COUNT, defaultCoverLayers } from '@luvi/schema';
+import { DEFAULT_PETAL_COUNT, defaultCoverLayers, defaultGame } from '@luvi/schema';
 
 /** 저장된 문서에 빠진 필드를 채우기 위한 골격. 값은 모두 "비어 있음" 입니다. */
 export function emptyContent(): ContentDoc {
@@ -52,7 +52,14 @@ export function emptyContent(): ContentDoc {
       },
       share: { title: '', description: '', image: null, durationMinutes: 120 },
     },
-    theme: {},
+    /**
+     * 🔴 미니게임 설정도 골격에 넣습니다 (예전에는 `theme: {}` 였습니다).
+     *
+     * 비워두면 게임 문구가 전부 `undefined` 인 채 에디터로 갑니다 — 폼은 빈칸으로 보이는데
+     * 하객 화면에는 기본 문구가 떠서, 사용자가 "설정에 없는 글이 화면에 있다" 를 겪습니다.
+     * 여기서 채워 두면 폼에 보이는 값이 곧 화면의 값입니다.
+     */
+    theme: { classic1: { game: defaultGame() } },
   };
 }
 
@@ -148,13 +155,8 @@ export function sampleContent(): ContentDoc {
     },
     theme: {
       classic1: {
-        game: {
-          petName: '일홍이',
-          fallingImages: [],
-          idleImage: null,
-          speed: 'normal',
-          showLeaderboard: true,
-        },
+        // 문구·난이도·랭킹 기본값은 스키마 한 곳에서 옵니다 (`defaultGame`)
+        game: defaultGame('일홍이'),
       },
     },
   };

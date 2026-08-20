@@ -13,7 +13,7 @@ export const SECTION_META: Record<SectionKey, SectionMeta> = {
   minigame: {
     key: 'minigame',
     label: '미니게임',
-    desc: '우리 반려동물이 캐릭터가 되는 게임과 랭킹',
+    desc: '하객이 즐기는 게임과 랭킹 — 그림·문구·난이도를 바꿀 수 있어요',
   },
   location: { key: 'location', label: '오시는 길', desc: '지도·주소·교통편 안내' },
   account: { key: 'account', label: '마음 전하기', desc: '축의금 계좌 안내' },
@@ -27,6 +27,7 @@ export const SECTION_TO_FORM: Partial<Record<SectionKey, string>> = {
   greeting: 'greeting',
   calendar: 'ceremony',
   gallery: 'gallery',
+  minigame: 'minigame',
   location: 'location',
   account: 'account',
   guestbook: 'guestbook',

@@ -9,8 +9,8 @@
  *  · **제어(하위)** — repeat 항목 안의 칸처럼 doc 경로가 없는 경우, 부모가 `value`/`onChange`를 줍니다.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { AssetRef, FieldDef, PetalItem } from '@luvi/schema';
-import { PETAL_EMOJIS, PETAL_ITEM_MAX } from '@luvi/schema';
+import type { AssetRef, FieldDef, PetalItem, TextBlock, TextBlockStyle } from '@luvi/schema';
+import { GAME_LIST, PETAL_EMOJIS, PETAL_ITEM_MAX, createTextBlock } from '@luvi/schema';
 import { assetUrl } from '@/lib/env';
 import { useEditor, type EditorContextValue } from '@/lib/editorContext';
 
@@ -192,7 +192,7 @@ function ImagesField({
     } catch (e) {
       setError(e instanceof Error ? e.message : '일부 사진을 올리지 못했습니다');
     } finally {
-      if (added.length) bound.set([...items, ...added]);
+      if (added.length) bound.set(max === 1 ? added.slice(0, 1) : [...items, ...added]);
       setBusy(false);
       if (ref.current) ref.current.value = '';
     }
@@ -372,10 +372,13 @@ function PetalItemsField({
   field,
   bound,
   editor,
+  /** 옛 단일 이미지(`…petals.image`) 승격을 할지. 낙하 연출에만 있는 사정입니다 */
+  legacy,
 }: {
   field: FieldDef;
   bound: Binding;
   editor: EditorContextValue;
+  legacy: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -383,6 +386,8 @@ function PetalItemsField({
   const items = (bound.value as PetalItem[] | undefined) ?? [];
   const max = field.max ?? PETAL_ITEM_MAX;
   const full = items.length >= max;
+  /** 아이콘 후보 — 매니페스트가 주면 그것, 없으면 낙하 연출용 프리셋 */
+  const emojis: readonly string[] = field.options?.map((o) => o.value) ?? PETAL_EMOJIS;
 
   /**
    * 옛 문서 승격 — `…petals.image` 만 들고 있는 문서를 열면 그 사진을 **실제 선택**으로 올립니다.
@@ -394,18 +399,22 @@ function PetalItemsField({
    */
   const promoted = useRef(false);
   useEffect(() => {
-    if (promoted.current || items.length > 0) return;
-    const legacy = (editor.get(field.path.replace(/\.items$/, '.image')) as AssetRef | null) ?? null;
-    if (!legacy) return;
+    if (!legacy || promoted.current || items.length > 0) return;
+    const legacyImage =
+      (editor.get(field.path.replace(/\.items$/, '.image')) as AssetRef | null) ?? null;
+    if (!legacyImage) return;
     promoted.current = true;
-    bound.set([{ kind: 'image', asset: legacy }]);
-  }, [bound, editor, field.path, items.length]);
+    bound.set([{ kind: 'image', asset: legacyImage }]);
+  }, [bound, editor, field.path, items.length, legacy]);
 
   const hasEmoji = (value: string) => items.some((it) => it.kind === 'emoji' && it.value === value);
 
   const toggleEmoji = (value: string) => {
     if (hasEmoji(value)) {
       bound.set(items.filter((it) => !(it.kind === 'emoji' && it.value === value)));
+    } else if (max === 1) {
+      // 하나만 고르는 필드는 곧바로 바꿔칩니다 — 먼저 빼게 하면 두 번 눌러야 합니다
+      bound.set([{ kind: 'emoji', value }]);
     } else if (!full) {
       bound.set([...items, { kind: 'emoji', value }]);
     }
@@ -416,7 +425,8 @@ function PetalItemsField({
     setBusy(true);
     setError(null);
     // 남은 자리만큼만 받습니다 — 넘치게 올려두고 조용히 버리면 왜 안 들어갔는지 알 수 없습니다
-    const picked = Array.from(files).slice(0, Math.max(0, max - items.length));
+    const room = max === 1 ? 1 : Math.max(0, max - items.length);
+    const picked = Array.from(files).slice(0, room);
     const added: PetalItem[] = [];
     try {
       for (const file of picked) {
@@ -448,7 +458,9 @@ function PetalItemsField({
       <div className="rounded-xl border border-line bg-surface p-3">
         {/* ── 고른 것 ── */}
         <div className="mb-2.5 flex items-center justify-between">
-          <span className="text-[12px] font-semibold text-ink-soft">떨어질 것</span>
+          <span className="text-[12px] font-semibold text-ink-soft">
+            {field.pickedLabel ?? '고른 것'}
+          </span>
           <span className={`text-[11.5px] ${full ? 'text-gold-deep' : 'text-muted'}`}>
             {items.length} / {max}
           </span>
@@ -481,16 +493,20 @@ function PetalItemsField({
           </div>
         ) : (
           <p className="rounded-lg bg-cream px-3 py-2 text-[11.5px] leading-[1.6] text-gold-deep">
-            아직 고른 것이 없어서 <b className="font-semibold">아무것도 떨어지지 않아요.</b> 아래에서
-            아이콘이나 사진을 고르면 고른 것만 떨어집니다 — 섞어서 {max}개까지 (사진만 {max}개도
-            됩니다).
+            {field.emptyHint ?? (
+              <>
+                아직 고른 것이 없어서 <b className="font-semibold">아무것도 떨어지지 않아요.</b>{' '}
+                아래에서 아이콘이나 사진을 고르면 고른 것만 떨어집니다 — 섞어서 {max}개까지
+                (사진만 {max}개도 됩니다).
+              </>
+            )}
           </p>
         )}
 
         {/* ── 아이콘 고르기 ── */}
         <p className="mb-1.5 mt-3.5 text-[12px] font-semibold text-ink-soft">아이콘</p>
         <div className="flex flex-wrap gap-1.5">
-          {PETAL_EMOJIS.map((emoji) => {
+          {emojis.map((emoji) => {
             const on = hasEmoji(emoji);
             return (
               <button
@@ -519,7 +535,7 @@ function PetalItemsField({
         */}
         <button
           type="button"
-          disabled={busy || full}
+          disabled={busy || (full && max !== 1)}
           onClick={() => ref.current?.click()}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong bg-white py-3 text-[12.5px] text-ink-soft disabled:opacity-50"
         >
@@ -528,6 +544,161 @@ function PetalItemsField({
         </button>
         {error && <p className="mt-1.5 text-[11.5px] text-gold-deep">{error}</p>}
       </div>
+    </div>
+  );
+}
+
+// ───────────────── 문단 목록 (소개 문구) ─────────────────
+
+const BLOCK_STYLES: { value: TextBlockStyle; label: string }[] = [
+  { value: 'badge', label: '배지' },
+  { value: 'title', label: '제목' },
+  { value: 'body', label: '설명' },
+];
+
+/**
+ * 순서를 바꿀 수 있는 문단 목록.
+ *
+ * 커버 텍스트와 같은 조작(수정·추가·삭제·이동)을 제공하지만, 커버는 사진 위 좌표를
+ * 드래그하고 이쪽은 **위아래 순서**만 있습니다 — 흐름 배치라 좌표가 없습니다.
+ *
+ * 🔴 `style` 은 크기를 직접 정하지 않고 **역할**만 정합니다 (배지/제목/설명).
+ *    실제 크기·색은 디자인이 정하므로, 같은 값이 테마마다 다르게 그려집니다.
+ *    폰트 크기를 여기서 숫자로 받으면 어떤 디자인에서는 반드시 깨집니다.
+ */
+function TextBlocksField({ field, bound }: { field: FieldDef; bound: Binding }) {
+  const blocks = (bound.value as TextBlock[] | undefined) ?? [];
+
+  const patch = (i: number, next: Partial<TextBlock>) =>
+    bound.set(blocks.map((b, idx) => (idx === i ? { ...b, ...next } : b)));
+
+  return (
+    <div>
+      <Label field={field} />
+      <div className="flex flex-col gap-2">
+        {blocks.map((block, i) => (
+          <div key={block.id} className="rounded-xl border border-line bg-white p-3">
+            <div className="mb-2 flex items-center gap-1">
+              <div className="flex gap-0.5 rounded-lg bg-surface-sunken p-0.5">
+                {BLOCK_STYLES.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => patch(i, { style: o.value })}
+                    className={`rounded-md px-2 py-1 text-[11.5px] ${
+                      block.style === o.value
+                        ? 'bg-white font-semibold text-ink shadow-sm'
+                        : 'text-ink-soft'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                aria-label="위로"
+                disabled={i === 0}
+                onClick={() => bound.set(move(blocks, i, i - 1))}
+                className="ml-auto rounded-md border border-line-strong px-2 py-1 text-[11px] text-ink-soft disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label="아래로"
+                disabled={i === blocks.length - 1}
+                onClick={() => bound.set(move(blocks, i, i + 1))}
+                className="rounded-md border border-line-strong px-2 py-1 text-[11px] text-ink-soft disabled:opacity-30"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                onClick={() => bound.set(blocks.filter((_, idx) => idx !== i))}
+                className="rounded-md px-2 py-1 text-[11.5px] text-gold-deep"
+              >
+                삭제
+              </button>
+            </div>
+            <textarea
+              rows={block.style === 'body' ? 3 : 1}
+              value={block.text}
+              onChange={(e) => patch(i, { text: e.target.value })}
+              placeholder="문구를 입력하세요"
+              maxLength={300}
+              className={`${inputClass} resize-none leading-relaxed`}
+            />
+          </div>
+        ))}
+      </div>
+
+      {blocks.length === 0 && (
+        <p className="rounded-lg bg-cream px-3 py-2 text-[11.5px] leading-[1.6] text-gold-deep">
+          문단을 모두 지웠어요. 이대로 두면 게임 위에 아무 글도 보이지 않습니다.
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={() => bound.set([...blocks, createTextBlock('', 'body')])}
+        className="mt-2 rounded-lg bg-ink px-3 py-2 text-[12px] text-paper-soft"
+      >
+        + 문단 추가
+      </button>
+    </div>
+  );
+}
+
+// ───────────────── 게임 선택 ─────────────────
+
+/**
+ * 고를 수 있는 게임 카드.
+ *
+ * 지금은 게임이 하나뿐이라 카드도 하나만 뜹니다 — 그래도 목록으로 그립니다.
+ * "이게 무슨 게임인지" 를 보여주지 않으면 아래의 문구·난이도 설정이 무엇에 대한
+ * 설정인지 알 수 없고, 게임이 늘어날 때 이 화면을 다시 만들지 않아도 됩니다.
+ */
+function GamePickerField({ field, bound }: { field: FieldDef; bound: Binding }) {
+  const current = typeof bound.value === 'string' ? bound.value : GAME_LIST[0]?.id;
+
+  return (
+    <div>
+      <Label field={field} />
+      <div className="flex flex-col gap-2">
+        {GAME_LIST.map((game) => {
+          const on = current === game.id;
+          return (
+            <button
+              key={game.id}
+              type="button"
+              onClick={() => bound.set(game.id)}
+              className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
+                on ? 'border-gold bg-cream' : 'border-line bg-white'
+              }`}
+            >
+              <span className="mt-0.5 flex size-9 flex-none items-center justify-center rounded-lg bg-white text-[20px] leading-none shadow-sm">
+                {game.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5">
+                  <b className="text-[13.5px] font-semibold text-ink">{game.name}</b>
+                  {on && <span className="text-[11px] text-gold-deep">사용 중</span>}
+                </span>
+                <span className="mt-0.5 block text-[11.5px] text-muted">{game.tagline}</span>
+                <span className="mt-1 block text-[11.5px] leading-[1.6] text-ink-soft">
+                  {game.description}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {GAME_LIST.length === 1 && (
+        <p className="mt-1.5 text-[11.5px] text-muted">
+          지금은 게임이 하나예요. 새 게임이 준비되면 여기에 함께 보입니다.
+        </p>
+      )}
     </div>
   );
 }
@@ -751,7 +922,14 @@ export function FieldRenderer({
       );
 
     case 'petals':
-      return <PetalItemsField field={field} bound={bound} editor={editor} />;
+      return <PetalItemsField field={field} bound={bound} editor={editor} legacy />;
+    case 'items':
+      return <PetalItemsField field={field} bound={bound} editor={editor} legacy={false} />;
+
+    case 'textBlocks':
+      return <TextBlocksField field={field} bound={bound} />;
+    case 'game':
+      return <GamePickerField field={field} bound={bound} />;
 
     case 'image':
       return <ImageField field={field} bound={bound} editor={editor} />;

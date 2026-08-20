@@ -1,4 +1,4 @@
-import type { GameSpeed } from '@/config/invitation.config';
+import type { GameSprite, GameSpeed } from '@/config/invitation.config';
 
 /**
  * "떨어지는 일홍이 받기" 캔버스 미니게임 엔진.
@@ -14,9 +14,19 @@ interface FallingItem {
   spin: number;
   rot: number;
   kind: 'good' | 'bad';
-  img: HTMLImageElement;
+  /** 받아야 하는 것의 그림 — 아이콘이면 `img` 가 없습니다 */
+  sprite: Sprite;
+  /** 피해야 하는 것(벌) */
   e: string;
 }
+
+/**
+ * 그릴 준비가 된 그림.
+ *
+ * 이모지는 폰트로 바로 그리고, 사진은 `Image` 를 미리 만들어 둡니다 —
+ * 프레임 안에서 `new Image()` 를 하면 첫 낙하가 빈칸으로 떨어집니다.
+ */
+type Sprite = { kind: 'emoji'; value: string } | { kind: 'image'; img: HTMLImageElement };
 
 interface FloatingText {
   x: number;
@@ -33,7 +43,8 @@ export interface GameResult {
 
 export interface CatchGameOptions {
   canvas: HTMLCanvasElement;
-  dogImageSrcs: string[];
+  /** 떨어질 것 — 아이콘·사진을 섞을 수 있습니다 */
+  fallingItems: GameSprite[];
   speed: GameSpeed;
   onGameOver: (result: GameResult) => void;
 }
@@ -43,7 +54,9 @@ export class CatchGame {
   private ctx: CanvasRenderingContext2D | null = null;
   private speed: GameSpeed;
   private onGameOver: (result: GameResult) => void;
-  private dogImgs: HTMLImageElement[];
+  private sprites: Sprite[];
+  /** 상단 '받은 개수' 옆 아이콘 — 고른 아이콘을 따라갑니다 (사진만 골랐으면 강아지) */
+  private countIcon: string;
 
   private W = 340;
   private H = 440;
@@ -62,11 +75,15 @@ export class CatchGame {
     this.canvas = opts.canvas;
     this.speed = opts.speed;
     this.onGameOver = opts.onGameOver;
-    this.dogImgs = opts.dogImageSrcs.map((src) => {
-      const im = new Image();
-      im.src = src;
-      return im;
+    this.sprites = opts.fallingItems.map((it) => {
+      if (it.kind === 'emoji') return { kind: 'emoji' as const, value: it.value };
+      const img = new Image();
+      img.src = it.src;
+      return { kind: 'image' as const, img };
     });
+
+    const firstEmoji = this.sprites.find((s): s is { kind: 'emoji'; value: string } => s.kind === 'emoji');
+    this.countIcon = firstEmoji?.value ?? '🐶';
 
     this.canvas.addEventListener('pointerdown', this.onPointer);
     this.canvas.addEventListener('pointermove', this.onPointer);
@@ -184,6 +201,12 @@ export class CatchGame {
     this.raf = requestAnimationFrame(this.loop);
   };
 
+  /** 고른 것 중 하나. 아무것도 없으면 이모지 폴백 (빈 화면으로 떨어지지 않게) */
+  private pickSprite(): Sprite {
+    if (this.sprites.length === 0) return { kind: 'emoji', value: '🐶' };
+    return this.sprites[Math.floor(Math.random() * this.sprites.length)] as Sprite;
+  }
+
   private spawn(sf: number): void {
     const good = Math.random() < 0.8;
     this.items.push({
@@ -194,7 +217,7 @@ export class CatchGame {
       spin: (Math.random() * 2 - 1) * 1.4,
       rot: (Math.random() * 2 - 1) * 0.3,
       kind: good ? 'good' : 'bad',
-      img: this.dogImgs[Math.floor(Math.random() * this.dogImgs.length)],
+      sprite: this.pickSprite(),
       e: '🐝',
     });
   }
@@ -228,22 +251,33 @@ export class CatchGame {
 
     const dw = 52;
     for (const it of this.items) {
-      if (it.kind === 'good') {
-        const im = it.img;
-        if (im && im.complete && im.naturalWidth) {
-          const dh = dw * (im.naturalHeight / im.naturalWidth);
-          ctx.save();
-          ctx.translate(it.x, it.y);
-          ctx.rotate(it.rot || 0);
-          ctx.drawImage(im, -dw / 2, -dh / 2, dw, dh);
-          ctx.restore();
-        } else {
-          ctx.font = '30px serif';
-          ctx.fillText('🐶', it.x, it.y);
-        }
-      } else {
+      if (it.kind !== 'good') {
         ctx.font = '28px serif';
         ctx.fillText(it.e, it.x, it.y);
+        continue;
+      }
+      if (it.sprite.kind === 'emoji') {
+        // 아이콘도 사진과 같이 회전시킵니다 — 한쪽만 안 돌면 섞어 썼을 때 눈에 걸립니다
+        ctx.save();
+        ctx.translate(it.x, it.y);
+        ctx.rotate(it.rot || 0);
+        ctx.font = '44px serif';
+        ctx.fillText(it.sprite.value, 0, 0);
+        ctx.restore();
+        continue;
+      }
+      const im = it.sprite.img;
+      if (im.complete && im.naturalWidth) {
+        const dh = dw * (im.naturalHeight / im.naturalWidth);
+        ctx.save();
+        ctx.translate(it.x, it.y);
+        ctx.rotate(it.rot || 0);
+        ctx.drawImage(im, -dw / 2, -dh / 2, dw, dh);
+        ctx.restore();
+      } else {
+        // 아직 안 받아진 사진 — 빈칸 대신 자리를 잡아둡니다
+        ctx.font = '30px serif';
+        ctx.fillText('🐶', it.x, it.y);
       }
     }
 
@@ -281,7 +315,7 @@ export class CatchGame {
     ctx.textAlign = 'center';
     ctx.font = '800 13px sans-serif';
     ctx.fillStyle = '#A65A6E';
-    ctx.fillText('🐶 ' + this.caught, this.W / 2, 40);
+    ctx.fillText(this.countIcon + ' ' + this.caught, this.W / 2, 40);
   }
 
   private gameOver(): void {

@@ -20,6 +20,7 @@ import {
   FONTS,
   LAYER_SIZE_RANGE,
   createTextLayer,
+  normalizeGame,
   type AssetRef,
   type ContentDoc,
   type Features,
@@ -85,6 +86,26 @@ const timeLabel = (iso: string) => {
   return Number.isNaN(d.getTime()) ? '' : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+/**
+ * 미니게임 설정의 빠진 값을 채워 폼에 넣습니다.
+ *
+ * 서버(`mergeContent`)도 같은 정규화를 하지만, **화면이 그것에 의존하면 안 됩니다** —
+ * API 워커는 수동 배포라 사이트가 먼저 나갈 수 있고, 그때 폼은 빈칸인데 하객 화면에는
+ * 기본 문구가 떠서 "설정에 없는 글이 화면에 있다" 가 됩니다. 여기서 채우면 폼에 보이는
+ * 값이 항상 화면의 값입니다.
+ *
+ * 이것만으로는 초안이 '변경됨' 이 되지 않습니다 (저장은 사용자가 필드를 고칠 때).
+ */
+function withGameDefaults(draft: ContentDoc): ContentDoc {
+  return {
+    ...draft,
+    theme: {
+      ...draft.theme,
+      classic1: { ...draft.theme.classic1, game: normalizeGame(draft.theme.classic1?.game) },
+    },
+  };
+}
+
 type Load =
   | { state: 'loading' }
   | { state: 'error'; message: string }
@@ -123,7 +144,7 @@ export default function Editor() {
       const res = await api.invitations.get(id);
       if (!alive) return;
       if (res.ok) {
-        setDoc(res.data.draft);
+        setDoc(withGameDefaults(res.data.draft));
         setSections(res.data.sections);
         setFeatures(res.data.features);
         setThemeId(res.data.themeId);

@@ -8,7 +8,19 @@
  *     여러 건을 서비스하려면 발행 스냅샷을 런타임에 받아와야 합니다.
  * ─────────────────────────────────────────────────────────────
  */
-import { defaultCoverLayers, type SectionKey, type TextLayer, type ThemeId } from '@luvi/schema';
+import {
+  DEFAULT_GAME_LEADERBOARD,
+  DEFAULT_GAME_TEXTS,
+  defaultCoverLayers,
+  defaultGameIntro,
+  type GameId,
+  type GameLeaderboard,
+  type GameTexts,
+  type SectionKey,
+  type TextBlock,
+  type TextLayer,
+  type ThemeId,
+} from '@luvi/schema';
 
 export interface Person {
   /** 표시 이름 (예: 이호석) */
@@ -31,6 +43,9 @@ export interface GalleryItem {
   /** 라이트박스에서 크게 볼 원본 */
   full: string;
 }
+
+/** 게임에 그려지는 것 하나 — 아이콘이거나 이미지 */
+export type GameSprite = { kind: 'emoji'; value: string } | { kind: 'image'; src: string };
 
 export interface AccountItem {
   /** 예: 신랑 이호석 */
@@ -118,16 +133,25 @@ export interface InvitationConfig {
   gallery: GalleryItem[];
 
   game: {
-    /** 반려견 이름 (예: 일홍이) */
+    /** 어떤 게임인지 (지금은 'catch' 하나) */
+    gameId: GameId;
+    /** 주인공 이름 — 문구의 {이름} 자리에 들어갑니다 */
     petName: string;
-    /** 낙하 이미지들 (dog1~6) */
-    fallingImages: string[];
-    /** idle 화면 큰 이미지 */
-    idleImage: string;
+    /**
+     * 떨어질 것 — **아이콘(이모지)이거나 이미지 URL** 입니다.
+     * 비어 있으면 어댑터가 기본 강아지 그림을 채웁니다 (게임에 아무것도 안 떨어지면
+     * 놀이가 성립하지 않습니다 — 낙하 연출과 달리 '아무것도 없음' 이 의미가 없습니다).
+     */
+    fallingItems: GameSprite[];
+    /** 시작 화면 큰 그림 */
+    idleItem: GameSprite;
     /** 난이도 */
     speed: GameSpeed;
-    /** 랭킹판 노출 여부 */
-    showLeaderboard: boolean;
+    /** 게임 위 소개 문단 (순서 = 화면 순서) */
+    intro: TextBlock[];
+    /** 게임 화면 안 문구 */
+    texts: GameTexts;
+    leaderboard: GameLeaderboard;
   };
 
   location: {
@@ -288,18 +312,17 @@ export const invitation: InvitationConfig = {
   ],
 
   game: {
+    gameId: 'catch',
     petName: '일홍이',
-    fallingImages: [
-      '/assets/dog1_c.png',
-      '/assets/dog2_c.png',
-      '/assets/dog3_c.png',
-      '/assets/dog4_c.png',
-      '/assets/dog5_c.png',
-      '/assets/dog6_c.png',
-    ],
-    idleImage: '/assets/embedded/img_010.png',
+    fallingItems: [1, 2, 3, 4, 5, 6].map((n) => ({
+      kind: 'image' as const,
+      src: `/assets/dog${n}_c.png`,
+    })),
+    idleItem: { kind: 'image', src: '/assets/embedded/img_010.png' },
     speed: 'normal',
-    showLeaderboard: true,
+    intro: defaultGameIntro(),
+    texts: { ...DEFAULT_GAME_TEXTS },
+    leaderboard: { ...DEFAULT_GAME_LEADERBOARD },
   },
 
   location: {

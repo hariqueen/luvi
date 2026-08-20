@@ -9,6 +9,7 @@
  */
 
 import { PETAL_ITEM_MAX } from './content';
+import { GAME_EMOJIS, GAME_ITEM_MAX, GAME_SPEED_OPTIONS, LEADERBOARD_SIZE_RANGE } from './games';
 
 export type FieldType =
   /** 한 줄 텍스트 */
@@ -35,6 +36,18 @@ export type FieldType =
   | 'icon'
   /** 낙하 요소 — 이모지 아이콘 칩 + 사진 업로드를 한 컨트롤에서 (최대 `PETAL_ITEM_MAX` 개) */
   | 'petals'
+  /**
+   * 아이콘·사진 섞어 고르기 — `petals` 와 같은 컨트롤이지만 **옛 단일 이미지 승격이 없는**
+   * 범용 버전입니다. 아이콘 후보는 `options`, 개수 상한은 `max` 로 받습니다.
+   */
+  | 'items'
+  /**
+   * 순서를 바꿀 수 있는 문단 목록 (`TextBlock[]`) — 수정·추가·삭제·위아래 이동.
+   * 커버 텍스트가 사진 위 자유 배치라면, 이쪽은 위에서 아래로 흐르는 문단입니다.
+   */
+  | 'textBlocks'
+  /** 미니게임 선택 (`GAME_LIST` 카드) */
+  | 'game'
   /** 반복 항목 (교통편 등) */
   | 'repeat'
   /** 중첩 반복 (계좌 그룹 → 계좌 N개) */
@@ -82,6 +95,10 @@ export interface FieldDef {
   inheritFrom?: string;
   /** `inheritFrom` 값이 뭔지 사람 말로 (예: '인사말 말풍선 아이콘') */
   inheritLabel?: string;
+  /** `petals`·`items` 안쪽 '고른 것' 머리말 (예: '떨어질 것') */
+  pickedLabel?: string;
+  /** `petals`·`items` 가 비었을 때 보여줄 안내. 없으면 낙하 연출용 기본 문구 */
+  emptyHint?: string;
 }
 
 export interface SectionDef {
@@ -231,6 +248,133 @@ export const CORE_SECTIONS: SectionDef[] = [
       },
     ],
   },
+  /**
+   * 미니게임 — 저장 위치가 `theme.classic1.game` 인데 코어 섹션에 있는 이유:
+   * 두 디자인(classic1·classic2)이 **같은 설정을 공유**하기 때문입니다. 어댑터도 테마와
+   * 무관하게 이 경로를 읽습니다. 경로를 옮기면 이미 발행된 문서의 게임 설정이 사라집니다.
+   */
+  {
+    key: 'minigame',
+    label: '미니게임',
+    required: false,
+    fields: [
+      { path: 'theme.classic1.game.gameId', type: 'game', label: '게임' },
+      {
+        path: 'theme.classic1.game.petName',
+        type: 'text',
+        label: '주인공 이름',
+        hint: '문구의 {이름} 자리에 들어갑니다 (예: 일홍이)',
+        maxLength: 20,
+      },
+      {
+        path: 'theme.classic1.game.fallingItems',
+        type: 'items',
+        label: '떨어지는 것',
+        pickedLabel: '떨어질 것',
+        hint: '아이콘·사진을 섞어 최대 6개까지. 사진은 배경이 없는 스티커형 PNG 를 권합니다',
+        emptyHint: '아직 고른 것이 없어요. 그대로 두면 기본 강아지 그림이 떨어집니다.',
+        max: GAME_ITEM_MAX,
+        options: GAME_EMOJIS.map((value) => ({ value, label: value })),
+      },
+      {
+        path: 'theme.classic1.game.idleItems',
+        type: 'items',
+        label: '시작 화면 그림',
+        pickedLabel: '고른 그림',
+        hint: '게임을 시작하기 전 크게 보이는 그림 하나 (아이콘이나 사진)',
+        emptyHint: '고르지 않으면 기본 그림이 보입니다.',
+        max: 1,
+        options: GAME_EMOJIS.map((value) => ({ value, label: value })),
+      },
+      {
+        path: 'theme.classic1.game.speed',
+        type: 'segment',
+        label: '난이도',
+        hint: '떨어지는 속도와 양이 달라집니다',
+        options: GAME_SPEED_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+      },
+      {
+        path: 'theme.classic1.game.intro',
+        type: 'textBlocks',
+        label: '소개 문구',
+        hint: '게임 위에 보이는 문단입니다. 순서를 바꾸고 추가·삭제할 수 있어요',
+      },
+      {
+        path: 'theme.classic1.game.texts.startTitle',
+        type: 'text',
+        label: '시작 화면 제목',
+        hint: '{이름} 을 쓰면 주인공 이름으로 바뀝니다',
+        maxLength: 40,
+      },
+      {
+        path: 'theme.classic1.game.texts.startDesc',
+        type: 'textarea',
+        label: '시작 화면 설명',
+        hint: '게임 방법 안내. 줄바꿈이 그대로 보입니다',
+        rows: 3,
+        maxLength: 200,
+      },
+      {
+        path: 'theme.classic1.game.texts.startButton',
+        type: 'text',
+        label: '시작 버튼',
+        hint: '비우면 기본 문구로 돌아갑니다 (버튼에 글자가 없으면 누를 수 없어 보입니다)',
+        maxLength: 20,
+      },
+      {
+        path: 'theme.classic1.game.texts.resultCaught',
+        type: 'text',
+        label: '결과 문구',
+        hint: '{이름} · {횟수} 를 쓸 수 있습니다',
+        maxLength: 60,
+      },
+      {
+        path: 'theme.classic1.game.texts.resultHint',
+        type: 'text',
+        label: '결과 아래 한 줄',
+        hint: '{점수} 를 쓸 수 있습니다. 비우면 그 줄이 사라집니다',
+        maxLength: 60,
+      },
+      {
+        path: 'theme.classic1.game.leaderboard.show',
+        type: 'toggle',
+        label: '랭킹 보여주기',
+        hint: '끄면 게임만 남고 랭킹판·등록 버튼이 사라집니다',
+      },
+      {
+        path: 'theme.classic1.game.leaderboard.size',
+        type: 'range',
+        label: '몇 등까지',
+        hint: '랭킹판에 보여줄 순위 개수',
+        min: LEADERBOARD_SIZE_RANGE.min,
+        max: LEADERBOARD_SIZE_RANGE.max,
+        step: 1,
+        unit: '등',
+      },
+      {
+        path: 'theme.classic1.game.leaderboard.title',
+        type: 'text',
+        label: '랭킹 제목',
+        hint: '{이름} 을 쓸 수 있습니다',
+        maxLength: 40,
+      },
+      {
+        path: 'theme.classic1.game.leaderboard.empty',
+        type: 'textarea',
+        label: '기록이 없을 때',
+        rows: 2,
+        maxLength: 120,
+      },
+      {
+        path: 'theme.classic1.game.leaderboard.reward',
+        type: 'textarea',
+        label: '랭킹 아래 안내',
+        hint: '선물 안내 같은 한 줄. 비우면 그 줄이 사라집니다',
+        rows: 2,
+        maxLength: 120,
+      },
+    ],
+  },
   /** 켜고 끄는 것만 있는 섹션. 담긴 섹션 목록에서 빼면 사라진다 */
   {
     key: 'guestbook',
@@ -248,6 +392,7 @@ export const CORE_SECTIONS: SectionDef[] = [
         path: 'core.effects.petals.items',
         type: 'petals',
         label: '떨어지는 것',
+        pickedLabel: '떨어질 것',
         hint: '아이콘·사진을 자유롭게 섞어 최대 3개까지 (사진만 3개도 됩니다). 사진은 배경이 없는 스티커형 PNG를 올려주세요 — 배경이 있는 결혼식 사진은 떨어질 때 어울리지 않습니다',
         max: PETAL_ITEM_MAX,
       },

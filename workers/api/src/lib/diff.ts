@@ -13,6 +13,7 @@ const REMOVABLE: Record<string, SectionKey> = {
   cover: 'cover',
   greeting: 'greeting',
   gallery: 'gallery',
+  minigame: 'minigame',
   location: 'location',
   account: 'account',
   guestbook: 'guestbook',

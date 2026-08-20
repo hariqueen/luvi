@@ -1,7 +1,18 @@
+/**
+ * 미니게임 (classic1).
+ *
+ * 화면의 **모든 문구는 편집 값**입니다 — 소개 문단(순서·추가·삭제), 시작 화면 문구,
+ * 결과 문구, 랭킹 문구. 이 파일에 문장을 새로 적으면 편집 화면에서 바꿀 수 없는 글이
+ * 생기므로, 기본 문구는 스키마(`DEFAULT_GAME_TEXTS`)에만 둡니다.
+ *
+ * `{이름}`·`{횟수}`·`{점수}` 는 `fillGameText` 가 실제 값으로 바꿉니다.
+ */
 import { useEffect, useRef, useState } from 'react';
+import { fillGameText } from '@luvi/schema';
 import { CatchGame, type GameResult } from '@/game/catchGame';
 import { useRankings } from '@/hooks/useRankings';
 import { useInvitation } from '@/lib/invitationContext';
+import { GameIntro, GameSpriteView, type BlockClassMap } from '@/components/common/GameParts';
 
 type Phase = 'idle' | 'playing' | 'over';
 
@@ -12,9 +23,19 @@ const pushBtn =
   'transition-[transform,box-shadow] duration-100 ' +
   'active:translate-y-1 active:shadow-[0_4px_0_#A65A6E,0_8px_14px_rgba(199,123,139,.4)]';
 
+/** 문단 역할 → 이 디자인에서의 모양. 예전에 하드코딩돼 있던 배지·제목·설명 그대로입니다 */
+const INTRO_CLASSES: BlockClassMap = {
+  badge:
+    'mx-auto inline-flex items-center gap-1.5 rounded-full bg-rose px-3.5 py-1.5 text-[11px] ' +
+    'font-bold tracking-[0.1em] text-white shadow-[0_6px_16px_rgba(199,123,139,.4)]',
+  title: 'mt-4 mb-1.5 font-myeongjo text-2xl text-ink',
+  body: 'mx-auto mb-[22px] max-w-[300px] text-[13.5px] leading-[1.7] text-ink-soft',
+};
+
 export function MiniGame() {
   const { game } = useInvitation();
-  const { rows, hasBoard, register, myRank } = useRankings();
+  const { texts, leaderboard } = game;
+  const { rows, hasBoard, register, myRank } = useRankings(leaderboard.size);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<CatchGame | null>(null);
@@ -27,7 +48,7 @@ export function MiniGame() {
     if (!canvasRef.current) return;
     const engine = new CatchGame({
       canvas: canvasRef.current,
-      dogImageSrcs: game.fallingImages,
+      fallingItems: game.fallingItems,
       speed: game.speed,
       onGameOver: (r) => {
         setResult(r);
@@ -36,7 +57,7 @@ export function MiniGame() {
     });
     gameRef.current = engine;
     return () => engine.destroy();
-  }, [game.fallingImages, game.speed]);
+  }, [game.fallingItems, game.speed]);
 
   const startGame = () => {
     setRegistered(false);
@@ -50,46 +71,41 @@ export function MiniGame() {
     setRegistered(true);
   };
 
+  /** 문구 치환용 값 — 결과 화면에서 받은 횟수·점수를 쓸 수 있습니다 */
+  const vars = { 이름: game.petName, 횟수: result.caught, 점수: result.score };
+
   return (
     <section className="bg-gradient-to-b from-cream to-ivory px-[22px] py-[56px] text-center">
-      <div className="inline-flex items-center gap-1.5 rounded-full bg-rose px-3.5 py-1.5 text-[11px] font-bold tracking-[0.1em] text-white shadow-[0_6px_16px_rgba(199,123,139,.4)]">
-        🎮 MINI GAME
-      </div>
-      <h2 className="my-4 mb-1.5 font-myeongjo text-2xl text-ink">떨어지는 {game.petName} 받기</h2>
-      <p className="mx-auto mb-[22px] max-w-[300px] text-[13.5px] leading-[1.7] text-ink-soft">
-        신랑·신부의 반려견 <b className="text-rose-deep">{game.petName}</b>가 하늘에서 떨어져요!
-        <br />
-        바구니로 오래 받을수록 고득점, <b>1등은 선물</b>이 있어요 🎁
-      </p>
+      <GameIntro blocks={game.intro} petName={game.petName} classes={INTRO_CLASSES} />
 
       {/* 게임 캔버스 + 오버레이 */}
       <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-[#dbeafe] via-[#eef4ec] to-[#f6efe6] shadow-lg">
-        <canvas
-          ref={canvasRef}
-          className="block h-[460px] w-full cursor-pointer touch-none"
-        />
+        <canvas ref={canvasRef} className="block h-[460px] w-full cursor-pointer touch-none" />
 
         {phase === 'idle' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-[#dbeafe8c] to-[#f6efe6d9] p-6 text-center">
             <div className="relative animate-bob">
-              <img
-                src={game.idleImage}
+              <GameSpriteView
+                sprite={game.idleItem}
                 alt={game.petName}
-                className="h-auto w-[104px] drop-shadow-[0_10px_18px_rgba(58,51,46,.28)]"
+                imgClassName="h-auto w-[104px] drop-shadow-[0_10px_18px_rgba(58,51,46,.28)]"
+                emojiClassName="block text-[84px] leading-none drop-shadow-[0_10px_18px_rgba(58,51,46,.28)]"
               />
               <span className="absolute -right-3 -top-1 animate-wobble-fast text-2xl">🎀</span>
             </div>
             <div className="mt-3.5 flex gap-1 text-base">❤️❤️❤️</div>
-            <div className="mt-2 font-myeongjo text-[21px] font-bold text-ink">
-              {game.petName}를 받아주세요!
-            </div>
-            <div className="mx-0 mb-5 mt-2 max-w-[255px] text-[12.5px] leading-[1.7] text-ink-soft">
-              바구니 🧺 를 움직여 떨어지는 {game.petName}를 받으세요.
-              <br />
-              놓치거나 벌 🐝 을 받으면 체력이 줄어요!
-            </div>
-            <button onClick={startGame} className={`${pushBtn} px-11 py-[15px] text-base`}>
-              🎮 게임 시작
+            {texts.startTitle.trim() && (
+              <div className="mt-2 whitespace-pre-line font-myeongjo text-[21px] font-bold text-ink">
+                {fillGameText(texts.startTitle, vars)}
+              </div>
+            )}
+            {texts.startDesc.trim() && (
+              <div className="mx-0 mb-5 mt-2 max-w-[255px] whitespace-pre-line text-[12.5px] leading-[1.7] text-ink-soft">
+                {fillGameText(texts.startDesc, vars)}
+              </div>
+            )}
+            <button onClick={startGame} className={`${pushBtn} mt-3 px-11 py-[15px] text-base`}>
+              {fillGameText(texts.startButton, vars)}
             </button>
           </div>
         )}
@@ -97,16 +113,30 @@ export function MiniGame() {
         {phase === 'over' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[rgba(58,51,46,.82)] p-6 text-center text-white backdrop-blur-[3px]">
             <div className="font-cormorant text-3xl tracking-[0.04em] opacity-90">Game Over</div>
-            <div className="mt-1.5 text-[13px] opacity-85">
-              {game.petName}를 <b className="text-[#ffd9a8]">{result.caught}</b>번 받았어요
-            </div>
+            {texts.resultCaught.trim() && (
+              <div className="mt-1.5 whitespace-pre-line text-[13px] opacity-85">
+                {fillGameText(texts.resultCaught, vars)}
+              </div>
+            )}
             <div className="mb-0.5 mt-2 font-mono text-[46px] font-extrabold text-[#ffd9a8]">
               {result.score}
               <span className="text-lg"> 초</span>
             </div>
-            <div className="mb-[18px] text-xs opacity-80">생존 시간이 곧 점수예요</div>
+            {texts.resultHint.trim() && (
+              <div className="mb-[18px] whitespace-pre-line text-xs opacity-80">
+                {fillGameText(texts.resultHint, vars)}
+              </div>
+            )}
 
-            {registered ? (
+            {/*
+              랭킹을 끈 청첩장에서는 등록 UI 자체가 없어야 합니다 — 닉네임을 받아 두고
+              어디에도 보여주지 않으면, 하객은 자기 기록이 사라졌다고 읽습니다.
+            */}
+            {!leaderboard.show ? (
+              <button onClick={startGame} className={`${pushBtn} mt-2 px-9 py-3 text-[15px]`}>
+                다시 도전
+              </button>
+            ) : registered ? (
               <div className="flex flex-col items-center gap-3.5">
                 <div className="text-[15px] font-bold">
                   🎉 랭킹 <b className="text-[#ffd9a8]">{myRank}위</b>로 등록됐어요!
@@ -146,13 +176,13 @@ export function MiniGame() {
       </div>
 
       {/* 랭킹판 */}
-      {game.showLeaderboard && (
+      {leaderboard.show && (
         <div className="mt-[22px] overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-line px-[18px] py-4">
-            <div className="font-myeongjo text-[15px] font-bold text-ink">
-              🏆 {game.petName} 컬렉터 랭킹
+            <div className="whitespace-pre-line font-myeongjo text-[15px] font-bold text-ink">
+              {fillGameText(leaderboard.title, vars)}
             </div>
-            <div className="text-[11px] text-ink-soft">TOP 7</div>
+            <div className="flex-none pl-2 text-[11px] text-ink-soft">TOP {leaderboard.size}</div>
           </div>
 
           {hasBoard ? (
@@ -172,15 +202,16 @@ export function MiniGame() {
               ))}
             </div>
           ) : (
-            <div className="px-[18px] py-[26px] text-[13px] text-ink-soft">
-              아직 기록이 없어요.
-              <br />첫 번째 {game.petName} 컬렉터가 되어보세요! 🐶
+            <div className="whitespace-pre-line px-[18px] py-[26px] text-[13px] text-ink-soft">
+              {fillGameText(leaderboard.empty, vars)}
             </div>
           )}
 
-          <div className="border-t border-line bg-gradient-to-br from-white to-[#fdeef0] px-[18px] py-3.5 text-[12.5px] leading-[1.6] text-rose-deep">
-            🎁 결혼식 당일까지 <b>1등</b> 컬렉터님께 신랑·신부가 준비한 선물을 드려요!
-          </div>
+          {leaderboard.reward.trim() && (
+            <div className="whitespace-pre-line border-t border-line bg-gradient-to-br from-white to-[#fdeef0] px-[18px] py-3.5 text-[12.5px] leading-[1.6] text-rose-deep">
+              {fillGameText(leaderboard.reward, vars)}
+            </div>
+          )}
         </div>
       )}
     </section>

@@ -171,6 +171,88 @@ export interface AccountGroup {
 
 export type GameSpeed = 'easy' | 'normal' | 'hard';
 
+/**
+ * 어떤 미니게임을 쓰는지. **값이 문서에 저장되므로 이름을 바꾸면 안 됩니다.**
+ * 카탈로그(이름·설명·기본 문구)는 `games.ts` 에 있습니다.
+ */
+export type GameId = 'catch';
+
+/** 문단 하나의 역할. 크기·색은 테마가 정합니다 (같은 값이 디자인마다 다르게 그려집니다) */
+export type TextBlockStyle = 'badge' | 'title' | 'body';
+
+/**
+ * 순서를 바꿀 수 있는 문단 하나 — 커버 텍스트(`TextLayer`)의 '흐름 배치' 버전입니다.
+ *
+ * 커버는 사진 위 **자유 배치**라 좌표를 갖지만, 섹션 소개 문구는 위에서 아래로 흐르므로
+ * 좌표 대신 **배열 순서**가 위치입니다. 그래서 별도 타입입니다 — 좌표를 갖는 타입을
+ * 여기서 재사용하면 쓰이지 않는 x·y 가 저장돼 나중에 무슨 값인지 알 수 없게 됩니다.
+ */
+export interface TextBlock {
+  id: string;
+  /** 줄바꿈이 화면에 그대로 반영됩니다 */
+  text: string;
+  style: TextBlockStyle;
+}
+
+/**
+ * 게임 화면 **안**의 문구. 기본값은 `games.ts` 의 `DEFAULT_GAME_TEXTS`.
+ *
+ * `{이름}`·`{횟수}`·`{점수}` 를 쓰면 실제 값으로 바뀝니다 (`fillGameText`).
+ */
+export interface GameTexts {
+  /** 시작 화면 큰 글씨 */
+  startTitle: string;
+  /** 시작 화면 설명 (여러 줄) */
+  startDesc: string;
+  /** 시작 버튼 */
+  startButton: string;
+  /** 결과 화면 한 줄 (예: '{이름}를 {횟수}번 받았어요') */
+  resultCaught: string;
+  /** 점수 아래 작은 안내 */
+  resultHint: string;
+}
+
+export interface GameLeaderboard {
+  /** 랭킹판을 보여줄지 */
+  show: boolean;
+  /** 몇 등까지 보여줄지 */
+  size: number;
+  title: string;
+  /** 기록이 하나도 없을 때 (여러 줄) */
+  empty: string;
+  /** 랭킹판 맨 아래 안내. 비우면 그 줄이 사라집니다 */
+  reward: string;
+}
+
+/**
+ * 미니게임 설정.
+ *
+ * 🔴 `fallingImages`·`idleImage`·`showLeaderboard` 는 **옛 문서 전용**입니다. 새 값은
+ *    `fallingItems`·`idleItems`(아이콘/사진 섞기) 와 `leaderboard.show` 로 갑니다.
+ *    읽는 쪽은 반드시 `normalizeGame()` 을 통과시키세요 — 승격이 거기 한 곳에만 있습니다.
+ */
+export interface GameContent {
+  gameId: GameId;
+  petName: string;
+  /** 떨어지는 것 — 아이콘·사진을 섞어서 */
+  fallingItems: PetalItem[];
+  /** 시작 화면 그림 — 아이콘이나 사진 하나 */
+  idleItems: PetalItem[];
+  /** 난이도 */
+  speed: GameSpeed;
+  /** 섹션 소개 문구 (게임 캔버스 위쪽) */
+  intro: TextBlock[];
+  texts: GameTexts;
+  leaderboard: GameLeaderboard;
+
+  /** @deprecated 옛 문서 — `normalizeGame` 이 `fallingItems` 로 승격합니다 */
+  fallingImages?: AssetRef[];
+  /** @deprecated 옛 문서 — `idleItems` 로 승격 */
+  idleImage?: AssetRef | null;
+  /** @deprecated 옛 문서 — `leaderboard.show` 로 승격 */
+  showLeaderboard?: boolean;
+}
+
 /** 모든 테마가 공유하는 필드 */
 export interface CoreContent {
   couple: { groom: Person; bride: Person };
@@ -249,15 +331,15 @@ export interface CoreContent {
   };
 }
 
-/** classic1 테마 전용 필드 */
+/**
+ * classic1 테마 전용 필드.
+ *
+ * 미니게임 설정은 두 디자인(classic1·classic2)이 **같은 값을 공유**합니다 —
+ * 저장 위치가 여기인 것은 초기 구현의 흔적이고, 어댑터가 테마와 무관하게 읽습니다.
+ * 옮기면 이미 발행된 문서의 게임 설정이 전부 사라지므로 그대로 둡니다.
+ */
 export interface Classic1Content {
-  game: {
-    petName: string;
-    fallingImages: AssetRef[];
-    idleImage: AssetRef | null;
-    speed: GameSpeed;
-    showLeaderboard: boolean;
-  };
+  game: GameContent;
 }
 
 export interface ContentDoc {

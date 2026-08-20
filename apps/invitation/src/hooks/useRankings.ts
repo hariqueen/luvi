@@ -18,9 +18,15 @@ const medalFor = (i: number): string => ['🥇', '🥈', '🥉'][i] ?? ('0' + (i
  * register()로 등록하며, 방금 등록한 기록(newTs)과 내 순위(myRank)를 함께 제공.
  *
  * `invitationId` 가 비어 있으면(미리보기·옛 스냅샷) 서버를 부르지 않고 로컬로만 동작합니다.
+ *
+ * @param size 랭킹판에 보여줄 순위 개수 (편집 화면의 '몇 등까지'). 로컬 보관은 이보다
+ *             넉넉히 잡습니다 — 목록을 몇 등까지 보여줄지는 화면의 문제이고, 기록을
+ *             몇 개 갖고 있을지는 저장의 문제입니다. 같은 값으로 자르면 순위를 줄였다
+ *             늘렸을 때 사라진 기록이 돌아오지 않습니다.
  */
-export function useRankings() {
+export function useRankings(size: number) {
   const { invitationId } = useInvitation();
+  const keep = Math.max(10, size);
 
   const [board, setBoard] = useState<RankEntry[]>(() =>
     loadArray<RankEntry>(STORAGE_KEYS.leaderboard, []),
@@ -46,7 +52,7 @@ export function useRankings() {
       setBoard((prev) => {
         const next = [...prev, { nick: name, score, caught, ts }]
           .sort((a, b) => b.score - a.score)
-          .slice(0, 10);
+          .slice(0, keep);
         saveArray(STORAGE_KEYS.leaderboard, next);
         return next;
       });
@@ -56,19 +62,19 @@ export function useRankings() {
       // 서버가 돌려준 createdAt 은 ts 와 달라 방금 세운 기록 강조가 풀립니다.
       if (invitationId) void postRank(invitationId, name, score, caught);
     },
-    [invitationId],
+    [invitationId, keep],
   );
 
-  /** 화면 표기용 TOP 7 (메달·순위·강조 포함) */
+  /** 화면 표기용 상위 `size` 개 (메달·순위·강조 포함) */
   const rows: RankRow[] = useMemo(
     () =>
-      board.slice(0, 7).map((b, i) => ({
+      board.slice(0, size).map((b, i) => ({
         ...b,
         rank: i + 1,
         medal: medalFor(i),
         isMine: b.ts === newTs,
       })),
-    [board, newTs],
+    [board, newTs, size],
   );
 
   const myRank = useMemo(() => {
