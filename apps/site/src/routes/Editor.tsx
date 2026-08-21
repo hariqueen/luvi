@@ -24,6 +24,7 @@ import {
   type AssetRef,
   type ContentDoc,
   type Features,
+  type FieldDef,
   type LayerFont,
   type SectionDef,
   type SectionKey,
@@ -54,9 +55,47 @@ type PanelMode = { kind: 'sections' } | { kind: 'form'; formKey: string };
 const ALWAYS_FORMS: { formKey: string; label: string }[] = [
   { formKey: 'couple', label: '기본 정보' },
   { formKey: 'ceremony', label: '예식 정보' },
+  { formKey: 'photos', label: '사진' },
   { formKey: 'effects', label: '연출' },
   { formKey: 'share', label: '공유 설정' },
 ];
+
+/**
+ * '사진' 폼 — 청첩장에 들어가는 사진을 **한 화면에 모아** 보여줍니다.
+ *
+ * 사진이 커버 캔버스·갤러리 섹션·마무리 섹션에 흩어져 있으면 어디서 무엇을 바꾸는지
+ * 찾아다녀야 하고, 실제로 맨 아래 사진은 편집할 곳을 찾지 못해 커버 사진 그대로 발행되었습니다.
+ *
+ * 🔴 매니페스트에 사진 섹션을 새로 만들지 **않고** 기존 필드 정의를 참조합니다.
+ *    같은 경로가 CORE_SECTIONS 에 두 번 들어가면 발행 요약(diff.ts)에 같은 항목이
+ *    두 줄로 뜨고, 섹션을 뺐을 때의 검사 제외 규칙도 어긋납니다.
+ */
+const PHOTO_FIELDS: { path: string; label: string }[] = [
+  // 라벨을 여기서 덮어씁니다 — 세 필드가 나란히 놓이면 갤러리의 원래 라벨('사진')만으로는
+  // 커버·마지막 사진과 구분되지 않습니다. 각 섹션 폼에서는 원래 라벨이 그대로 쓰입니다.
+  { path: 'core.cover.image', label: '커버 사진 · 첫 화면' },
+  { path: 'core.gallery', label: '갤러리 사진' },
+  { path: 'core.footer.image', label: '마지막 사진 · 맨 아래' },
+];
+
+/** 매니페스트에서 위 경로의 필드 정의를 찾아 '사진' 폼을 만듭니다 */
+function buildPhotosForm(): SectionDef {
+  const byPath = new Map<string, FieldDef>();
+  for (const section of CORE_SECTIONS) {
+    for (const field of section.fields) byPath.set(field.path, field);
+  }
+  return {
+    key: 'photos',
+    label: '사진',
+    required: true,
+    fields: PHOTO_FIELDS.flatMap(({ path, label }) => {
+      const field = byPath.get(path);
+      // 매니페스트에서 경로가 사라졌다면 빈칸을 그리는 대신 조용히 빠집니다 —
+      // 없는 경로에 업로드하면 저장은 되는데 화면에 안 나오는 상태가 됩니다.
+      return field ? [{ ...field, label }] : [];
+    }),
+  };
+}
 
 function ToggleRow({
   label,
@@ -77,6 +116,53 @@ function ToggleRow({
         className="h-5 w-9 accent-gold"
       />
     </label>
+  );
+}
+
+/**
+ * 커버 캔버스 툴바의 사진 슬롯 버튼.
+ *
+ * 썸네일을 함께 보여주는 이유: 커버는 캔버스에 깔려 있어 결과가 보이지만, 마지막 사진은
+ * 이 화면에 나타나지 않습니다. 라벨만 있으면 무엇을 바꿨는지 확인할 방법이 없어
+ * 같은 사진을 두 번 올리는 일이 생깁니다.
+ */
+function PhotoSlotButton({
+  label,
+  url,
+  busy,
+  inherited,
+  onClick,
+}: {
+  label: string;
+  url: string | null;
+  busy: boolean;
+  /** 자기 사진이 없어 다른 사진을 물려받아 보여주는 중 */
+  inherited?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-lg border border-line-strong bg-white py-1.5 pl-1.5 pr-3 text-[12px] disabled:opacity-50"
+    >
+      {url ? (
+        <img
+          src={url}
+          alt=""
+          className={`h-7 w-7 flex-none rounded-md object-cover ${inherited ? 'opacity-60' : ''}`}
+        />
+      ) : (
+        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-md bg-surface-sunken text-[13px] text-muted">
+          +
+        </span>
+      )}
+      <span className="whitespace-nowrap">
+        {busy ? '올리는 중…' : label}
+        {!busy && inherited && <span className="text-muted-soft"> · 커버와 같음</span>}
+      </span>
+    </button>
   );
 }
 
@@ -132,6 +218,7 @@ export default function Editor() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const footerInputRef = useRef<HTMLInputElement>(null);
 
   // ── 시트 ──
   const [panel, setPanel] = useState<PanelMode>({ kind: 'sections' });
@@ -366,23 +453,38 @@ export default function Editor() {
     setEditingTextId(layer.id);
   }, [layers, setLayers]);
 
-  const [coverBusy, setCoverBusy] = useState(false);
-  const onCoverFile = async (file: File | undefined) => {
+  /**
+   * 맨 아래 '마무리' 사진. 비워두면 뷰어가 커버 사진을 씁니다
+   * (`apps/invitation/src/lib/adapter.ts`) — 그래서 여기서도 커버를 물려받아 보여줍니다.
+   */
+  const footerImage = doc?.core.footer?.image ?? null;
+  const footerUrl = footerImage ? assetUrl(footerImage.key) : photoUrl;
+
+  /**
+   * 커버 사진과 마지막 사진은 업로드 절차가 같아 한 함수로 둡니다.
+   *
+   * 두 장을 **같은 화면에서** 바꿀 수 있어야 합니다 — 처음과 끝은 짝이라 한자리에서
+   * 고르게 되고, 마지막 사진만 다른 곳에 숨겨두면 커버만 바꾼 채 발행됩니다.
+   */
+  const [photoBusy, setPhotoBusy] = useState<'cover' | 'footer' | null>(null);
+  const onPhotoFile = async (slot: 'cover' | 'footer', file: File | undefined) => {
     if (!file) return;
-    setCoverBusy(true);
+    const path = slot === 'cover' ? 'core.cover.image' : 'core.footer.image';
+    const input = slot === 'cover' ? coverInputRef : footerInputRef;
+    setPhotoBusy(slot);
     try {
-      const ref: AssetRef = await uploadImageForPath(id, 'core.cover.image', file);
-      setField('core.cover.image', ref);
+      const ref: AssetRef = await uploadImageForPath(id, path, file);
+      setField(path, ref);
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '사진 업로드에 실패했습니다');
     } finally {
-      setCoverBusy(false);
-      if (coverInputRef.current) coverInputRef.current.value = '';
+      setPhotoBusy(null);
+      if (input.current) input.current.value = '';
     }
   };
 
   // ─────────────── 폼 ───────────────
-  const formSections = useMemo(() => CORE_SECTIONS, []);
+  const formSections = useMemo(() => [...CORE_SECTIONS, buildPhotosForm()], []);
   const activeForm: SectionDef | undefined =
     panel.kind === 'form' ? formSections.find((s) => s.key === panel.formKey) : undefined;
 
@@ -575,6 +677,14 @@ export default function Editor() {
           />
         </>
       )}
+      {/* 사진을 모아 보여주는 폼 — 여기에 없는 사진은 어디 있는지 알려준다 */}
+      {activeForm.key === 'photos' && (
+        <p className="text-[12px] leading-relaxed text-muted">
+          커버 문구의 위치는 “커버” 편집에서 끌어 옮기고, 카톡 미리보기 사진은 “공유 설정”에
+          있어요.
+        </p>
+      )}
+
       {activeForm.fields.length === 0 && activeForm.key !== 'effects' && activeForm.key !== 'cover' && (
         <p className="text-[13px] text-muted">이 섹션은 켜고 끄는 것만 정할 수 있어요.</p>
       )}
@@ -589,7 +699,14 @@ export default function Editor() {
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => void onCoverFile(e.target.files?.[0])}
+        onChange={(e) => void onPhotoFile('cover', e.target.files?.[0])}
+      />
+      <input
+        ref={footerInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void onPhotoFile('footer', e.target.files?.[0])}
       />
       <div className="relative min-h-0 flex-1">
         <CoverCanvas
@@ -624,7 +741,7 @@ export default function Editor() {
       )}
 
       {!selectedLayer && !editingLayer && (
-        <div className="flex flex-none items-center gap-2 border-t border-line bg-surface px-3 py-2.5">
+        <div className="flex flex-none flex-wrap items-center gap-2 border-t border-line bg-surface px-3 py-2.5">
           <button
             type="button"
             onClick={addLayer}
@@ -632,14 +749,21 @@ export default function Editor() {
           >
             + 텍스트
           </button>
-          <button
-            type="button"
-            disabled={coverBusy}
+          {/* 첫 사진(커버) · 끝 사진(마무리) — 순서대로 둔다 */}
+          <PhotoSlotButton
+            label="커버 사진"
+            url={photoUrl}
+            busy={photoBusy === 'cover'}
             onClick={() => coverInputRef.current?.click()}
-            className="rounded-lg border border-line-strong bg-white px-3 py-2 text-[12px] disabled:opacity-50"
-          >
-            {coverBusy ? '올리는 중…' : photoUrl ? '사진 바꾸기' : '사진 올리기'}
-          </button>
+          />
+          <PhotoSlotButton
+            label="마지막 사진"
+            url={footerUrl}
+            // 커버를 물려받아 보여주는 중이라는 표시 — 바꾸면 마무리에만 적용된다
+            inherited={!footerImage && !!photoUrl}
+            busy={photoBusy === 'footer'}
+            onClick={() => footerInputRef.current?.click()}
+          />
           <span className="ml-auto text-[11px] text-muted-soft">문구를 탭해서 옮기세요</span>
         </div>
       )}
@@ -727,6 +851,8 @@ export default function Editor() {
                 <h2 className="mb-1.5 text-[17px] font-bold tracking-[-.03em]">커버 편집</h2>
                 <p className="mb-4 text-[12.5px] leading-relaxed text-muted">
                   오른쪽 사진 위 문구를 끌어서 옮기고, 탭하면 서식을 바꿀 수 있어요.
+                  <br />
+                  첫 화면(커버)과 맨 아래 마지막 사진은 오른쪽 아래 버튼에서 바꿉니다.
                   <br />
                   다른 항목은 아래에서 편집하세요.
                 </p>

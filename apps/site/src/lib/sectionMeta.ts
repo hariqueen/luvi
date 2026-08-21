@@ -21,14 +21,22 @@ export const SECTION_META: Record<SectionKey, SectionMeta> = {
   footer: { key: 'footer', label: '마무리', desc: '마지막 사진과 공유 버튼' },
 };
 
-/** 섹션 키 → 폼 그룹 키. 매니페스트의 섹션과 이름이 다른 경우를 잇는다 */
+/**
+ * 섹션 키 → 폼 그룹 키. 매니페스트의 섹션과 이름이 다른 경우를 잇는다.
+ *
+ * 사진이 들어가는 섹션(갤러리·마무리)은 **'사진' 폼 하나**로 보냅니다 — 커버·갤러리·마지막
+ * 사진을 한 화면에서 고르는 편이 섹션마다 찾아 들어가는 것보다 직관적이고, 실제로 마지막
+ * 사진은 편집할 곳을 못 찾아 손대지 않은 채 발행되었습니다. (필드 정의 자체는 여전히
+ * 각 섹션 매니페스트에 하나씩만 있습니다 — Editor 의 `buildPhotosForm` 이 그것을 참조합니다)
+ */
 export const SECTION_TO_FORM: Partial<Record<SectionKey, string>> = {
   cover: 'cover',
   greeting: 'greeting',
   calendar: 'ceremony',
-  gallery: 'gallery',
+  gallery: 'photos',
   minigame: 'minigame',
   location: 'location',
   account: 'account',
   guestbook: 'guestbook',
+  footer: 'photos',
 };

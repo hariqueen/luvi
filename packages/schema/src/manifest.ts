@@ -160,15 +160,27 @@ export const CORE_SECTIONS: SectionDef[] = [
     ],
   },
   /**
-   * 커버는 **폼이 아니라 캔버스에서 직접 편집**합니다 (사진 위 텍스트 자유 배치).
-   * 그래서 필드 목록이 비어 있습니다 — 에디터가 이 섹션을 캔버스로 라우팅합니다.
+   * 커버의 **문구**는 폼이 아니라 캔버스에서 편집합니다 (사진 위 자유 배치) —
+   * 에디터가 이 섹션을 캔버스로 라우팅합니다. 사진은 경로가 하나뿐이라 필드로 둡니다.
+   *
+   * ⚠️ 이 필드를 다른 섹션에도 복사하지 마세요. 발행 요약(`workers/api/src/lib/diff.ts`)이
+   *    CORE_SECTIONS 를 훑으며 경로마다 한 줄을 만들기 때문에, 같은 경로가 두 섹션에 있으면
+   *    "변경사항"에 같은 항목이 두 번 뜹니다. 여러 사진을 한 화면에 모아 보여주는 것은
+   *    에디터의 '사진' 폼이 이 정의들을 **참조**해서 합니다 (routes/Editor.tsx).
    */
   {
     key: 'cover',
     label: '커버',
     required: true,
     editor: 'canvas',
-    fields: [],
+    fields: [
+      {
+        path: 'core.cover.image',
+        type: 'image',
+        label: '커버 사진',
+        hint: '첫 화면에 깔리는 사진. 이 사진 위에 문구가 얹힙니다',
+      },
+    ],
   },
   {
     key: 'greeting',
@@ -381,6 +393,28 @@ export const CORE_SECTIONS: SectionDef[] = [
     label: '방명록',
     required: false,
     fields: [],
+  },
+  /**
+   * 마무리 — 청첩장 맨 아래 사진.
+   *
+   * 비워두면 커버 사진을 그대로 씁니다 (`apps/invitation` 의 adapter 가 그렇게 읽습니다).
+   * 그래서 `inheritFrom` 으로 물려받은 사진을 보여줍니다 — 빈 칸을 보여주면 "사진이 없다"로
+   * 읽히는데 화면에는 커버 사진이 깔려 있습니다.
+   */
+  {
+    key: 'footer',
+    label: '마무리',
+    required: true,
+    fields: [
+      {
+        path: 'core.footer.image',
+        type: 'image',
+        label: '마지막 사진',
+        hint: '맨 아래 감사 인사 뒤에 깔리는 사진. 비워두면 커버 사진을 씁니다',
+        inheritFrom: 'core.cover.image',
+        inheritLabel: '커버 사진',
+      },
+    ],
   },
   {
     key: 'effects',
