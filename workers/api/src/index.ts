@@ -270,15 +270,33 @@ async function isOwnerOf(
  */
 async function audit(
   c: Context<{ Bindings: Env; Variables: Vars }>,
-  input: { name: string; invitationId: string; detail?: string },
+  input: {
+    name: string;
+    invitationId: string;
+    detail?: string;
+    /**
+     * 그 청첩장의 소유자 uid. 주면 `by=owner` / `by=admin` 을 앞에 붙입니다 —
+     * **"누가 건드렸나" 는 uid 만으로는 부족합니다.** 운영자가 남의 청첩장을 고칠 수 있으니
+     * (그게 운영자 계정의 목적입니다), 같은 동작이라도 *자기 것을 고친 것*과
+     * *남의 것을 고친 것*은 전혀 다른 사건입니다. 로그를 읽는 순간 구분돼야 합니다.
+     */
+    ownerUid?: string | null;
+  },
 ): Promise<void> {
+  const uid = c.get('uid');
+  const by = input.ownerUid ? (input.ownerUid === uid ? 'owner' : 'admin') : null;
+  const detail = [by ? `by=${by}` : null, input.detail]
+    .filter(Boolean)
+    .join(' ')
+    .slice(0, 500);
+
   await eventsRepo.insertEvents(c.env.LUVI_LOGS, [
     {
       at: new Date().toISOString(),
       kind: 'admin',
       name: input.name.slice(0, 60),
       ok: 1,
-      detail: input.detail ? input.detail.slice(0, 500) : null,
+      detail: detail || null,
       invitationId: input.invitationId.slice(0, 60),
       slug: null,
       session: null,
@@ -600,6 +618,17 @@ app.post('/api/invitations/:id/publish', async (c) => {
     pinnedHost: invitation.pinnedHost,
   });
 
+  /**
+   * 발행 이력 — **하객 화면이 바뀌는 유일한 동작**이라 가장 중요한 기록입니다.
+   * 화면에서도 `publish` 이벤트를 보내지만, 그건 발행한 쪽이 안 보내면 남지 않습니다.
+   */
+  await audit(c, {
+    name: 'invitation_publish',
+    invitationId: id,
+    ownerUid: invitation.ownerUid,
+    detail: `slug=${slug}`,
+  });
+
   return c.json(
     ok<PublishResult>({
       slug,
@@ -621,6 +650,7 @@ app.delete('/api/invitations/:id', async (c) => {
   await audit(c, {
     name: 'invitation_delete',
     invitationId: id,
+    ownerUid: invitation.ownerUid,
     detail: `slug=${invitation.slug || '없음'} status=${invitation.status}`,
   });
 
@@ -745,7 +775,7 @@ app.post('/api/invitations/:id/guestbook', async (c) => {
 app.patch('/api/invitations/:id/guestbook/:entryId', async (c) => {
   const db = firestore(c.env);
   const id = c.req.param('id');
-  await requireOwned(c, db, id);
+  const invitation = await requireOwned(c, db, id);
 
   const { hidden } = await readJson<{ hidden: boolean }>(c.req);
   if (typeof hidden !== 'boolean') {
@@ -758,6 +788,7 @@ app.patch('/api/invitations/:id/guestbook/:entryId', async (c) => {
   await audit(c, {
     name: hidden ? 'guestbook_hide' : 'guestbook_unhide',
     invitationId: id,
+    ownerUid: invitation.ownerUid,
     detail: `entry=${entry.id}`,
   });
   return c.json(ok<GuestbookEntry>(entry));
@@ -766,12 +797,13 @@ app.patch('/api/invitations/:id/guestbook/:entryId', async (c) => {
 app.delete('/api/invitations/:id/guestbook/:entryId', async (c) => {
   const db = firestore(c.env);
   const id = c.req.param('id');
-  await requireOwned(c, db, id);
+  const invitation = await requireOwned(c, db, id);
 
   await guestbookRepo.removeEntry(db, id, c.req.param('entryId'));
   await audit(c, {
     name: 'guestbook_delete',
     invitationId: id,
+    ownerUid: invitation.ownerUid,
     detail: `entry=${c.req.param('entryId')}`,
   });
   return c.json(ok({ id: c.req.param('entryId') }));
@@ -787,10 +819,15 @@ app.delete('/api/invitations/:id/guestbook/:entryId', async (c) => {
 app.delete('/api/invitations/:id/guestbook', async (c) => {
   const db = firestore(c.env);
   const id = c.req.param('id');
-  await requireOwned(c, db, id);
+  const invitation = await requireOwned(c, db, id);
 
   const deleted = await guestbookRepo.clearGuestbook(db, id);
-  await audit(c, { name: 'guestbook_clear', invitationId: id, detail: `deleted=${deleted}` });
+  await audit(c, {
+    name: 'guestbook_clear',
+    invitationId: id,
+    ownerUid: invitation.ownerUid,
+    detail: `deleted=${deleted}`,
+  });
   return c.json(ok({ deleted }));
 });
 
@@ -832,12 +869,13 @@ app.post('/api/invitations/:id/rankings', async (c) => {
 app.delete('/api/invitations/:id/rankings/:entryId', async (c) => {
   const db = firestore(c.env);
   const id = c.req.param('id');
-  await requireOwned(c, db, id);
+  const invitation = await requireOwned(c, db, id);
 
   await rankingsRepo.removeRank(db, id, c.req.param('entryId'));
   await audit(c, {
     name: 'ranking_delete',
     invitationId: id,
+    ownerUid: invitation.ownerUid,
     detail: `entry=${c.req.param('entryId')}`,
   });
   return c.json(ok({ id: c.req.param('entryId') }));
