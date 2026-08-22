@@ -19,7 +19,13 @@ export function Greeting() {
       {greeting.dogBubbleVisible && (
         <div className="mt-7 flex items-center justify-center gap-2.5">
           <div className="flex size-[46px] flex-none items-center justify-center overflow-hidden rounded-full bg-c2-cream">
-            <img src={greeting.dogImage} alt="반려동물" className="w-[52px]" />
+            {greeting.dogImage ? (
+              <img src={greeting.dogImage} alt="반려동물" className="w-[52px]" />
+            ) : (
+              <span role="img" aria-label="반려동물" className="text-[24px] leading-none">
+                🐶
+              </span>
+            )}
           </div>
           <div className="whitespace-pre-line border border-c2-line bg-c2-ivory px-4 py-2.5 text-left font-myeongjo text-[12.5px] leading-[1.6] text-c2-sage-deep">
             {greeting.dogBubble}

@@ -12,7 +12,13 @@ export function Greeting() {
       {greeting.dogBubbleVisible && (
         <div className="mb-[30px] flex items-center justify-center gap-2.5">
           <div className="flex h-[50px] w-[50px] flex-none animate-wobble items-center justify-center overflow-hidden rounded-full bg-cream">
-            <img src={greeting.dogImage} alt="반려견" className="w-14" />
+            {greeting.dogImage ? (
+              <img src={greeting.dogImage} alt="반려견" className="w-14" />
+            ) : (
+              <span role="img" aria-label="반려견" className="text-[26px] leading-none">
+                🐶
+              </span>
+            )}
           </div>
           <div className="whitespace-pre-line rounded-[6px_16px_16px_16px] bg-cream px-[15px] py-[11px] text-left text-[13px] font-semibold leading-[1.5] text-ink">
             {greeting.dogBubble}

@@ -16,6 +16,7 @@ import {
   type GameId,
   type GameLeaderboard,
   type GameTexts,
+  type SectionBgMap,
   type SectionKey,
   type TextBlock,
   type TextLayer,
@@ -190,6 +191,14 @@ export interface InvitationConfig {
    */
   sections: SectionKey[];
 
+  /**
+   * 섹션마다 다르게 칠한 배경색 (`#RRGGBB`). **키가 없는 섹션은 디자인 기본 배경**입니다.
+   *
+   * 어댑터가 `normalizeSectionBg` 로 걸러 넣습니다 — 읽을 수 없는 색은 키째로 빠지므로
+   * 여기 담긴 값은 그대로 `style` 에 쓸 수 있습니다. 칠하는 곳은 `SectionSkin` 하나입니다.
+   */
+  sectionBg: SectionBgMap;
+
   /** 떨어지는 효과 노출 여부 (모양·양은 아래 petals) */
   showPetals: boolean;
 
@@ -259,7 +268,7 @@ export const invitation: InvitationConfig = {
   weddingAt: '2026-10-24T13:00:00',
 
   cover: {
-    image: '/assets/embedded/img_002.jpg',
+    image: '',
     layers: defaultCoverLayers({
       eyebrow: 'The Wedding of',
       names: '신랑 · 신부',
@@ -269,7 +278,7 @@ export const invitation: InvitationConfig = {
 
   greeting: {
     dogBubble: '멍! 두 분의 결혼식에\n놀러 와주실 거죠? 🐾',
-    dogImage: '/assets/embedded/img_001.png',
+    dogImage: '',
     dogBubbleVisible: true,
     message:
       '서로의 이름을 처음 부르던 날처럼\n설레는 마음으로 인사드립니다.\n\n' +
@@ -284,29 +293,29 @@ export const invitation: InvitationConfig = {
 
   gallery: [
     // 첫 항목은 상단 대표 이미지로 사용됩니다.
-    { thumb: '/assets/embedded/img_003.jpg', full: '/assets/embedded/img_003.jpg' },
+    { thumb: '', full: '' },
     {
-      thumb: '/assets/embedded/img_004.jpg',
+      thumb: '',
       full: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=75',
     },
     {
-      thumb: '/assets/embedded/img_005.jpg',
+      thumb: '',
       full: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=900&q=75',
     },
     {
-      thumb: '/assets/embedded/img_006.jpg',
+      thumb: '',
       full: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?auto=format&fit=crop&w=900&q=75',
     },
     {
-      thumb: '/assets/embedded/img_007.jpg',
+      thumb: '',
       full: 'https://images.unsplash.com/photo-1457089328109-e5d9bd499191?auto=format&fit=crop&w=900&q=75',
     },
     {
-      thumb: '/assets/embedded/img_008.jpg',
+      thumb: '',
       full: 'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=900&q=75',
     },
     {
-      thumb: '/assets/embedded/img_009.jpg',
+      thumb: '',
       full: 'https://images.unsplash.com/photo-1469371670807-013ccf25f16a?auto=format&fit=crop&w=900&q=75',
     },
   ],
@@ -316,7 +325,7 @@ export const invitation: InvitationConfig = {
     petName: '멍멍이',
     // 실제 반려동물 사진 대신 아이콘 — 예시 데이터에 특정인의 사진을 두지 않습니다
     fallingItems: ['🐶', '🐕', '🦴', '🐾'].map((value) => ({ kind: 'emoji' as const, value })),
-    idleItem: { kind: 'image', src: '/assets/embedded/img_010.png' },
+    idleItem: { kind: 'emoji', value: '🐶' },
     speed: 'normal',
     intro: defaultGameIntro(),
     texts: { ...DEFAULT_GAME_TEXTS },
@@ -382,10 +391,13 @@ export const invitation: InvitationConfig = {
   },
 
   footer: {
-    image: '/assets/embedded/img_003.jpg',
+    image: '',
   },
 
-  bgm: '/assets/embedded/audio_001.mp3',
+  bgm: '',
+
+  // 예시 데이터는 디자인 기본 배경을 그대로 씁니다
+  sectionBg: {},
 
   sections: [
     'cover',
@@ -401,7 +413,7 @@ export const invitation: InvitationConfig = {
 
   showPetals: true,
   petals: {
-    items: [{ kind: 'image', src: '/assets/embedded/img_001.png' }],
+    items: [{ kind: 'emoji', value: '🌸' }],
     count: 9,
   },
 
@@ -411,8 +423,7 @@ export const invitation: InvitationConfig = {
     url: 'https://luvi-wedding.pages.dev/',
     description: '2026. 10. 24 SAT · PM 1:00\n포항 더퀸컨벤션 6F 갤럭시홀',
     siteName: 'Luvi',
-    // 미리보기 카드는 가로형이라 세로 사진(cover.jpg 1000×1500)은 위아래가 잘립니다.
-    image: '/assets/embedded/img_003.jpg',
+    image: '',
     imageWidth: 1000,
     imageHeight: 667,
     durationMinutes: 120,

@@ -7,7 +7,12 @@
  * 🔴 여기가 "발행하면 그대로 뜬다"의 실제 지점입니다 — 스냅샷의 모든 값이 화면 값으로 1:1 매핑됩니다.
  */
 import type { AssetRef, PetalItem, PublicInvitation } from '@luvi/schema';
-import { DEFAULT_PETAL_COUNT, normalizeGame, normalizePetalItems } from '@luvi/schema';
+import {
+  DEFAULT_PETAL_COUNT,
+  normalizeGame,
+  normalizePetalItems,
+  normalizeSectionBg,
+} from '@luvi/schema';
 import type { GameSprite, InvitationConfig } from '@/config/invitation.config';
 import { BASE } from './env';
 
@@ -18,13 +23,18 @@ const MONTHS = [
 const WEEKDAYS_EN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** 번들된 기본 에셋 (사용자가 아직 안 올린 자리 메우기용) */
-const asset = (name: string) => `${BASE}assets/${name}`;
-const FALLBACK = {
-  dog: asset('embedded/img_001.png'),
-  gameFalling: [1, 2, 3, 4, 5, 6].map((n) => asset(`dog${n}_c.png`)),
-  gameIdle: asset('embedded/img_010.png'),
-};
+/**
+ * 사용자가 아직 안 올린 자리를 메우는 기본값.
+ *
+ * 🔴 **사진을 쓰지 않습니다.** 예전에는 번들된 이미지(`embedded/img_001.png`,
+ * `dog{n}_c.png`)를 썼는데 그것이 **첫 고객의 실제 반려견 사진**이었습니다 — 남의
+ * 청첩장에 그 사진이 기본값으로 떴습니다. 아이콘은 누구의 것도 아니라 안전하고,
+ * 게임 엔진·말풍선 모두 이모지를 그대로 그립니다.
+ */
+const FALLBACK_SPRITES: GameSprite[] = ['🐶', '🐕', '🦴', '🐾'].map((value) => ({
+  kind: 'emoji',
+  value,
+}));
 
 export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
   const c = pub.content.core;
@@ -78,7 +88,8 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
     },
 
     greeting: {
-      dogImage: url(c.greeting.bubbleImage) || FALLBACK.dog,
+      // 사진이 없으면 빈 문자열 — 섹션이 이모지로 대체합니다 (기본 사진을 두지 않는 이유는 FALLBACK_SPRITES 주석)
+      dogImage: url(c.greeting.bubbleImage),
       dogBubble: c.greeting.bubbleText,
       // 이미 발행된 KV 스냅샷은 mergeContent 를 거치지 않은 '그때의 JSON' 이라
       // showBubble 이 생기기 전 스냅샷에는 이 키가 없습니다. 없으면 켜진 것으로 봅니다
@@ -98,10 +109,8 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
       gameId: game.gameId,
       petName: game.petName,
       // 고른 것이 없으면 기본 강아지 그림 — 아무것도 떨어지지 않는 게임은 놀 수 없습니다
-      fallingItems: fallingItems.length
-        ? fallingItems
-        : FALLBACK.gameFalling.map((src) => ({ kind: 'image' as const, src })),
-      idleItem: idleItem ?? { kind: 'image', src: FALLBACK.gameIdle },
+      fallingItems: fallingItems.length ? fallingItems : FALLBACK_SPRITES,
+      idleItem: idleItem ?? FALLBACK_SPRITES[0],
       speed: game.speed,
       intro: game.intro,
       texts: game.texts,
@@ -136,6 +145,12 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
     bgm: pub.features.bgm ? url(c.bgm) : '',
     // 담긴 섹션과 순서를 그대로 넘깁니다 — 그리는 순서는 테마가 이 배열을 따릅니다
     sections: pub.sections,
+
+    /**
+     * 섹션 배경색. 옛 스냅샷에는 `design` 이 없고, 사용자가 지운 색은 빈 문자열로
+     * 남아 있습니다 — `normalizeSectionBg` 가 둘 다 '없음' 으로 정리합니다.
+     */
+    sectionBg: normalizeSectionBg(c.design?.sectionBg),
 
     showPetals: pub.features.petals,
 
