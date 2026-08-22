@@ -225,7 +225,9 @@ export default function Guestbook() {
   };
 
   return (
-    <section>
+    /* 축하 메시지는 읽는 글이라 줄 길이를 제한합니다 — 넓은 화면에서 한 줄이 너무 길어집니다.
+       헤더·탭·목록을 한 컬럼으로 묶어 가운데 두면 왼쪽으로 쏠려 보이지 않습니다. */
+    <section className="mx-auto max-w-[760px]">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -309,8 +311,7 @@ export default function Guestbook() {
         </div>
       )}
 
-      {/* 축하 메시지는 읽는 글이라 줄 길이를 제한합니다 — 넓은 화면에서 한 줄이 너무 길어집니다 */}
-      <div className="mt-6 max-w-[760px]">
+      <div className="mt-6">
         {load.state === 'loading' && (
           <div className="flex flex-col gap-3">
             {[0, 1, 2].map((i) => (
