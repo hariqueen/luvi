@@ -461,6 +461,26 @@ app.post('/api/invitations', async (c) => {
   const db = firestore(c.env);
   const body = await readJson<CreateInvitationBody>(c.req);
 
+  /**
+   * 🔴 **운영자 계정은 청첩장을 만들지 못합니다.**
+   *
+   * 운영자는 *남의* 청첩장을 대신 손봐주는 계정입니다. 그런데 운영자 계정으로도 만들 수
+   * 있게 두니, 2026-08-18 에 테스트로 만든 빈 초안이 그대로 남아 **한 결혼식에 청첩장이
+   * 두 개**처럼 보였습니다 (실제 발행본은 신부 계정 소유, 초안은 운영자 계정 소유).
+   * 관리 화면·방명록에서 둘이 나란히 뜨니 "계정별로 갈라졌다" 로 읽힙니다.
+   *
+   * 테스트가 필요하면 `e2e/` 하네스를 쓰세요 — **일회용 계정과 청첩장을 스스로 만들고
+   * finally 에서 지웁니다.** 실계정에 흔적을 남기지 않는 유일한 방법입니다.
+   */
+  if (await usersRepo.isAdmin(db, uid)) {
+    throw new HttpError({
+      code: 'forbidden',
+      message:
+        '운영자 계정으로는 청첩장을 만들 수 없습니다. ' +
+        '테스트가 필요하면 e2e 하네스(일회용 계정)를 쓰세요',
+    });
+  }
+
   // 모르는 디자인 이름은 기본 디자인으로 떨어집니다 (카탈로그가 판정합니다)
   const themeId = parseThemeId(body.themeId);
 
