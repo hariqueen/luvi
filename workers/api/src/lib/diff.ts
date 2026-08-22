@@ -55,6 +55,9 @@ const EXTRA_LABELS: Record<string, string> = {
   'core.cover.layers': '커버 · 사진 위 문구',
   'core.gallery': '갤러리 · 사진',
   'theme.classic1.game': '미니게임 설정',
+  // 섹션별 배경색. 섹션마다 한 줄씩 늘어놓지 않습니다 — 색만 바꿨는데 발행 요약이
+  // 아홉 줄로 뜨면 정작 무엇이 바뀌었는지 안 보입니다
+  'core.design.sectionBg': '꾸미기 · 섹션 배경색',
 };
 
 export interface DiffInput {

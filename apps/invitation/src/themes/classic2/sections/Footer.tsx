@@ -23,8 +23,15 @@ export function Footer() {
             className="absolute inset-0 bg-cover opacity-[.12]"
             style={{ backgroundImage: `url("${footer.image}")`, backgroundPosition: 'center 30%' }}
           />
-          {/* 사진 무늬 위에서도 활자가 읽히도록 아이보리를 한 겹 덮습니다 */}
-          <div className="absolute inset-0 bg-c2-ivory/55" />
+          {/*
+            사진 무늬 위에서도 활자가 읽히도록 한 겹 덮습니다.
+            색을 아이보리로 못 박지 않고 `--section-bg`(SectionSkin 이 넘겨주는 그 섹션의
+            배경색)를 씁니다 — 못 박으면 에디터에서 고른 배경색이 이 덮개 아래에서 흐려집니다.
+          */}
+          <div
+            className="absolute inset-0 opacity-55"
+            style={{ background: 'var(--section-bg, #FCFAF6)' }}
+          />
         </>
       )}
       <div

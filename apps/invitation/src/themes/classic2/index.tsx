@@ -19,6 +19,7 @@ import { useBgm } from '@/hooks/useBgm';
 import { IS_PREVIEW, Slot, notifySectionClick } from '@/components/common/PreviewSlot';
 import { MusicToggle } from '@/components/common/MusicToggle';
 import { Petals } from '@/components/common/Petals';
+import { SectionSkin } from '@/components/common/SectionSkin';
 import { useInvitation } from '@/lib/invitationContext';
 import { Cover } from './sections/Cover';
 import { Greeting } from './sections/Greeting';
@@ -83,7 +84,10 @@ export default function Classic2Theme() {
         if (!Section) return null;
         return (
           <Slot key={key} section={key}>
-            <Section />
+            {/* 에디터에서 고른 배경색을 그 섹션에만 입힙니다 (안 고른 섹션은 그대로) */}
+            <SectionSkin section={key}>
+              <Section />
+            </SectionSkin>
           </Slot>
         );
       })}

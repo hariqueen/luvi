@@ -21,6 +21,7 @@ import {
   LAYER_SIZE_RANGE,
   createTextLayer,
   normalizeGame,
+  normalizeSectionBg,
   type AssetRef,
   type ContentDoc,
   type Features,
@@ -44,9 +45,10 @@ import { CoverCanvas } from '@/components/CoverCanvas';
 import { FieldRenderer } from '@/components/FieldRenderer';
 import { LayerToolbar } from '@/components/LayerToolbar';
 import { SaveState, type SaveStatus } from '@/components/SaveState';
+import { SectionBgControl } from '@/components/SectionBgControl';
 import { SectionManager } from '@/components/SectionManager';
 import { TextEditorOverlay } from '@/components/TextEditorOverlay';
-import { SECTION_META, SECTION_TO_FORM } from '@/lib/sectionMeta';
+import { FORM_TO_SECTION, SECTION_META, SECTION_TO_FORM } from '@/lib/sectionMeta';
 
 /** 시트가 무엇을 보여주는지. 디자인의 panelList / panelEdit 에 대응한다 */
 type PanelMode = { kind: 'sections' } | { kind: 'form'; formKey: string };
@@ -73,6 +75,10 @@ const ALWAYS_FORMS: { formKey: string; label: string }[] = [
 const PHOTO_FIELDS: { path: string; label: string }[] = [
   // 라벨을 여기서 덮어씁니다 — 세 필드가 나란히 놓이면 갤러리의 원래 라벨('사진')만으로는
   // 커버·마지막 사진과 구분되지 않습니다. 각 섹션 폼에서는 원래 라벨이 그대로 쓰입니다.
+  //
+  // ⚠️ 이 묶음은 '사진' 칩으로 열었을 때만 보입니다. **마무리 카드는 자기 폼**으로 가서
+  //    마지막 사진 하나만 보여줍니다 (`SECTION_TO_FORM.footer`) — 마무리를 편집하러
+  //    들어왔는데 첫 화면 사진이 맨 위에 있으면 엉뚱한 사진을 바꾸게 됩니다.
   { path: 'core.cover.image', label: '커버 사진 · 첫 화면' },
   { path: 'core.gallery', label: '갤러리 사진' },
   { path: 'core.footer.image', label: '마지막 사진 · 맨 아래' },
@@ -483,10 +489,34 @@ export default function Editor() {
     }
   };
 
+  // ─────────────── 섹션 배경색 ───────────────
+  /**
+   * 섹션마다 고른 배경색 (`core.design.sectionBg`).
+   *
+   * 이 필드가 생기기 전 문서에는 `design` 이 아예 없어서 `?.` 로 읽습니다.
+   * 빈 문자열('')은 지우고 **'고르지 않음'** 을 뜻하므로 그대로 넘깁니다 — 컨트롤이
+   * '디자인 기본' 칩을 켜진 상태로 보여줘야 합니다 (없는 값과 같은 뜻입니다).
+   */
+  const sectionBg = doc?.core.design?.sectionBg ?? {};
+  const setSectionBg = useCallback(
+    (key: SectionKey, color: string) => setField(`core.design.sectionBg.${key}`, color),
+    [setField],
+  );
+
   // ─────────────── 폼 ───────────────
   const formSections = useMemo(() => [...CORE_SECTIONS, buildPhotosForm()], []);
   const activeForm: SectionDef | undefined =
     panel.kind === 'form' ? formSections.find((s) => s.key === panel.formKey) : undefined;
+
+  /**
+   * 지금 열린 폼이 **어느 섹션**의 것인지 — 배경색은 섹션 단위 값입니다.
+   * 섹션이 아닌 폼(기본 정보·연출·공유 설정)과 청첩장에서 빼둔 섹션은 `null` 이라
+   * 배경색 컨트롤이 뜨지 않습니다 (보이지 않는 섹션의 색을 정하게 하지 않습니다).
+   */
+  const bgSectionKey: SectionKey | null = useMemo(() => {
+    const key = activeForm ? FORM_TO_SECTION[activeForm.key] : undefined;
+    return key && sections.includes(key) ? key : null;
+  }, [activeForm, sections]);
 
   const openForm = useCallback((formKey: string) => {
     setPanel({ kind: 'form', formKey });
@@ -569,6 +599,8 @@ export default function Editor() {
       <SectionManager
         active={sections}
         meta={SECTION_META}
+        // 카드에 색 점을 찍어, 어느 섹션에 색을 넣었는지 목록에서 바로 보이게 합니다
+        bg={normalizeSectionBg(sectionBg)}
         onReorder={queueSections}
         onRemove={(key) => queueSections(sections.filter((k) => k !== key))}
         onAdd={(key) => queueSections([...sections, key])}
@@ -579,6 +611,17 @@ export default function Editor() {
 
   const formBody = activeForm ? (
     <div className="flex max-w-[520px] flex-col gap-4">
+      {/* 배경색은 섹션 전체에 걸리는 값이라 필드들 위에 둡니다 */}
+      {bgSectionKey && (
+        <SectionBgControl
+          themeId={themeId}
+          sectionKey={bgSectionKey}
+          label={SECTION_META[bgSectionKey].label}
+          value={sectionBg[bgSectionKey] ?? ''}
+          onChange={(color) => setSectionBg(bgSectionKey, color)}
+        />
+      )}
+
       {activeForm.fields.map((f) => (
         <FieldRenderer key={f.path} field={f} />
       ))}
@@ -686,7 +729,11 @@ export default function Editor() {
       )}
 
       {activeForm.fields.length === 0 && activeForm.key !== 'effects' && activeForm.key !== 'cover' && (
-        <p className="text-[13px] text-muted">이 섹션은 켜고 끄는 것만 정할 수 있어요.</p>
+        <p className="text-[13px] text-muted">
+          {bgSectionKey
+            ? '이 섹션은 배경색과 켜고 끄는 것만 정할 수 있어요.'
+            : '이 섹션은 켜고 끄는 것만 정할 수 있어요.'}
+        </p>
       )}
     </div>
   ) : null;

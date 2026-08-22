@@ -7,6 +7,8 @@
  *     (따로 입력받으면 불일치가 반드시 생긴다)
  */
 
+import type { SectionBgMap } from './design';
+
 /** 이미지·오디오 참조. 절대 URL을 저장하지 않는다 — 도메인이 바뀌면 전부 고쳐야 한다. */
 export interface AssetRef {
   /** R2 키 (예: 'inv/abc123/gallery/003.webp') */
@@ -297,6 +299,21 @@ export interface CoreContent {
   };
   footer: { image: AssetRef | null };
   bgm: AssetRef | null;
+  /**
+   * 화면 꾸미기 — 섹션마다 다르게 정할 수 있는 것.
+   *
+   * ⚠️ 이 필드가 생기기 전 문서·스냅샷에는 없습니다. 읽는 쪽은
+   *    `normalizeSectionBg(core.design?.sectionBg)` 로 통과시키세요 (`design.ts`).
+   */
+  design: {
+    /**
+     * 섹션 키 → 배경색(`#RRGGBB`). **키가 없으면 그 디자인의 기본 배경**입니다.
+     *
+     * 색을 '기본으로 되돌리기' 는 빈 문자열을 저장합니다 — Firestore 부분 업데이트로
+     * 중첩 키를 지우는 것보다 안전하고, 읽는 쪽이 빈 값을 '없음' 으로 봅니다.
+     */
+    sectionBg: SectionBgMap;
+  };
   /**
    * 화면 위로 떨어지는 연출. on/off 는 `features.petals` 이고, 여기는 모양·양입니다.
    *

@@ -51,6 +51,8 @@ export function emptyContent(): ContentDoc {
         petals: { items: [{ kind: 'emoji', value: '🌸' }], image: null, count: DEFAULT_PETAL_COUNT },
       },
       share: { title: '', description: '', image: null, durationMinutes: 120 },
+      // 비어 있음 = 섹션마다 그 디자인의 기본 배경. 사용자가 고른 색만 들어옵니다
+      design: { sectionBg: {} },
     },
     /**
      * 🔴 미니게임 설정도 골격에 넣습니다 (예전에는 `theme: {}` 였습니다).
@@ -152,6 +154,8 @@ export function sampleContent(): ContentDoc {
         image: null,
         durationMinutes: 120,
       },
+      // 새 청첩장은 디자인이 정한 배경 그대로 시작합니다 (색을 고르면 여기에 쌓입니다)
+      design: { sectionBg: {} },
     },
     theme: {
       classic1: {

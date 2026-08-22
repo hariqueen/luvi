@@ -7,7 +7,7 @@
  *
  * 필수 섹션은 제거 버튼을 아예 안 보여줍니다 — 누르고 나서 거절당하는 것보다 낫습니다.
  */
-import { canRemoveSection, type SectionKey } from '@luvi/schema';
+import { canRemoveSection, type SectionBgMap, type SectionKey } from '@luvi/schema';
 
 export interface SectionMeta {
   key: SectionKey;
@@ -22,6 +22,11 @@ interface Props {
   /** 담긴 섹션 — 배열 순서가 화면 순서 */
   active: SectionKey[];
   meta: Record<SectionKey, SectionMeta>;
+  /**
+   * 섹션마다 고른 배경색 — 카드에 색 점으로 보여줍니다.
+   * 어디에 색을 넣었는지 목록에서 바로 보여야 폼을 하나씩 열어보지 않습니다.
+   */
+  bg?: SectionBgMap;
   onReorder: (next: SectionKey[]) => void;
   onRemove: (key: SectionKey) => void;
   onAdd: (key: SectionKey) => void;
@@ -49,7 +54,7 @@ function move<T>(list: T[], from: number, to: number): T[] {
   return next;
 }
 
-export function SectionManager({ active, meta, onReorder, onRemove, onAdd, onEdit }: Props) {
+export function SectionManager({ active, meta, bg, onReorder, onRemove, onAdd, onEdit }: Props) {
   const available = ALL_KEYS.filter((k) => !active.includes(k));
 
   return (
@@ -89,7 +94,18 @@ export function SectionManager({ active, meta, onReorder, onRemove, onAdd, onEdi
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold">{m.label}</div>
+                  <div className="flex items-center gap-1.5">
+                    {/* 색을 고른 섹션만 점이 찍힙니다 (기본 배경은 점 없음) */}
+                    {bg?.[key] && (
+                      <span
+                        aria-label={`배경색 ${bg[key]}`}
+                        title={`배경색 ${bg[key]}`}
+                        className="h-3 w-3 flex-none rounded-full border border-line-strong"
+                        style={{ background: bg[key] }}
+                      />
+                    )}
+                    <span className="truncate text-[13px] font-semibold">{m.label}</span>
+                  </div>
                   {m.status && (
                     <div className="truncate text-[11px] text-muted-soft">{m.status}</div>
                   )}
