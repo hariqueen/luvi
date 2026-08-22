@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { assetUrl } from '@/lib/env';
 import type { InvitationSummary } from '@luvi/schema';
 
@@ -44,6 +45,7 @@ function statusBadge(inv: InvitationSummary): { label: string; className: string
 }
 
 export default function Dashboard() {
+  const { isAdmin } = useAuth();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -111,14 +113,37 @@ export default function Dashboard() {
 
         {load.state === 'ready' && load.items.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
-            <p className="text-[15px] font-medium text-ink">아직 만든 청첩장이 없어요</p>
-            <p className="mt-2 text-[13px] text-muted">첫 청첩장을 만들어 시작해보세요.</p>
-            <Link
-              to="/app/new"
-              className="mt-5 inline-block rounded-full bg-ink px-5 py-2.5 text-[13px] text-paper-soft"
-            >
-              + 새 청첩장 만들기
-            </Link>
+            {/*
+              운영자 계정은 **청첩장을 소유하지 않습니다**(서버가 생성을 막습니다). 그래서 이
+              화면은 늘 비어 있는 것이 정상이고, 안내를 '전체 청첩장' 으로 돌립니다 —
+              여기서 만들라고 하면 막힌 길로 보냅니다.
+            */}
+            {isAdmin ? (
+              <>
+                <p className="text-[15px] font-medium text-ink">운영자 계정은 청첩장을 갖지 않아요</p>
+                <p className="mt-2 text-[13px] text-muted">
+                  다른 계정의 청첩장을 손봐주는 계정입니다. 목록은 상단{' '}
+                  <b className="font-medium text-ink">전체 청첩장</b> 에서 볼 수 있어요.
+                </p>
+                <Link
+                  to="/app/admin"
+                  className="mt-5 inline-block rounded-full bg-ink px-5 py-2.5 text-[13px] text-paper-soft"
+                >
+                  전체 청첩장 보기
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="text-[15px] font-medium text-ink">아직 만든 청첩장이 없어요</p>
+                <p className="mt-2 text-[13px] text-muted">첫 청첩장을 만들어 시작해보세요.</p>
+                <Link
+                  to="/app/new"
+                  className="mt-5 inline-block rounded-full bg-ink px-5 py-2.5 text-[13px] text-paper-soft"
+                >
+                  + 새 청첩장 만들기
+                </Link>
+              </>
+            )}
           </div>
         )}
 

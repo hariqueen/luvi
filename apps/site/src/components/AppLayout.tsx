@@ -54,12 +54,19 @@ export function AppLayout() {
               </NavLink>
             ))}
           </nav>
-          <Link
-            to="/app/new"
-            className="flex-none rounded-full bg-ink px-4 py-[9px] text-[12.5px] text-paper-soft"
-          >
-            + 새로 만들기
-          </Link>
+          {/*
+            운영자에게는 감춥니다 — 서버가 운영자 계정의 청첩장 생성을 403 으로 막습니다
+            (운영노트 6-6: 운영자 계정으로 만든 테스트 청첩장이 남아 '한 결혼식에 청첩장
+            두 개' 로 보인 사고). 눌리는데 막히는 버튼은 고장으로 읽힙니다.
+          */}
+          {!isAdmin && (
+            <Link
+              to="/app/new"
+              className="flex-none rounded-full bg-ink px-4 py-[9px] text-[12.5px] text-paper-soft"
+            >
+              + 새로 만들기
+            </Link>
+          )}
           {/*
             로그인한 계정 표시.
 
