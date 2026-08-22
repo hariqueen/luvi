@@ -1,7 +1,7 @@
 import type { GameSprite, GameSpeed } from '@/config/invitation.config';
 
 /**
- * "떨어지는 일홍이 받기" 캔버스 미니게임 엔진.
+ * "떨어지는 {이름} 받기" 캔버스 미니게임 엔진.
  * React에 의존하지 않는 순수 클래스 — 컴포넌트는 start()/destroy()와
  * onGameOver 콜백만 사용합니다. (원본 DCLogic의 게임 로직을 이식)
  */

@@ -68,19 +68,19 @@ export function sampleContent(): ContentDoc {
     core: {
       couple: {
         groom: {
-          name: '이호석',
-          nameEn: 'Hoseok',
-          firstName: '호석',
-          father: '이승봉',
-          mother: '진순희',
+          name: '신랑',
+          nameEn: 'Groom',
+          firstName: '신랑',
+          father: '아버지',
+          mother: '어머니',
           relation: '장남',
         },
         bride: {
-          name: '백송희',
-          nameEn: 'Songhee',
-          firstName: '송희',
-          father: '백승환',
-          mother: '엄정숙',
+          name: '신부',
+          nameEn: 'Bride',
+          firstName: '신부',
+          father: '아버지',
+          mother: '어머니',
           relation: '장녀',
         },
       },
@@ -89,7 +89,7 @@ export function sampleContent(): ContentDoc {
         image: null,
         layers: defaultCoverLayers({
           eyebrow: 'The Wedding of',
-          names: '호석 · 송희',
+          names: '신랑 · 신부',
           dateLabel: '2026. 10. 24 SAT · PM 1:00',
         }),
       },
@@ -128,13 +128,13 @@ export function sampleContent(): ContentDoc {
           {
             title: '신랑에게',
             items: [
-              { label: '신랑 이호석', bank: '국민 000000-00-000000', number: '000000-00-000000' },
+              { label: '신랑', bank: '국민 000000-00-000000', number: '000000-00-000000' },
             ],
           },
           {
             title: '신부에게',
             items: [
-              { label: '신부 백송희', bank: '국민 000000-00-000000', number: '000000-00-000000' },
+              { label: '신부', bank: '국민 000000-00-000000', number: '000000-00-000000' },
             ],
           },
         ],
@@ -147,7 +147,7 @@ export function sampleContent(): ContentDoc {
         petals: { items: [{ kind: 'emoji', value: '🌸' }], image: null, count: DEFAULT_PETAL_COUNT },
       },
       share: {
-        title: '호석 ♥ 송희 결혼합니다',
+        title: '신랑 ♥ 신부 결혼합니다',
         description: '2026. 10. 24 SAT · PM 1:00\n포항 더퀸컨벤션 6F 갤럭시홀',
         image: null,
         durationMinutes: 120,
@@ -156,7 +156,7 @@ export function sampleContent(): ContentDoc {
     theme: {
       classic1: {
         // 문구·난이도·랭킹 기본값은 스키마 한 곳에서 옵니다 (`defaultGame`)
-        game: defaultGame('일홍이'),
+        game: defaultGame('멍멍이'),
       },
     },
   };

@@ -32,7 +32,7 @@ function ThemeMock({ theme }: { theme: ThemeDef }) {
       >
         <span className="font-script text-[13px] leading-none text-white/80">The Wedding of</span>
         <span className="text-[19px] font-semibold leading-none tracking-[-.02em] text-white">
-          호석 · 송희
+          신랑 · 신부
         </span>
         <span className="mt-0.5 h-px w-5" style={{ background: palette.accent }} />
         <span className="text-[8px] tracking-[.14em] text-white/85">2026. 10. 24 SAT</span>
@@ -50,7 +50,7 @@ function ThemeMock({ theme }: { theme: ThemeDef }) {
         OCTOBER 24, 2026
       </span>
       <span className="font-script text-[19px] leading-none" style={{ color: palette.ink }}>
-        Hoseok &amp; Songhee
+        Groom &amp; Bride
       </span>
       <span
         className="mt-0.5 h-[52px] w-[42px] rounded-[3px]"

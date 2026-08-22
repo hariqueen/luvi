@@ -23,11 +23,11 @@ import {
 } from '@luvi/schema';
 
 export interface Person {
-  /** 표시 이름 (예: 이호석) */
+  /** 표시 이름 (예: 신랑) */
   name: string;
-  /** 커버용 영문 이름 (예: Hoseok) */
+  /** 커버용 영문 이름 (예: Groom) */
   nameEn: string;
-  /** 이름만 (예: 호석) */
+  /** 이름만 (예: 신랑) */
   firstName: string;
   /** 아버지 성함 */
   father: string;
@@ -48,9 +48,9 @@ export interface GalleryItem {
 export type GameSprite = { kind: 'emoji'; value: string } | { kind: 'image'; src: string };
 
 export interface AccountItem {
-  /** 예: 신랑 이호석 */
+  /** 예: 신랑 */
   label: string;
-  /** 예: 국민 710402-00-217723 */
+  /** 예: 국민 000000-00-000000 */
   bank: string;
   /** 복사에 사용할 계좌번호(숫자/하이픈) */
   number: string;
@@ -240,19 +240,19 @@ export const invitation: InvitationConfig = {
   invitationId: '',
 
   groom: {
-    name: '이호석',
-    nameEn: 'Hoseok',
-    firstName: '호석',
-    father: '이승봉',
-    mother: '진순희',
+    name: '신랑',
+    nameEn: 'Groom',
+    firstName: '신랑',
+    father: '아버지',
+    mother: '어머니',
     relation: '장남',
   },
   bride: {
-    name: '백송희',
-    nameEn: 'Songhee',
-    firstName: '송희',
-    father: '백승환',
-    mother: '엄정숙',
+    name: '신부',
+    nameEn: 'Bride',
+    firstName: '신부',
+    father: '아버지',
+    mother: '어머니',
     relation: '장녀',
   },
 
@@ -262,7 +262,7 @@ export const invitation: InvitationConfig = {
     image: '/assets/embedded/img_002.jpg',
     layers: defaultCoverLayers({
       eyebrow: 'The Wedding of',
-      names: '호석 · 송희',
+      names: '신랑 · 신부',
       dateLabel: '2026. 10. 24 SAT · PM 1:00',
     }),
   },
@@ -284,7 +284,7 @@ export const invitation: InvitationConfig = {
 
   gallery: [
     // 첫 항목은 상단 대표 이미지로 사용됩니다.
-    { thumb: '/assets/embedded/img_003.jpg', full: '/assets/couple_c.jpg' },
+    { thumb: '/assets/embedded/img_003.jpg', full: '/assets/embedded/img_003.jpg' },
     {
       thumb: '/assets/embedded/img_004.jpg',
       full: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=75',
@@ -313,11 +313,9 @@ export const invitation: InvitationConfig = {
 
   game: {
     gameId: 'catch',
-    petName: '일홍이',
-    fallingItems: [1, 2, 3, 4, 5, 6].map((n) => ({
-      kind: 'image' as const,
-      src: `/assets/dog${n}_c.png`,
-    })),
+    petName: '멍멍이',
+    // 실제 반려동물 사진 대신 아이콘 — 예시 데이터에 특정인의 사진을 두지 않습니다
+    fallingItems: ['🐶', '🐕', '🦴', '🐾'].map((value) => ({ kind: 'emoji' as const, value })),
     idleItem: { kind: 'image', src: '/assets/embedded/img_010.png' },
     speed: 'normal',
     intro: defaultGameIntro(),
@@ -367,31 +365,17 @@ export const invitation: InvitationConfig = {
       {
         title: '신랑에게',
         items: [
-          {
-            label: '신랑 이호석',
-            bank: '국민 710402-00-217723',
-            number: '710402-00-217723',
-            kakaoPay: 'https://qr.kakaopay.com/FaOjDEWvQ',
-          },
-          { label: '아버지 이승봉', bank: '신한 110-006-882000', number: '110-006-882000' },
-          { label: '어머니 진순희', bank: '국민 838501-01-038275', number: '838501-01-038275' },
+          { label: '신랑', bank: '국민 000000-00-000000', number: '000000-00-000000' },
+          { label: '아버지', bank: '신한 000-000-000000', number: '000-000-000000' },
+          { label: '어머니', bank: '국민 000000-00-000000', number: '000000-00-000000' },
         ],
       },
       {
         title: '신부에게',
         items: [
-          {
-            label: '신부 백송희',
-            bank: '국민 459002-04-204336',
-            number: '459002-04-204336',
-            kakaoPay: 'https://qr.kakaopay.com/FXqFz2dlg',
-          },
-          { label: '아버지 백승환', bank: '국민 606-21-0278-441', number: '606-21-0278-441' },
-          {
-            label: '어머니 엄정숙',
-            bank: '카카오뱅크 3333-06-2090673',
-            number: '3333-06-2090673',
-          },
+          { label: '신부', bank: '국민 000000-00-000000', number: '000000-00-000000' },
+          { label: '아버지', bank: '국민 000-00-0000-000', number: '000-00-0000-000' },
+          { label: '어머니', bank: '카카오뱅크 0000-00-0000000', number: '0000-00-0000000' },
         ],
       },
     ],
@@ -422,13 +406,13 @@ export const invitation: InvitationConfig = {
   },
 
   share: {
-    title: '호석 ♥ 송희 결혼합니다',
+    title: '신랑 ♥ 신부 결혼합니다',
     date: '2026. 10. 24 SAT · PM 1:00',
     url: 'https://luvi-wedding.pages.dev/',
     description: '2026. 10. 24 SAT · PM 1:00\n포항 더퀸컨벤션 6F 갤럭시홀',
     siteName: 'Luvi',
     // 미리보기 카드는 가로형이라 세로 사진(cover.jpg 1000×1500)은 위아래가 잘립니다.
-    image: '/assets/couple_c.jpg',
+    image: '/assets/embedded/img_003.jpg',
     imageWidth: 1000,
     imageHeight: 667,
     durationMinutes: 120,

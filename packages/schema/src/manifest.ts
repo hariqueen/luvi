@@ -275,7 +275,7 @@ export const CORE_SECTIONS: SectionDef[] = [
         path: 'theme.classic1.game.petName',
         type: 'text',
         label: '주인공 이름',
-        hint: '문구의 {이름} 자리에 들어갑니다 (예: 일홍이)',
+        hint: '문구의 {이름} 자리에 들어갑니다 (예: 멍멍이)',
         maxLength: 20,
       },
       {
