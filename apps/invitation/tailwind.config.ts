@@ -29,7 +29,9 @@ export default {
          *
          * classic1 의 색(rose·cream…)과 **섞지 않습니다** — 한 이름을 두 디자인이 나눠 쓰면
          * 한쪽 색을 고치는 순간 다른 청첩장의 화면이 함께 바뀝니다.
-         * 값 출처: 저장소 밖 `classic2/index.html` 의 CSS 변수.
+         * 값 출처: 원본 단일 HTML 시제품(`classic2/index.html`) 의 CSS 변수. 그 폴더는
+         * 포팅이 끝나 2026-08-22 에 지웠으므로 **이 값들이 이제 유일한 출처**입니다
+         * (원본은 `docs/archive/classic2-original-prototype.zip` 에 넣어 뒀습니다).
          */
         c2: {
           ivory: '#FCFAF6',
