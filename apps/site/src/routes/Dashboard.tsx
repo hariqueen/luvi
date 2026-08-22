@@ -32,6 +32,25 @@ function formatWeddingAt(iso: string): string {
   return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()} (${WEEKDAYS[d.getDay()]}) ${ampm} ${h12}:${pad(d.getMinutes())}`;
 }
 
+/**
+ * 마지막으로 저장한 시각. "오늘 14:32" · "어제 09:10" · "8. 19 21:04".
+ *
+ * 왜 상대시간("3분 전")이 아니라 시각인가: 이 화면은 **여러 청첩장 중 어느 것을 최근에
+ * 손댔는지** 고르는 데 씁니다. 상대시간은 목록에서 서로 비교하기 어렵고, 며칠이 지나면
+ * "5일 전" 처럼 오히려 뭉개집니다. 오늘·어제만 말로 바꿔 읽기 쉽게 합니다.
+ */
+function formatTouched(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  const days = Math.floor((midnight.getTime() - d.getTime()) / 86_400_000);
+  if (days < 0) return `오늘 ${time}`;
+  if (days === 0) return `어제 ${time}`;
+  return `${d.getMonth() + 1}. ${d.getDate()} ${time}`;
+}
+
 function statusBadge(inv: InvitationSummary): { label: string; className: string } {
   if (inv.status === 'archived') {
     return { label: '보관됨', className: 'bg-surface-sunken text-muted-faint' };
@@ -152,6 +171,7 @@ export default function Dashboard() {
             {load.items.map((inv) => {
               const badge = statusBadge(inv);
               const thumb = assetUrl(inv.thumbKey);
+              const touched = formatTouched(inv.updatedAt);
               const busy = busyId === inv.id;
               return (
                 <li
@@ -178,6 +198,15 @@ export default function Dashboard() {
                       {inv.coupleLabel || '제목 없음'}
                     </h3>
                     <p className="mt-0.5 text-[12px] text-muted">{formatWeddingAt(inv.weddingAt)}</p>
+                    {/*
+                      마지막 편집 시각 — 예식 날짜와 헷갈리지 않게 라벨을 붙입니다.
+                      날짜만 두면 둘 중 무엇인지 알 수 없습니다.
+                    */}
+                    {touched && (
+                      <p className="mt-0.5 text-[11.5px] text-muted-faint">
+                        마지막 편집 {touched}
+                      </p>
+                    )}
 
                     <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2.5 text-[12.5px]">
                       <Link to={`/app/i/${inv.id}/edit`} className="font-medium text-ink hover:underline">
