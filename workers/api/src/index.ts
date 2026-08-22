@@ -12,7 +12,7 @@
  *    KV 쓰기는 발행할 때만 일어납니다 (`lib/snapshot.ts`).
  * 3. **하객 경로는 Firestore 를 읽지 않습니다.** 발행 스냅샷을 KV 에서 읽습니다.
  */
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import type {
   AdminInvitationSummary,
@@ -253,6 +253,41 @@ async function isOwnerOf(
   const invitation = await invitationsRepo.findInvitation(db, invitationId);
   if (!invitation) return false;
   return invitation.ownerUid === uid || (await usersRepo.isAdmin(db, uid));
+}
+
+/**
+ * 관리 이력(감사 로그) — **누가 언제 무엇을 지우거나 숨겼나**.
+ *
+ * 🔴 왜 서버가 남기는가: 화면에서 보내는 로그(`POST /api/events`)는 **지운 사람이 보내지
+ *    않으면 기록이 없습니다.** 지운 흔적은 지운 쪽의 선의에 기대면 안 됩니다. 그래서
+ *    되돌릴 수 없는 동작(삭제·초기화)과 하객 화면을 바꾸는 동작(숨김)은 서버가 직접 씁니다.
+ *
+ * 개인정보는 넣지 않습니다 — 하객 이름·글 내용은 기록하지 않고 **문서 ID 만** 남깁니다
+ * (migrations/0001_events.sql 의 원칙). "누가" 는 `uid`, "언제" 는 `at` 입니다.
+ *
+ * 로그 실패가 동작을 막아서는 안 되므로 `insertEvents` 는 던지지 않습니다.
+ * 조회는 D1 콘솔에서 SQL 로만 합니다 (웹 화면을 만들지 않는다 — 운영노트 7).
+ */
+async function audit(
+  c: Context<{ Bindings: Env; Variables: Vars }>,
+  input: { name: string; invitationId: string; detail?: string },
+): Promise<void> {
+  await eventsRepo.insertEvents(c.env.LUVI_LOGS, [
+    {
+      at: new Date().toISOString(),
+      kind: 'admin',
+      name: input.name.slice(0, 60),
+      ok: 1,
+      detail: input.detail ? input.detail.slice(0, 500) : null,
+      invitationId: input.invitationId.slice(0, 60),
+      slug: null,
+      session: null,
+      uid: c.get('uid'),
+      path: c.req.path.slice(0, 200),
+      ua: (c.req.header('User-Agent') ?? '').slice(0, 200),
+      ipHash: await hashIp(c.env.APP_SECRET, clientIp(c)).catch(() => null),
+    },
+  ]);
 }
 
 function clientIp(c: { req: { header: (k: string) => string | undefined } }): string {
@@ -563,6 +598,11 @@ app.delete('/api/invitations/:id', async (c) => {
   await removeSnapshot(c.env.LUVI_KV, id, invitation.slug || null, invitation.pinnedHost);
   await deleteAssets(c.env.LUVI_ASSETS, `inv/${id}/`);
   await invitationsRepo.deleteInvitation(db, invitation);
+  await audit(c, {
+    name: 'invitation_delete',
+    invitationId: id,
+    detail: `slug=${invitation.slug || '없음'} status=${invitation.status}`,
+  });
 
   return c.json(ok({ id }));
 });
@@ -695,6 +735,11 @@ app.patch('/api/invitations/:id/guestbook/:entryId', async (c) => {
   const entry = await guestbookRepo.setHidden(db, id, c.req.param('entryId'), hidden);
   if (!entry) throw new HttpError({ code: 'not_found', message: '해당 글을 찾을 수 없습니다' });
 
+  await audit(c, {
+    name: hidden ? 'guestbook_hide' : 'guestbook_unhide',
+    invitationId: id,
+    detail: `entry=${entry.id}`,
+  });
   return c.json(ok<GuestbookEntry>(entry));
 });
 
@@ -704,7 +749,29 @@ app.delete('/api/invitations/:id/guestbook/:entryId', async (c) => {
   await requireOwned(c, db, id);
 
   await guestbookRepo.removeEntry(db, id, c.req.param('entryId'));
+  await audit(c, {
+    name: 'guestbook_delete',
+    invitationId: id,
+    detail: `entry=${c.req.param('entryId')}`,
+  });
   return c.json(ok({ id: c.req.param('entryId') }));
+});
+
+/**
+ * 방명록 전체 초기화 — 하객 글을 **전부** 지웁니다.
+ *
+ * 한 건씩 지우는 것과 경로가 다릅니다(`/guestbook` vs `/guestbook/:entryId`) — 세그먼트
+ * 수가 달라 라우팅이 겹치지 않습니다. 숨김과 달리 되돌릴 수 없어 화면에서 건수를
+ * 보여주고 확인받은 뒤에만 부릅니다.
+ */
+app.delete('/api/invitations/:id/guestbook', async (c) => {
+  const db = firestore(c.env);
+  const id = c.req.param('id');
+  await requireOwned(c, db, id);
+
+  const deleted = await guestbookRepo.clearGuestbook(db, id);
+  await audit(c, { name: 'guestbook_clear', invitationId: id, detail: `deleted=${deleted}` });
+  return c.json(ok({ deleted }));
 });
 
 // ─────────────────────────── 랭킹 ───────────────────────────
@@ -748,6 +815,11 @@ app.delete('/api/invitations/:id/rankings/:entryId', async (c) => {
   await requireOwned(c, db, id);
 
   await rankingsRepo.removeRank(db, id, c.req.param('entryId'));
+  await audit(c, {
+    name: 'ranking_delete',
+    invitationId: id,
+    detail: `entry=${c.req.param('entryId')}`,
+  });
   return c.json(ok({ id: c.req.param('entryId') }));
 });
 

@@ -11,6 +11,11 @@
 /** 하나의 이벤트. 클라이언트가 보내는 필드 + 서버가 채우는 필드 */
 export interface EventRow {
   at: string;
+  /**
+   * 'click' | 'error' | 'view' — 화면에서 보낸 것.
+   * 'admin' — **서버가 직접 남긴 관리 이력**(방명록 숨김·삭제·초기화, 청첩장 삭제).
+   *   지운 사람이 로그를 보내지 않아도 남아야 하므로 워커가 씁니다 (`audit()` in index.ts).
+   */
   kind: string;
   name: string;
   ok: number | null;

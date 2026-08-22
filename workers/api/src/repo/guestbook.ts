@@ -117,6 +117,17 @@ export async function setHidden(
   return toEntry(doc);
 }
 
+/**
+ * 방명록 전체 삭제 (초기화). 지운 건수를 돌려줍니다.
+ *
+ * 🔴 되돌릴 수 없습니다. 그래서 화면에서 건수를 보여주고 한 번 더 확인받습니다.
+ * 예식이 끝난 뒤 정리하거나, 테스트로 남긴 글을 한 번에 치우는 용도입니다.
+ * (청첩장 자체를 지울 때도 같은 함수로 방명록을 정리합니다 — `deleteInvitation`)
+ */
+export async function clearGuestbook(db: Firestore, invitationId: string): Promise<number> {
+  return db.deleteCollection(invitationPath(invitationId), COLLECTION);
+}
+
 export async function removeEntry(
   db: Firestore,
   invitationId: string,

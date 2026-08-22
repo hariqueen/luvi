@@ -131,6 +131,9 @@ export function createClient(opts: ClientOptions) {
         patch<GuestbookEntry>(`/invitations/${invitationId}/guestbook/${entryId}`, { hidden }),
       remove: (invitationId: string, entryId: string) =>
         del<{ id: string }>(`/invitations/${invitationId}/guestbook/${entryId}`),
+      /** 전체 초기화 — 되돌릴 수 없다. 지운 건수를 돌려준다 */
+      clear: (invitationId: string) =>
+        del<{ deleted: number }>(`/invitations/${invitationId}/guestbook`),
     },
 
     rankings: {
