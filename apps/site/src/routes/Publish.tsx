@@ -276,6 +276,18 @@ export default function Publish() {
               </div>
             )}
 
+            {/*
+              발행 직후가 "하객 글은 어디서 보나" 를 알려줄 유일한 타이밍입니다.
+              여기에 길을 두지 않으면 대시보드의 작은 '방명록' 링크를 스스로 찾아야 합니다.
+            */}
+            <p className="text-center text-[12.5px] text-muted">
+              하객이 남긴 축하 메시지는{' '}
+              <Link to={`/app/i/${id}/guestbook`} className="text-gold-deep underline">
+                방명록 관리
+              </Link>
+              에서 모아 볼 수 있어요.
+            </p>
+
             <Link to="/app" className="text-center text-[13px] text-muted underline">
               대시보드로 돌아가기
             </Link>

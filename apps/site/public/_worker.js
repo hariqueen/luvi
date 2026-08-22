@@ -10,6 +10,14 @@
  *   · /i/{slug}       (확장자 없음) → 뷰어 SPA
  *   · /i/assets/*, 파일             → 그대로 (장기 캐시)
  *   · 그 외 파일 없는 경로          → 사이트 SPA
+ *
+ * 🔴 **없는 자산에는 절대 장기 캐시를 걸지 않는다** (2026-08-22 발행 화면 사고).
+ *    배포가 교체되는 몇 초 사이에 아직 올라가지 않은 청크를 누가 요청하면 Pages 가
+ *    SPA 폴백(200 text/html)을 돌려주는데, 여기서 그 응답에 `immutable` 을 달아
+ *    **엣지에 1년간 굳어버렸습니다.** 파일은 배포에 있는데도 그 화면만 흰 화면이 되고,
+ *    파일 이름이 같으니 재배포로도 낫지 않습니다(캐시 퍼지 아니면 이름을 바꿔야 함).
+ *    그래서 자산 경로에 HTML 이 오면 404 + no-store 로 돌려보냅니다 — 굳지 않고,
+ *    `lazyPage()` 의 자동 새로고침이 다음 배포본을 받아옵니다.
  */
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const hasExt = (p) => /\.[a-zA-Z0-9]+$/.test(p);
@@ -29,6 +37,14 @@ export default {
       return new Response(r.body, { status: 200, headers: h });
     };
     const immutable = (r) => {
+      // 자산을 달라고 했는데 HTML 이 왔다 = 그 파일이 없다 (Pages 의 SPA 폴백).
+      // 이걸 캐시하면 그 화면이 영구히 흰 화면이 된다 — 캐시하지 말고 404 로 알린다.
+      if ((r.headers.get('content-type') ?? '').includes('text/html')) {
+        return new Response('asset not found', {
+          status: 404,
+          headers: { 'Cache-Control': 'no-store' },
+        });
+      }
       const h = new Headers(r.headers);
       h.set('Cache-Control', IMMUTABLE);
       return new Response(r.body, { status: r.status, headers: h });
