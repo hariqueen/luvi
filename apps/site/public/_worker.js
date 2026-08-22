@@ -22,10 +22,29 @@
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const hasExt = (p) => /\.[a-zA-Z0-9]+$/.test(p);
 
+/**
+ * 🔴 지운 고객 사진은 경로째로 거절한다 (2026-08-22).
+ *
+ * 첫 고객의 실제 사진·반려견 사진 20개를 저장소에서 지웠는데(커밋 5b99f1b), 배포에
+ * 없는데도 **apex(luv-ai.co.kr)에서 5개가 계속 200** 으로 나왔습니다 — 같은 배포를
+ * 보는 `www.luv-ai.co.kr`·`luvi-site.pages.dev` 는 404 인데 apex 만 그랬고,
+ * 존 캐시 전체 퍼지(purge_everything)로도, 새 배포로도 사라지지 않았습니다
+ * (Pages 자산 계층에 남은 것으로 보입니다). 남의 사진이 URL 로 열리는 상태를
+ * 캐시가 비길 때까지 둘 수 없으니 워커에서 막습니다.
+ *
+ * 되살릴 이름이 아니므로 410(Gone) 입니다. 이 목록은 그 계층이 비워지면 지워도 됩니다.
+ */
+const GONE =
+  /^\/i\/assets\/(?:couple_c\.jpg|cover\.jpg|dogface_c\.png|dog[1-6]_c\.png|embedded\/(?:img_0(?:0[1-9]|10)\.(?:jpg|png)|audio_001\.mp3))$/;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const p = url.pathname;
+
+    if (GONE.test(p)) {
+      return new Response('gone', { status: 410, headers: { 'Cache-Control': 'no-store' } });
+    }
     const asset = (path) => env.ASSETS.fetch(new Request(new URL(path, url.origin), request));
 
     // ⚠️ '/i/index.html' 을 직접 요청하면 Pages 가 308(정규화)로 응답해 빈 바디가 된다.
