@@ -5,7 +5,14 @@
  * 마크업에 자리를 박지 않습니다. 대신 역할(윗줄·제목·안내)마다 **이 디자인의 타이포**를
  * 여기 한 곳에 두고, 섹션은 목록만 넘깁니다 — 테마마다 크기·색을 다시 적으면 한쪽만 바뀝니다.
  */
-import { CardText, type CardTextProps, type RoleClass } from '@/components/common/CardText';
+import type { SectionKey } from '@luvi/schema';
+import {
+  CardText,
+  FreeText,
+  type CardTextProps,
+  type RoleClass,
+} from '@/components/common/CardText';
+import { useInvitation } from '@/lib/invitationContext';
 
 /** 역할 → 로즈 클래식의 타이포. 여백은 자리(zone)의 `className` 이 정합니다 */
 const ROLE: RoleClass = {
@@ -23,4 +30,13 @@ export function SectionText({
   ...rest
 }: Omit<CardTextProps, 'roleClass'> & { override?: Partial<RoleClass> }) {
   return <CardText {...rest} roleClass={override ? { ...ROLE, ...override } : ROLE} />;
+}
+
+/**
+ * 자유 배치된 문구를 카드 위에 얹는 층 — 끌어서 옮긴 문구가 여기로 옵니다.
+ * 테마마다 타이포가 다르므로 `ROLE` 을 함께 넘깁니다.
+ */
+export function SectionFreeText({ section }: { section: SectionKey }) {
+  const { sectionText } = useInvitation();
+  return <FreeText section={section} zones={sectionText[section]} roleClass={ROLE} />;
 }

@@ -42,12 +42,3 @@
     transform: scaleY(1);
   }
 }
-
-/**
- * 에디터 미리보기에서 문구를 끌고 있는 동안에만 '빈 자리' 를 보여줍니다.
- * (`components/common/blockDrag.ts` 가 body 에 이 표시를 붙입니다)
- * 항상 보이면 카드마다 점선 상자가 두 개씩 떠서 미리보기가 시끄러워집니다.
- */
-body[data-luvi-dragging] [data-luvi-empty-zone] {
-  display: block;
-}

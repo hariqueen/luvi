@@ -1,90 +1,70 @@
 /**
- * 미리보기에서 **문구를 집어 옮기기** — PPT 에서 텍스트 상자를 끄는 감각.
+ * 미리보기에서 **문구를 집어 원하는 자리에 놓기** — PPT 에서 텍스트 상자를 끄는 감각.
  *
- * 왜 여기(에디터 패널이 아니라 미리보기)인가: 순서를 바꾸는 일은 **보면서** 하는 일입니다.
- * 왼쪽 목록의 ▲▼ 버튼으로 옮기면 눈은 오른쪽 미리보기를 보고 손은 왼쪽을 누르게 되고,
- * 한 번 누를 때마다 어디로 갔는지 다시 확인해야 합니다. 옮길 대상을 직접 집는 게 자연스럽습니다.
+ * 왜 여기(에디터 패널이 아니라 미리보기)인가: 위치는 **보면서** 정하는 일입니다. 왼쪽
+ * 목록의 버튼으로 옮기면 눈은 오른쪽 미리보기를 보고 손은 왼쪽을 누르게 되고, 한 번
+ * 누를 때마다 어디로 갔는지 다시 확인해야 합니다.
  *
- * 왜 자유 좌표(x·y)가 아닌가: 카드의 높이는 콘텐츠(달력·지도·방명록 목록)에 따라 변하고
- * 하객의 폰 폭도 다릅니다. 좌표로 저장하면 **다른 폰에서 글자가 달력 위에 겹칩니다.**
- * 그래서 "어느 자리(카드 위/콘텐츠 아래)의 몇 번째" 로 떨어뜨립니다 — 끄는 감각은 같고,
- * 결과는 어떤 화면에서도 깨지지 않습니다. (커버는 배경이 고정 비율이라 좌표를 씁니다)
+ * 좌표는 **카드 박스 기준 비율**로 저장합니다(`data-preview-frame`). 하객의 폰 폭이
+ * 미리보기 폭과 다르므로 px 로 저장하면 위치가 어긋납니다 — 커버 문구가 같은 이유로
+ * 비율을 씁니다. `pos` 가 붙은 순간 그 문구는 흐름에서 빠져나와 절대 배치됩니다.
  *
- * 🔴 React 상태를 쓰지 않고 DOM 을 직접 다룹니다. 삽입선 하나를 그리려고 섹션마다 흩어진
- *    `CardText` 들이 상태를 공유하게 만들면 배선이 훨씬 커집니다. 드래그는 편집 화면에서만
- *    잠깐 사는 UI 라 이쪽이 단순합니다.
+ * ⚠️ 자유 배치는 카드 높이가 콘텐츠(달력·지도·방명록 목록)에 따라 달라지는 만큼, 폰
+ *    크기가 다르면 글자가 콘텐츠 위에 겹칠 수 있습니다. 사용자가 그걸 알고 쓰는 기능이고,
+ *    되돌리는 길(툴바의 '흐름으로')을 함께 둡니다.
+ *
+ * 🔴 끄는 동안에는 **DOM 을 직접 옮깁니다**(`transform`). 움직일 때마다 부모에게 좌표를
+ *    보내 초안을 갱신하면, 매 프레임마다 미리보기 전체가 다시 그려져 끊깁니다. 손을
+ *    떼는 순간에만 최종 좌표를 보냅니다.
  */
-const ZONES = ['head', 'foot'] as const;
-
-interface Spot {
-  zone: string;
-  index: number;
-  /** 삽입선을 그릴 화면 y */
-  y: number;
-  left: number;
-  width: number;
-}
-
 interface Session {
   section: string;
   zone: string;
   id: string;
-  line: HTMLElement;
-  spot: Spot | null;
+  el: HTMLElement;
+  frame: HTMLElement;
+  startX: number;
+  startY: number;
+  moved: boolean;
   onMove: (e: PointerEvent) => void;
-  onUp: () => void;
+  onUp: (e: PointerEvent) => void;
 }
 
 let session: Session | null = null;
 
-/** 떨어뜨릴 수 있는 자리들 — 블록 사이사이 + 빈 자리 */
-function spots(section: string): Spot[] {
-  const out: Spot[] = [];
-  for (const zone of ZONES) {
-    const zoneEl = document.querySelector<HTMLElement>(`[data-preview-zone="${section}:${zone}"]`);
-    if (!zoneEl) continue;
-    const zr = zoneEl.getBoundingClientRect();
-    const blocks = Array.from(zoneEl.querySelectorAll<HTMLElement>('[data-preview-block]'));
-
-    // 빈 자리 — 여기로도 옮길 수 있어야 합니다 (문구가 없는 자리에 처음 넣는 경우)
-    if (blocks.length === 0) {
-      out.push({ zone, index: 0, y: zr.top + zr.height / 2, left: zr.left, width: zr.width });
-      continue;
-    }
-    blocks.forEach((b, i) => {
-      const r = b.getBoundingClientRect();
-      out.push({ zone, index: i, y: r.top, left: zr.left, width: zr.width });
-      if (i === blocks.length - 1) {
-        out.push({ zone, index: i + 1, y: r.bottom, left: zr.left, width: zr.width });
-      }
-    });
-  }
-  return out;
+/** 이 문구가 속한 카드 박스 — 좌표의 기준 */
+function frameOf(el: HTMLElement): HTMLElement | null {
+  return el.closest<HTMLElement>('[data-preview-frame]');
 }
 
-function paint(line: HTMLElement, spot: Spot) {
-  line.style.top = `${spot.y - 1}px`;
-  line.style.left = `${spot.left}px`;
-  line.style.width = `${spot.width}px`;
-  line.style.opacity = '1';
-}
-
-function end() {
+function finish() {
   if (!session) return;
-  const { line, onMove, onUp, section, zone, id, spot } = session;
+  const { el, frame, section, zone, id, moved, onMove, onUp } = session;
   window.removeEventListener('pointermove', onMove);
   window.removeEventListener('pointerup', onUp);
   window.removeEventListener('pointercancel', onUp);
-  line.remove();
   delete document.body.dataset.luviDragging;
+  el.style.zIndex = '';
   session = null;
 
-  if (!spot) return;
-  // 제자리인지 판단은 에디터가 합니다 (지금 목록의 진짜 순서는 초안이 알고 있습니다)
+  if (!moved) {
+    el.style.transform = '';
+    return;
+  }
+
+  // 지금 화면에 보이는 자리를 그대로 좌표로 굳힙니다 (정렬 기준점에 맞춰)
+  const r = el.getBoundingClientRect();
+  const f = frame.getBoundingClientRect();
+  const align = window.getComputedStyle(el).textAlign;
+  const anchorX = align === 'left' ? r.left : align === 'right' ? r.right : r.left + r.width / 2;
+  const clamp = (v: number) => Math.min(1, Math.max(0, v));
+  const x = clamp((anchorX - f.left) / Math.max(1, f.width));
+  const y = clamp((r.top + r.height / 2 - f.top) / Math.max(1, f.height));
+
+  // 초안이 갱신되면 그 좌표로 다시 그려지므로, 임시로 밀어둔 값은 지웁니다
+  el.style.transform = '';
   window.parent?.postMessage(
-    {
-      __luviBlockMove: { section, fromZone: zone, id, toZone: spot.zone, toIndex: spot.index },
-    },
+    { __luviBlockPlace: { section, zone, id, x, y } },
     window.location.origin,
   );
 }
@@ -97,36 +77,37 @@ export function startBlockDrag(
   // 글자가 contentEditable 이라 그대로 두면 드래그가 '글자 선택' 이 됩니다
   e.preventDefault();
   e.stopPropagation();
-  if (session) end();
+  if (session) finish();
 
-  const line = document.createElement('div');
-  line.setAttribute('data-luvi-drop-line', '');
-  line.style.cssText =
-    'position:fixed;height:2px;background:#C9A063;box-shadow:0 0 0 1px rgba(201,160,99,.35);' +
-    'z-index:120;pointer-events:none;opacity:0;transition:opacity .1s;border-radius:2px';
-  document.body.appendChild(line);
+  const handle = e.currentTarget as HTMLElement | null;
+  const el = handle?.closest<HTMLElement>('[data-preview-block]') ?? null;
+  const frame = el ? frameOf(el) : null;
+  if (!el || !frame) return;
+
   document.body.dataset.luviDragging = '1';
+  el.style.zIndex = '10';
 
   const onMove = (ev: PointerEvent) => {
     if (!session) return;
-    const list = spots(target.section);
-    let best: Spot | null = null;
-    let bestGap = Infinity;
-    for (const s of list) {
-      const gap = Math.abs(s.y - ev.clientY);
-      if (gap < bestGap) {
-        bestGap = gap;
-        best = s;
-      }
-    }
-    session.spot = best;
-    if (best) paint(line, best);
+    const dx = ev.clientX - session.startX;
+    const dy = ev.clientY - session.startY;
+    if (!session.moved && Math.abs(dx) + Math.abs(dy) < 3) return; // 손떨림은 무시
+    session.moved = true;
+    el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
   };
-  const onUp = () => end();
+  const onUp = () => finish();
 
-  session = { ...target, line, spot: null, onMove, onUp };
+  session = {
+    ...target,
+    el,
+    frame,
+    startX: e.clientX,
+    startY: e.clientY,
+    moved: false,
+    onMove,
+    onUp,
+  };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
-  onMove(e);
 }

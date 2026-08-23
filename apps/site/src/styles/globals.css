@@ -62,4 +62,27 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  /*
+    스크롤 진입 연출. 클래스는 lib/reveal.ts 의 useReveal() 이 붙입니다.
+    애니메이션을 꺼둔 사용자에게는 처음부터 보이는 상태로 둡니다.
+  */
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+      transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  [data-reveal].is-revealed {
+    opacity: 1;
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
 }

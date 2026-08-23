@@ -7,64 +7,15 @@
  * 🔴 디자인 목록은 `@luvi/schema` 의 `THEME_LIST` 입니다. 여기에 직접 적지 마세요 —
  *    서버(생성 요청 검증)와 뷰어(테마 등록소)가 같은 목록을 봐야 합니다.
  *
- * 미리보기 카드는 **각 디자인의 커버를 흉내 낸 목업**입니다. 실제 화면이 아니라 분위기용이며,
- * 만든 직후 에디터 오른쪽에 실제 뷰어가 그대로 뜹니다.
+ * 미리보기 카드는 **각 디자인의 커버를 흉내 낸 목업**입니다 (`components/ThemeMock` — B5 갤러리와 공용).
+ * 실제 화면이 아니라 분위기용이며, 만든 직후 에디터 오른쪽에 실제 뷰어가 그대로 뜹니다.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { THEME_LIST, type ThemeDef, type ThemeId } from '@luvi/schema';
+import { THEME_LIST, type ThemeId } from '@luvi/schema';
+import { ThemeMock } from '@/components/ThemeMock';
 import { api } from '@/lib/api';
 import { logEvent } from '@/lib/log';
-
-/** 카드 안의 축소 목업 — 각 디자인의 커버 구성을 그대로 줄인 것 */
-function ThemeMock({ theme }: { theme: ThemeDef }) {
-  const { palette } = theme;
-
-  if (theme.id === 'classic1') {
-    // 사진 한 장이 화면을 가득 채우고, 그 위에 문구가 얹힙니다
-    return (
-      <div
-        className="flex h-full w-full flex-col items-center justify-center gap-1.5 px-3 text-center"
-        style={{
-          background: `linear-gradient(180deg,#6f6259,#4a403a 46%,#241f1c), radial-gradient(circle at 50% 34%, ${palette.accent}55, transparent 62%)`,
-          backgroundBlendMode: 'screen',
-        }}
-      >
-        <span className="font-script text-[13px] leading-none text-white/80">The Wedding of</span>
-        <span className="text-[19px] font-semibold leading-none tracking-[-.02em] text-white">
-          신랑 · 신부
-        </span>
-        <span className="mt-0.5 h-px w-5" style={{ background: palette.accent }} />
-        <span className="text-[8px] tracking-[.14em] text-white/85">2026. 10. 24 SAT</span>
-      </div>
-    );
-  }
-
-  // classic2 — 아이보리 여백 위 액자, 문구는 사진 밖에서 정돈됩니다
-  return (
-    <div
-      className="flex h-full w-full flex-col items-center justify-center gap-[7px] px-3 text-center"
-      style={{ background: palette.base }}
-    >
-      <span className="text-[7px] tracking-[.3em]" style={{ color: '#8A8175' }}>
-        OCTOBER 24, 2026
-      </span>
-      <span className="font-script text-[19px] leading-none" style={{ color: palette.ink }}>
-        Groom &amp; Bride
-      </span>
-      <span
-        className="mt-0.5 h-[52px] w-[42px] rounded-[3px]"
-        style={{
-          background: `linear-gradient(160deg,${palette.sunken},#d9d3c4)`,
-          boxShadow: `0 0 0 1px #B49A63, inset 0 0 0 2px ${palette.base}`,
-        }}
-      />
-      <span className="text-[7.5px] tracking-[.12em]" style={{ color: palette.accent }}>
-        SATURDAY PM 1:00
-      </span>
-    </div>
-  );
-}
 
 export default function NewInvitation() {
   const navigate = useNavigate();

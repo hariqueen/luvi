@@ -32,8 +32,9 @@
  * 비율이라서입니다. 카드는 높이가 콘텐츠(달력·지도·방명록 목록)에 따라 변해서, 좌표로
  * 두면 폰 크기마다 글자가 달력 위에 겹칩니다. 대신 흐름 안에서 순서·정렬·크기·색을 엽니다.
  */
-import type { SectionKey, ThemeId } from './content';
+import type { LayerFont, SectionKey, ThemeId } from './content';
 import { SECTION_KEYS } from './content';
+import { FONT_ORDER } from './fonts';
 
 /** 문구의 역할. 크기·색·글꼴은 **디자인이** 정합니다 (같은 역할이 테마마다 다르게 그려집니다) */
 export type SectionTextRole = 'eyebrow' | 'title' | 'note';
@@ -60,6 +61,19 @@ export interface SectionBlock {
   scale?: number;
   /** CSS 색 문자열. 없으면 디자인 색 */
   color?: string;
+  /** 글씨체. 없으면 디자인 글꼴 (목록은 커버 문구와 같은 `fonts.ts`) */
+  font?: LayerFont;
+  /**
+   * **자유 배치 위치** — 카드 박스 기준 비율(0~1). 없으면 흐름(위→아래) 배치입니다.
+   *
+   * 🔴 px 이 아니라 비율입니다. 하객의 폰 폭이 에디터의 미리보기 폭과 다르므로 px 로
+   *    저장하면 위치가 어긋납니다 (커버 문구가 같은 이유로 비율을 씁니다).
+   *
+   * ⚠️ 자유 배치는 **흐름에서 빠져나옵니다.** 카드 높이는 콘텐츠(달력·지도·방명록
+   *    목록)에 따라 달라지므로, 폰 크기가 다르면 글자가 콘텐츠 위에 겹칠 수 있습니다.
+   *    사용자가 그걸 알고 고르는 기능입니다 — 되돌리려면 이 값을 지웁니다.
+   */
+  pos?: { x: number; y: number };
 }
 
 /** 한 카드의 문구. 자리가 없으면(`undefined`) 그 디자인의 기본 문구입니다 */
@@ -277,6 +291,17 @@ function asBlock(value: unknown, index: number, zone: SectionZone): SectionBlock
     block.scale = Math.min(max, Math.max(min, raw.scale));
   }
   if (typeof raw.color === 'string' && raw.color.trim()) block.color = raw.color;
+  if (typeof raw.font === 'string' && (FONT_ORDER as string[]).includes(raw.font)) {
+    block.font = raw.font as LayerFont;
+  }
+  // 카드 밖으로 나간 글자는 되찾을 방법이 없으므로 0~1 로 묶습니다 (커버와 같은 규칙)
+  if (raw.pos && typeof raw.pos === 'object') {
+    const pos = raw.pos as Record<string, unknown>;
+    if (typeof pos.x === 'number' && typeof pos.y === 'number') {
+      const clamp = (v: number) => Math.min(1, Math.max(0, v));
+      block.pos = { x: clamp(pos.x), y: clamp(pos.y) };
+    }
+  }
   return block;
 }
 

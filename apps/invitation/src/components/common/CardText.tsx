@@ -1,30 +1,39 @@
 /**
- * 카드 문구 그리기 — 블록 목록 하나를 화면에 얹고, **미리보기에서는 그 자리에서 고칩니다.**
+ * 카드 문구 그리기 — **미리보기에서 그 자리에서 고치고, 끌어서 원하는 자리에 놓습니다.**
  *
- * 문구는 "칸" 이 아니라 목록입니다(`@luvi/schema` 의 `sectionText.ts`). 사용자가 넣고 지우고
- * 순서를 바꿀 수 있으므로, 섹션 컴포넌트는 몇 줄이 올지 모릅니다. 그래서 마크업에 문구
- * 자리를 박지 않고 이 컴포넌트에 목록을 넘깁니다.
+ * 문구는 "칸" 이 아니라 목록입니다(`@luvi/schema` 의 `sectionText.ts`). 두 가지 배치가 섞입니다:
  *
- * 🔴 **블록이 없으면 아무것도 렌더하지 않습니다** (`null`). 예전에는 빈 문자열을 받아도
- *    래퍼 `<div className="mb-2">` 가 남아서, 문구를 지워도 **그 자리의 여백이 남았습니다.**
+ *  · **흐름 배치** — `pos` 가 없는 블록. 카드 위(head)·콘텐츠 아래(foot)에서 위→아래로 쌓입니다.
+ *  · **자유 배치** — `pos` 가 있는 블록. 카드 박스 기준 비율 좌표에 절대 배치됩니다(`FreeText`).
+ *    끌어서 옮기면 이 상태가 됩니다.
+ *
+ * 🔴 **블록이 없으면 아무것도 렌더하지 않습니다.** 예전에는 빈 문자열을 받아도 래퍼
+ *    `<div className="mb-2">` 가 남아서, 문구를 지워도 **그 자리의 여백이 남았습니다.**
  *
  * ─── 미리보기에서 직접 고치기 ────────────────────────────────────────────────
  *
- * 처음에는 글자를 누르면 **왼쪽 패널의 입력칸으로 커서를 옮겼습니다.** 눌러도 그 자리에서는
- * 아무 일이 없어서 "활성이 안 된다" 로 읽혔습니다 — 누른 곳에서 바로 고쳐지는 게 자연스럽습니다.
- * 그래서 미리보기에서는 글자 자체가 `contentEditable` 입니다. 브라우저가 누른 지점에 커서를
- * 놓아주므로 별도 활성화 단계가 없습니다.
+ * 글자 자체가 `contentEditable` 입니다. 브라우저가 누른 지점에 커서를 놓아주므로 별도
+ * 활성화 단계가 없습니다. **편집 중인 요소의 DOM 은 다시 쓰지 않습니다** — 타이핑 →
+ * 초안 갱신 → 초안이 미리보기로 되돌아옴 → 같은 글자를 다시 넣으면 커서가 맨 앞으로
+ * 튑니다. 그래서 `textContent` 는 포커스가 없을 때만 맞춥니다.
  *
- * 🔴 **편집 중인 요소의 DOM 은 절대 다시 쓰지 않습니다.** 타이핑 → 에디터가 초안을 갱신 →
- *    초안이 미리보기로 다시 내려옴 → 같은 글자를 다시 넣으면 **커서가 맨 앞으로 튑니다.**
- *    그래서 `textContent` 는 포커스가 없을 때만 맞춥니다 (제어 컴포넌트로 두면 매 글자마다
- *    커서가 튀는 그 문제가 그대로 재현됩니다).
+ * 옮기기는 **손잡이(⠿)** 로 갈라둡니다. 글자에서 바로 끌면 contentEditable 의 '글자 선택'
+ * 과 부딪힙니다 (`blockDrag.ts`).
  *
- * 크기·색·글꼴은 디자인이 정합니다(`roleClass`). 블록에 값이 있을 때만 덮습니다 — 손대지
- * 않은 문구는 디자인을 바꾸면 같이 따라와야 합니다. `scale` 은 배율이라 `em` 으로 겁니다.
+ * 크기·색·글씨체는 블록에 값이 있을 때만 덮습니다 — 손대지 않은 문구는 디자인을 바꾸면
+ * 같이 따라와야 합니다. `scale` 은 배율이라 `em` 으로 겁니다.
  */
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
-import type { SectionBlock, SectionKey, SectionTextRole, SectionZone } from '@luvi/schema';
+import {
+  FONT_STACK,
+  alignTransform,
+  ensureFonts,
+  type LayerAlign,
+  type SectionBlock,
+  type SectionKey,
+  type SectionTextRole,
+  type SectionZone,
+} from '@luvi/schema';
 import { IS_PREVIEW, notifyBlockEdit } from './PreviewSlot';
 import { startBlockDrag } from './blockDrag';
 
@@ -69,7 +78,7 @@ function EditableText({ text, onEdit }: { text: string; onEdit: (next: string) =
     if (el) onEdit(el.textContent ?? '');
   }, [onEdit]);
 
-  // 타이핑이 멈추면 올립니다. 매 글자마다 올리면 저장 요청과 미리보기 갱신이 과해집니다
+  // 타이핑이 멈추면 올립니다. 매 글자마다 올리면 저장 요청과 미리보기 갱신이 과합니다
   const schedule = useCallback(() => {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(flush, 250);
@@ -101,6 +110,76 @@ function EditableText({ text, onEdit }: { text: string; onEdit: (next: string) =
   );
 }
 
+/** 문구 한 줄 — 흐름 배치와 자유 배치가 같은 모양이어야 하므로 한 곳에서 그립니다 */
+function Block({
+  section,
+  zone,
+  block,
+  roleClass,
+  append,
+}: {
+  section: SectionKey;
+  zone: SectionZone;
+  block: SectionBlock;
+  roleClass: RoleClass;
+  append?: ReactNode;
+}) {
+  return (
+    <div
+      data-preview-block={IS_PREVIEW ? `${section}:${zone}:${block.id}` : undefined}
+      className={`${roleClass[block.role]}${
+        IS_PREVIEW
+          ? ' group relative rounded-[3px] outline-offset-[3px] hover:outline hover:outline-1 hover:outline-gold/60'
+          : ''
+      }`}
+      style={{
+        textAlign: block.align,
+        color: block.color,
+        fontFamily: block.font ? FONT_STACK[block.font] : undefined,
+      }}
+    >
+      {IS_PREVIEW && (
+        // 글자는 눌러서 고치고, 이 손잡이는 끌어서 옮깁니다 — 두 동작을 손잡이로 갈라둡니다
+        // 항상 옅게 보입니다: hover 로만 나타내면 터치 화면에서는 찾을 수 없습니다
+        <span
+          title="끌어서 옮기기"
+          onPointerDown={(e) => startBlockDrag(e.nativeEvent, { section, zone, id: block.id })}
+          onClick={(e) => e.stopPropagation()}
+          style={{ touchAction: 'none' }}
+          className="absolute -left-[17px] top-1/2 -translate-y-1/2 cursor-grab select-none text-[12px] font-normal leading-none tracking-normal text-gold-deep opacity-30 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+        >
+          ⠿
+        </span>
+      )}
+      <span
+        className="whitespace-pre-line"
+        style={block.scale && block.scale !== 1 ? { fontSize: `${block.scale}em` } : undefined}
+      >
+        {IS_PREVIEW ? (
+          <EditableText
+            text={block.text}
+            onEdit={(next) => notifyBlockEdit(section, zone, block.id, next)}
+          />
+        ) : (
+          block.text
+        )}
+        {append}
+      </span>
+    </div>
+  );
+}
+
+/** 글씨체를 고른 블록이 있으면 그 글꼴만 불러옵니다 (전부 미리 받으면 첫 화면이 늦습니다) */
+function useBlockFonts(blocks: SectionBlock[]) {
+  const key = blocks
+    .map((b) => b.font ?? '')
+    .filter(Boolean)
+    .join(',');
+  useEffect(() => {
+    if (key) ensureFonts(key.split(',') as Parameters<typeof ensureFonts>[0]);
+  }, [key]);
+}
+
 export function CardText({
   section,
   zone,
@@ -110,75 +189,71 @@ export function CardText({
   gap = 'gap-2',
   append,
 }: CardTextProps) {
-  /**
-   * 문구가 없는 자리.
-   *
-   * 하객 화면에서는 아무것도 그리지 않습니다(여백까지 사라집니다). 미리보기에서는 **끌어서
-   * 옮길 목표**가 되어야 하므로 자리만 남깁니다 — 다만 평소엔 감춰 두고, 무언가를 끌고 있는
-   * 동안에만 보입니다 (`index.css` 의 `body[data-luvi-dragging]`). 항상 보이면 카드마다
-   * 점선 상자가 두 개씩 떠서 미리보기가 시끄러워집니다.
-   */
-  if (blocks.length === 0) {
-    if (!IS_PREVIEW) return null;
-    return (
-      <div
-        data-preview-zone={`${section}:${zone}`}
-        data-luvi-empty-zone
-        className={`hidden ${className}`}
-      >
-        <div className="rounded-md border border-dashed border-gold/70 py-1.5 text-[11px] text-gold-deep">
-          여기에 문구를 놓을 수 있어요
-        </div>
-      </div>
-    );
-  }
+  // 자유 배치 블록은 `FreeText` 가 카드 위에 얹습니다 — 흐름에서는 빠집니다
+  const flow = blocks.filter((b) => !b.pos);
+  useBlockFonts(flow);
+
+  // 이 자리에 흐름 배치 문구가 없으면 아무것도 그리지 않습니다 (여백까지 사라집니다)
+  if (flow.length === 0) return null;
 
   return (
-    <div
-      data-preview-zone={IS_PREVIEW ? `${section}:${zone}` : undefined}
-      className={`flex flex-col ${gap} ${className}`}
-    >
-      {blocks.map((b, i) => (
-        <div
+    <div className={`flex flex-col ${gap} ${className}`}>
+      {flow.map((b, i) => (
+        <Block
           key={b.id}
-          // 눌린 글자가 무엇인지 — 에디터가 그 줄을 목록에서 골라줍니다 (PreviewSlot)
-          data-preview-block={IS_PREVIEW ? `${section}:${zone}:${b.id}` : undefined}
-          className={`${roleClass[b.role]}${
-            IS_PREVIEW
-              ? ' group relative rounded-[3px] outline-offset-[3px] hover:outline hover:outline-1 hover:outline-gold/60'
-              : ''
-          }`}
-          style={{ textAlign: b.align, color: b.color }}
+          section={section}
+          zone={zone}
+          block={b}
+          roleClass={roleClass}
+          append={i === flow.length - 1 ? append : undefined}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 자유 배치된 문구 — 카드 위에 얹는 층.
+ *
+ * 카드 전체를 덮지만 `pointer-events-none` 이라 아래의 버튼·지도를 가리지 않습니다.
+ * 글자에만 `pointer-events-auto` 를 줘서 그것만 눌립니다.
+ *
+ * `left/top` 은 비율(%)이고 `transform` 은 정렬 기준점입니다 — 가운데 정렬이면 그 점이
+ * 글자의 가운데가 되어야 사용자가 놓은 자리와 보이는 자리가 일치합니다.
+ */
+export function FreeText({
+  section,
+  zones,
+  roleClass,
+}: {
+  section: SectionKey;
+  /**
+   * 자리별 목록을 그대로 받습니다 — 자유 배치가 됐어도 **원래 자리는 기억합니다.**
+   * 편집·삭제 메시지가 그 자리를 가리켜야 에디터가 그 줄을 찾고, '흐름으로 되돌리기' 도
+   * 원래 자리로 돌아갑니다.
+   */
+  zones: { head: SectionBlock[]; foot: SectionBlock[] };
+  roleClass: RoleClass;
+}) {
+  const free = (['head', 'foot'] as const).flatMap((zone) =>
+    zones[zone].filter((b) => b.pos).map((block) => ({ zone, block })),
+  );
+  useBlockFonts(free.map((f) => f.block));
+  if (free.length === 0) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[5]">
+      {free.map(({ zone, block }) => (
+        <div
+          key={block.id}
+          className="pointer-events-auto absolute max-w-[88%]"
+          style={{
+            left: `${(block.pos?.x ?? 0) * 100}%`,
+            top: `${(block.pos?.y ?? 0) * 100}%`,
+            transform: alignTransform((block.align ?? 'center') as LayerAlign),
+          }}
         >
-          {IS_PREVIEW && (
-            // 글자는 눌러서 고치고, 이 손잡이는 끌어서 옮깁니다 — 두 동작을 손잡이로 갈라둡니다
-            // (글자에서 바로 끌면 contentEditable 의 '글자 선택' 과 부딪힙니다)
-            <span
-              title="끌어서 옮기기"
-              onPointerDown={(e) => startBlockDrag(e.nativeEvent, { section, zone, id: b.id })}
-              onClick={(e) => e.stopPropagation()}
-              style={{ touchAction: 'none' }}
-              // 항상 옅게 보입니다 — hover 로만 나타내면 터치 화면에서는 찾을 수 없고,
-              // 손잡이가 보이지 않으면 "옮길 수 있다" 는 것 자체를 모릅니다
-              className="absolute -left-[17px] top-1/2 -translate-y-1/2 cursor-grab select-none text-[12px] font-normal leading-none tracking-normal text-gold-deep opacity-30 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
-            >
-              ⠿
-            </span>
-          )}
-          <span
-            className="whitespace-pre-line"
-            style={b.scale && b.scale !== 1 ? { fontSize: `${b.scale}em` } : undefined}
-          >
-            {IS_PREVIEW ? (
-              <EditableText
-                text={b.text}
-                onEdit={(next) => notifyBlockEdit(section, zone, b.id, next)}
-              />
-            ) : (
-              b.text
-            )}
-            {i === blocks.length - 1 && append}
-          </span>
+          <Block section={section} zone={zone} block={block} roleClass={roleClass} />
         </div>
       ))}
     </div>

@@ -17,6 +17,7 @@ import { useEffect, type ComponentType } from 'react';
 import { ensureFonts, type SectionKey } from '@luvi/schema';
 import { useBgm } from '@/hooks/useBgm';
 import { IS_PREVIEW, Slot, notifySectionClick } from '@/components/common/PreviewSlot';
+import { SectionFreeText } from './ui';
 import { MusicToggle } from '@/components/common/MusicToggle';
 import { Petals } from '@/components/common/Petals';
 import { SectionSkin } from '@/components/common/SectionSkin';
@@ -84,10 +85,14 @@ export default function Classic2Theme() {
         if (!Section) return null;
         return (
           <Slot key={key} section={key}>
-            {/* 에디터에서 고른 배경색을 그 섹션에만 입힙니다 (안 고른 섹션은 그대로) */}
-            <SectionSkin section={key}>
-              <Section />
-            </SectionSkin>
+            {/* relative — 자유 배치 문구(`SectionFreeText`)가 이 카드 박스를 기준으로 놓입니다 */}
+            <div className="relative" data-preview-frame={key}>
+              {/* 에디터에서 고른 배경색을 그 섹션에만 입힙니다 (안 고른 섹션은 그대로) */}
+              <SectionSkin section={key}>
+                <Section />
+              </SectionSkin>
+              <SectionFreeText section={key} />
+            </div>
           </Slot>
         );
       })}

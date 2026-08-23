@@ -5,7 +5,14 @@
  * 섹션마다 같은 값을 적으면 자간·크기가 조금씩 어긋나므로 여기 한 곳에 둡니다.
  * (로즈 클래식은 `classic1/ui.tsx` 에 자기 타이포가 따로 있습니다 — 🐾·로즈 톤 전용)
  */
-import { CardText, type CardTextProps, type RoleClass } from '@/components/common/CardText';
+import type { SectionKey } from '@luvi/schema';
+import {
+  CardText,
+  FreeText,
+  type CardTextProps,
+  type RoleClass,
+} from '@/components/common/CardText';
+import { useInvitation } from '@/lib/invitationContext';
 
 
 /** 골드 실선 사이에 꽃 하나 — 문단 사이 구분선 */
@@ -38,4 +45,13 @@ export function SectionText({
   ...rest
 }: Omit<CardTextProps, 'roleClass'> & { override?: Partial<RoleClass> }) {
   return <CardText {...rest} roleClass={override ? { ...ROLE, ...override } : ROLE} />;
+}
+
+/**
+ * 자유 배치된 문구를 카드 위에 얹는 층 — 끌어서 옮긴 문구가 여기로 옵니다.
+ * 테마마다 타이포가 다르므로 `ROLE` 을 함께 넘깁니다.
+ */
+export function SectionFreeText({ section }: { section: SectionKey }) {
+  const { sectionText } = useInvitation();
+  return <FreeText section={section} zones={sectionText[section]} roleClass={ROLE} />;
 }

@@ -49,7 +49,7 @@ import { FieldRenderer } from '@/components/FieldRenderer';
 import { LayerToolbar } from '@/components/LayerToolbar';
 import { SaveState, type SaveStatus } from '@/components/SaveState';
 import { SectionBgControl } from '@/components/SectionBgControl';
-import { SectionBlocksControl } from '@/components/SectionBlocksControl';
+import { BlockToolbar, type BlockTarget } from '@/components/BlockToolbar';
 import { SectionManager } from '@/components/SectionManager';
 import { TextEditorOverlay } from '@/components/TextEditorOverlay';
 import { FORM_TO_SECTION, SECTION_META, SECTION_TO_FORM } from '@/lib/sectionMeta';
@@ -522,8 +522,12 @@ export default function Editor() {
     [setField],
   );
 
-  /** 미리보기에서 누른 문구 — 왼쪽 목록에서 그 줄을 골라 둡니다 (커서는 미리보기에 있습니다) */
-  const [selectBlockId, setSelectBlockId] = useState<string | null>(null);
+  /**
+   * 미리보기에서 누른 문구 — 미리보기 **바로 아래 툴바**가 이 문구의 서식을 다룹니다.
+   * 왼쪽 폼에는 문구 편집을 두지 않습니다 (같은 일을 하는 자리가 두 곳이 되면 어느 쪽이
+   * 원본인지 헷갈립니다 — `BlockToolbar` 주석).
+   */
+  const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
 
   /**
    * 미리보기에서 **그 자리에서 고친 글자**를 초안에 반영합니다.
@@ -533,34 +537,21 @@ export default function Editor() {
    * 이미 지워진 줄이면 아무것도 하지 않습니다(미리보기가 한 박자 늦게 올 수 있습니다).
    */
   /**
-   * 미리보기에서 **끌어서 옮긴** 문구를 초안에 반영합니다.
+   * 미리보기에서 **끌어서 놓은 자리**를 초안에 반영합니다.
    *
-   * 미리보기는 "어느 자리의 몇 번째" 만 보냅니다 — 화면 좌표를 저장하지 않는 이유는
-   * `blockDrag.ts` 주석에 있습니다(폰 폭·카드 높이가 달라 좌표는 깨집니다).
-   * 같은 자리 안에서 아래로 옮길 때는 **자기를 빼낸 뒤의 자리**가 되도록 index 를 당깁니다 —
-   * 이걸 빼먹으면 한 칸씩 덜 움직입니다.
+   * 좌표는 카드 박스 기준 비율입니다 — 하객의 폰 폭이 달라도 같은 자리에 놓이도록
+   * (`apps/invitation` 의 `blockDrag.ts`). `pos` 가 붙으면 그 문구는 흐름에서 빠져나와
+   * 절대 배치됩니다. 되돌리는 길은 툴바의 '흐름으로' 입니다.
    */
-  const applyBlockMove = useCallback(
-    (section: SectionKey, fromZone: string, id: string, toZone: string, toIndex: number) => {
-      const zoneOf = (z: string) => (z === 'head' || z === 'foot' ? z : null);
-      const from = zoneOf(fromZone);
-      const to = zoneOf(toZone);
-      if (!from || !to) return;
-
+  const applyBlockPlace = useCallback(
+    (section: SectionKey, zone: string, id: string, x: number, y: number) => {
+      if (zone !== 'head' && zone !== 'foot') return;
       const current = sectionBlocks(themeId, section, normalizeSectionText(doc?.core.sectionText));
-      const fromIndex = current[from].findIndex((b) => b.id === id);
-      const block = current[from][fromIndex];
-      if (!block) return;
-
-      const next = { head: [...current.head], foot: [...current.foot] };
-      next[from].splice(fromIndex, 1);
-      const at = from === to && toIndex > fromIndex ? toIndex - 1 : toIndex;
-      next[to].splice(Math.max(0, Math.min(at, next[to].length)), 0, block);
-
-      const same = (a: typeof next.head, b: typeof next.head) =>
-        a.length === b.length && a.every((x, i) => x.id === b[i]?.id);
-      if (same(next.head, current.head) && same(next.foot, current.foot)) return; // 제자리
-      setField(`core.sectionText.${section}`, next);
+      if (!current[zone].some((b) => b.id === id)) return;
+      setField(`core.sectionText.${section}`, {
+        ...current,
+        [zone]: current[zone].map((b) => (b.id === id ? { ...b, pos: { x, y } } : b)),
+      });
     },
     [doc, themeId, setField],
   );
@@ -628,19 +619,19 @@ export default function Editor() {
         __luviSectionClick?: SectionKey;
         __luviBlockClick?: { section: SectionKey; zone: string; id: string };
         __luviBlockEdit?: { section: SectionKey; zone: string; id: string; text: string };
-        __luviBlockMove?: {
+        __luviBlockPlace?: {
           section: SectionKey;
-          fromZone: string;
+          zone: string;
           id: string;
-          toZone: string;
-          toIndex: number;
+          x: number;
+          y: number;
         };
       } | null;
 
-      // 미리보기에서 끌어서 옮긴 문구
-      const moved = data?.__luviBlockMove;
-      if (moved?.section) {
-        applyBlockMove(moved.section, moved.fromZone, moved.id, moved.toZone, moved.toIndex);
+      // 미리보기에서 끌어서 놓은 문구
+      const placed = data?.__luviBlockPlace;
+      if (placed?.section) {
+        applyBlockPlace(placed.section, placed.zone, placed.id, placed.x, placed.y);
         return;
       }
 
@@ -652,14 +643,16 @@ export default function Editor() {
       }
 
       /**
-       * 글자를 눌렀다 — 그 카드를 열고 목록에서 그 줄을 **고르기만** 한다.
-       * 🔴 왼쪽 입력칸에 `focus()` 를 걸면 안 된다: 커서는 방금 누른 미리보기의 글자에
-       *    있는데, 부모 문서의 요소에 포커스를 주면 iframe 의 커서를 빼앗아 타이핑이 끊긴다.
+       * 글자를 눌렀다 — 미리보기 아래 툴바가 그 문구를 잡는다.
+       * 🔴 부모 문서의 입력칸에 `focus()` 를 걸면 안 된다: 커서는 방금 누른 미리보기의
+       *    글자에 있는데, 여기로 포커스를 옮기면 iframe 의 커서를 빼앗아 타이핑이 끊긴다.
        */
       const block = data?.__luviBlockClick;
       if (block?.section) {
         openSectionForm(block.section);
-        setSelectBlockId(block.id);
+        if (block.zone === 'head' || block.zone === 'foot') {
+          setBlockTarget({ section: block.section, zone: block.zone, id: block.id });
+        }
         return;
       }
 
@@ -670,7 +663,7 @@ export default function Editor() {
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [openSectionForm, applyBlockEdit, applyBlockMove]);
+  }, [openSectionForm, applyBlockEdit, applyBlockPlace]);
 
   const sheetTitle = panel.kind === 'sections' ? '청첩장 구성' : (activeForm?.label ?? '편집');
   const title = (doc?.core.share.title ?? '') as string;
@@ -733,16 +726,6 @@ export default function Editor() {
       {/* 배경색은 섹션 전체에 걸리는 값이라 필드들 위에 둡니다 */}
       {formSectionKey && (
         <>
-          {/* 카드에 적힌 글자 — 화면에서 가장 먼저 눈에 띄는 값이라 맨 위에 둡니다 */}
-          <SectionBlocksControl
-            themeId={themeId}
-            sectionKey={formSectionKey}
-            label={SECTION_META[formSectionKey].label}
-            stored={sectionText}
-            onChange={(next) => setSectionText(formSectionKey, next)}
-            selectBlockId={selectBlockId}
-            onSelectHandled={() => setSelectBlockId(null)}
-          />
           <SectionBgControl
             themeId={themeId}
             sectionKey={formSectionKey}
@@ -1082,6 +1065,20 @@ export default function Editor() {
                 </div>
               </div>
             </div>
+
+            {/* 문구 툴바 — 미리보기 **바로 아래**. 글자를 누른 자리에서 눈을 떼지 않고
+                색·정렬·글씨체를 바꿉니다 (왼쪽 폼에는 문구 편집을 두지 않습니다) */}
+            {rightView === 'preview' && (
+              <BlockToolbar
+                themeId={themeId}
+                target={blockTarget}
+                addTo={formSectionKey ?? null}
+                addToLabel={formSectionKey ? SECTION_META[formSectionKey].label : undefined}
+                stored={sectionText}
+                onChange={setSectionText}
+                onSelect={setBlockTarget}
+              />
+            )}
           </div>
 
           {/* 모바일 바텀시트 */}
