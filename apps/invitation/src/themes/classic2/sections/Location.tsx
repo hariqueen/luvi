@@ -5,7 +5,7 @@
  * (세이지·골드)로 제한해서 단정함을 만듭니다. 대신 라벨을 그대로 두어 어디로 가는지 알 수 있게 합니다.
  */
 import { useCopy } from '@/hooks/useCopy';
-import { Heading } from '../ui';
+import { SectionText } from '../ui';
 import { CheckIcon, CopyIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
 
@@ -16,7 +16,7 @@ export function Location() {
 
   return (
     <section className="bg-c2-ivory px-[30px] py-[60px] text-center">
-      <Heading script={text.eyebrow} label={text.title} />
+      <SectionText section="location" zone="head" blocks={text.head} />
 
       <div className="mt-6 font-myeongjo text-[17px] text-c2-ink">{location.venue}</div>
       <div className="mt-1 text-[12.5px] tracking-[0.04em] text-c2-sage-deep">{location.hall}</div>
@@ -78,6 +78,8 @@ export function Location() {
           ))}
         </div>
       )}
+
+      <SectionText section="location" zone="foot" blocks={text.foot} className="mt-7" />
     </section>
   );
 }

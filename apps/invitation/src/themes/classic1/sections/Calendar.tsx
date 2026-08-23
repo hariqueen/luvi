@@ -1,6 +1,6 @@
 import { useCountdown } from '@/hooks/useCountdown';
-import { Eyebrow } from '@/components/common/SectionHeading';
 import { useInvitation } from '@/lib/invitationContext';
+import { SectionText } from '../ui';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -50,7 +50,7 @@ export function Calendar() {
 
   return (
     <section className="bg-cream px-7 py-[58px] text-center">
-      <Eyebrow className="mb-2">{text.eyebrow}</Eyebrow>
+      <SectionText section="calendar" zone="head" blocks={text.head} className="mb-2" />
       <div className="font-cormorant text-[34px] font-medium text-ink">{calendar.monthLabel}</div>
 
       <div className="my-6 rounded-2xl border border-line bg-white px-[18px] py-[22px] shadow-sm">
@@ -78,7 +78,13 @@ export function Calendar() {
       </div>
 
       {/* 이름은 어댑터가 이미 치환했습니다 ({신랑}·{신부}) */}
-      <div className="mb-[18px] font-myeongjo text-sm text-ink-soft">{text.note}</div>
+      <SectionText
+        section="calendar"
+        zone="foot"
+        blocks={text.foot}
+        className="mb-[18px]"
+        override={{ note: 'font-myeongjo text-sm text-ink-soft' }}
+      />
       <div className="flex justify-center gap-2">
         <CountBox value={cd.d} label="DAYS" primary />
         <CountBox value={cd.h} label="HOURS" />

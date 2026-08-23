@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { useCopy } from '@/hooks/useCopy';
-import { Heading } from '../ui';
+import { SectionText } from '../ui';
 import { CheckIcon, CopyIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
 import { BASE } from '@/lib/env';
@@ -21,7 +21,7 @@ export function Account() {
 
   return (
     <section className="bg-white px-[30px] py-[60px] text-center">
-      <Heading script={text.eyebrow} label={text.title} />
+      <SectionText section="account" zone="head" blocks={text.head} />
 
       <p className="mx-auto mt-6 mb-6 max-w-[290px] whitespace-pre-line font-myeongjo text-[13px] leading-[1.9] text-c2-ink-soft">
         {account.description}
@@ -91,6 +91,8 @@ export function Account() {
           );
         })}
       </div>
+
+      <SectionText section="account" zone="foot" blocks={text.foot} className="mt-8" />
     </section>
   );
 }

@@ -29,7 +29,7 @@ import {
   type LayerFont,
   type SectionDef,
   type SectionKey,
-  type SectionTextSlot,
+  type SectionBlocks,
   type TextLayer,
   type ThemeId,
   type UpdateDraftBody,
@@ -47,7 +47,7 @@ import { FieldRenderer } from '@/components/FieldRenderer';
 import { LayerToolbar } from '@/components/LayerToolbar';
 import { SaveState, type SaveStatus } from '@/components/SaveState';
 import { SectionBgControl } from '@/components/SectionBgControl';
-import { SectionTextControl } from '@/components/SectionTextControl';
+import { SectionBlocksControl } from '@/components/SectionBlocksControl';
 import { SectionManager } from '@/components/SectionManager';
 import { TextEditorOverlay } from '@/components/TextEditorOverlay';
 import { FORM_TO_SECTION, SECTION_META, SECTION_TO_FORM } from '@/lib/sectionMeta';
@@ -507,11 +507,21 @@ export default function Editor() {
    * 한 가지 규칙으로만 판단합니다 (`resolveSectionText`).
    */
   const sectionText = doc?.core.sectionText ?? {};
+  /**
+   * 🔴 **카드 하나의 문구를 통째로** 씁니다 (칸 하나씩이 아닙니다).
+   *
+   * 문구는 순서가 있는 목록이라, 지운 줄·옮긴 줄을 표현하려면 배열 전체를 보내야 합니다.
+   * 워커의 `mergeContent` 는 배열을 통째로 대체하므로 **빈 배열(= 전부 지움)도 그대로**
+   * 저장됩니다 — 키 단위로 보내면 지운 줄이 기본값으로 되살아납니다.
+   */
   const setSectionText = useCallback(
-    (key: SectionKey, slot: SectionTextSlot, text: string) =>
-      setField(`core.sectionText.${key}.${slot}`, text),
+    (key: SectionKey, next: Required<SectionBlocks>) =>
+      setField(`core.sectionText.${key}`, next),
     [setField],
   );
+
+  /** 미리보기에서 탭한 문구 — 그 카드를 열고 그 줄에 커서를 둡니다 */
+  const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
 
   const setSectionBg = useCallback(
     (key: SectionKey, color: string) => setField(`core.design.sectionBg.${key}`, color),
@@ -558,7 +568,19 @@ export default function Editor() {
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
-      const data = e.data as { __luviSectionClick?: SectionKey } | null;
+      const data = e.data as {
+        __luviSectionClick?: SectionKey;
+        __luviBlockClick?: { section: SectionKey; zone: string; id: string };
+      } | null;
+
+      // 글자를 탭했으면 그 카드를 열고 그 줄에 커서를 둔다 (자리·id 는 컨트롤이 찾는다)
+      const block = data?.__luviBlockClick;
+      if (block?.section) {
+        openSectionForm(block.section);
+        setFocusBlockId(block.id);
+        return;
+      }
+
       const key = data?.__luviSectionClick;
       if (!key) return;
       if (key === 'cover') setRightView('cover');
@@ -630,12 +652,14 @@ export default function Editor() {
       {formSectionKey && (
         <>
           {/* 카드에 적힌 글자 — 화면에서 가장 먼저 눈에 띄는 값이라 맨 위에 둡니다 */}
-          <SectionTextControl
+          <SectionBlocksControl
             themeId={themeId}
             sectionKey={formSectionKey}
             label={SECTION_META[formSectionKey].label}
-            value={sectionText[formSectionKey] ?? {}}
-            onChange={(slot, text) => setSectionText(formSectionKey, slot, text)}
+            stored={sectionText}
+            onChange={(next) => setSectionText(formSectionKey, next)}
+            focusBlockId={focusBlockId}
+            onFocusHandled={() => setFocusBlockId(null)}
           />
           <SectionBgControl
             themeId={themeId}

@@ -27,9 +27,28 @@ export function Slot({ section, children }: { section: SectionKey; children: Rea
   );
 }
 
-/** 클릭한 지점의 섹션 키를 부모(에디터)에게 알립니다 */
+/**
+ * 클릭한 지점을 부모(에디터)에게 알립니다.
+ *
+ * **글자를 눌렀으면 그 글자**(`data-preview-block`), 아니면 그 섹션(`data-preview-section`).
+ * 글자를 우선하는 이유: 문구는 섹션 안에 있으므로 섹션만 알리면 "이 글자를 고치고 싶어서
+ * 눌렀는데 카드 편집만 열린다" 가 됩니다. 블록까지 알려주면 에디터가 그 줄에 커서를 둡니다.
+ */
 export function notifySectionClick(e: MouseEvent) {
-  const el = (e.target as HTMLElement).closest('[data-preview-section]');
-  const key = el?.getAttribute('data-preview-section');
-  if (key) window.parent?.postMessage({ __luviSectionClick: key }, window.location.origin);
+  const target = e.target as HTMLElement;
+  const post = (message: Record<string, unknown>) =>
+    window.parent?.postMessage(message, window.location.origin);
+
+  const block = target.closest('[data-preview-block]')?.getAttribute('data-preview-block');
+  if (block) {
+    // 'section:zone:id' — 문자열 하나로 보냅니다 (구조를 맞추다 어긋나면 원인 찾기가 어렵습니다)
+    const [section, zone, ...rest] = block.split(':');
+    if (section && zone && rest.length > 0) {
+      post({ __luviBlockClick: { section, zone, id: rest.join(':') } });
+      return;
+    }
+  }
+
+  const key = target.closest('[data-preview-section]')?.getAttribute('data-preview-section');
+  if (key) post({ __luviSectionClick: key });
 }

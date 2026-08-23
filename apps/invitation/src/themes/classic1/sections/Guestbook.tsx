@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGuestbook } from '@/hooks/useGuestbook';
-import { SectionHeading } from '@/components/common/SectionHeading';
 import { useInvitation } from '@/lib/invitationContext';
+import { SectionText } from '../ui';
 
 const fmtDate = (ts: number) =>
   new Date(ts).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
@@ -21,10 +21,14 @@ export function Guestbook() {
 
   return (
     <section className="bg-white px-7 py-[56px] text-center">
-      <SectionHeading eyebrow={text.eyebrow} title={text.title} />
-      <div className="mb-[22px] mt-1 text-[12.5px] text-ink-soft">
-        {text.note} ({entries.length})
-      </div>
+      <SectionText
+        section="guestbook"
+        zone="head"
+        blocks={text.head}
+        className="mb-[22px]"
+        override={{ note: 'text-[12.5px] text-ink-soft' }}
+        append={` (${entries.length})`}
+      />
 
       {entries.length > 0 ? (
         <div className="mb-[22px] flex flex-col gap-2.5 text-left">
@@ -76,6 +80,8 @@ export function Guestbook() {
           💌 메시지 남기기
         </button>
       </div>
+
+      <SectionText section="guestbook" zone="foot" blocks={text.foot} className="mt-7" />
     </section>
   );
 }

@@ -301,12 +301,15 @@ export interface CoreContent {
   footer: { image: AssetRef | null };
   bgm: AssetRef | null;
   /**
-   * 카드마다 적히는 문구 — 윗줄·제목·안내를 섹션별로 덮어씁니다.
+   * 카드마다 적히는 문구 — 카드 위·콘텐츠 아래 두 자리의 **블록 목록**입니다.
+   * 사용자가 줄을 넣고 지우고 순서를 바꿉니다 (`sectionText.ts`).
    *
-   * **비어 있으면 그 디자인의 기본 문구**입니다 (기본값은 `sectionText.ts` 한 곳).
+   * 🔴 **`undefined`(없음)와 `[]`(빈 배열)은 다른 뜻입니다** — 없음 = 아직 손대지 않아
+   *    디자인 기본 문구, 빈 배열 = 전부 지웠으니 아무것도 그리지 않음.
    *
-   * ⚠️ 이 필드가 생기기 전 문서·스냅샷에는 없습니다. 읽는 쪽은
-   *    `resolveSectionText(themeId, core.sectionText, …)` 를 통과시키세요.
+   * ⚠️ 옛 문서·스냅샷에는 이 필드가 없거나 `{eyebrow,title,note}` 문자열 세 칸입니다.
+   *    읽는 쪽은 `resolveSectionText(themeId, core.sectionText, …)` 를 통과시키세요 —
+   *    없음·옛 모양·새 모양을 한 곳에서 처리합니다.
    */
   sectionText: SectionTextMap;
   /**

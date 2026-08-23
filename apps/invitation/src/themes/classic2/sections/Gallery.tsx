@@ -5,7 +5,7 @@
  * 확대 보기는 테마가 함께 쓰는 Lightbox 입니다.
  */
 import { useState } from 'react';
-import { Heading } from '../ui';
+import { SectionText } from '../ui';
 import { Lightbox } from '@/components/common/Lightbox';
 import { useInvitation } from '@/lib/invitationContext';
 
@@ -21,7 +21,7 @@ export function Gallery() {
 
   return (
     <section className="bg-c2-ivory px-[30px] py-[60px] text-center">
-      <Heading script={text.eyebrow} label={text.title} />
+      <SectionText section="gallery" zone="head" blocks={text.head} />
 
       {hero && (
         <button
@@ -44,10 +44,14 @@ export function Gallery() {
         ))}
       </div>
 
-      <div className="mt-4 text-[11.5px] tracking-[0.04em] text-c2-ink-soft">
-        {text.note}
-        {gallery.length > 1 && ' · 옆으로 넘겨 다음 사진'}
-      </div>
+      <SectionText
+        section="gallery"
+        zone="foot"
+        blocks={text.foot}
+        className="mt-4"
+        override={{ note: 'text-[11.5px] tracking-[0.04em] text-c2-ink-soft' }}
+        append={gallery.length > 1 ? ' · 옆으로 넘겨 다음 사진' : null}
+      />
 
       <Lightbox
         images={images}

@@ -5,7 +5,7 @@
  * (요일 머리글이 국문 '일월화…' 가 아니라 영문 'SUN MON…').
  */
 import { useCountdown } from '@/hooks/useCountdown';
-import { Heading } from '../ui';
+import { SectionText } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
 
 const WEEKDAYS_EN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -39,7 +39,7 @@ export function Calendar() {
 
   return (
     <section className="bg-c2-ivory px-[30px] py-[60px] text-center">
-      <Heading script={text.eyebrow} label={text.title} />
+      <SectionText section="calendar" zone="head" blocks={text.head} />
 
       <div className="mt-[26px] rounded-[18px] border border-c2-line bg-white px-5 py-6 shadow-[0_6px_20px_rgba(62,58,51,.05)]">
         <div className="mb-4 font-cormorant text-2xl font-medium tracking-[0.04em] text-c2-ink">
@@ -78,7 +78,7 @@ export function Calendar() {
       </div>
 
       {/* 이름은 어댑터가 이미 치환했습니다 ({신랑}·{신부}) */}
-      <div className="mt-4 font-myeongjo text-[13px] text-c2-ink-soft">{text.note}</div>
+      <SectionText section="calendar" zone="foot" blocks={text.foot} className="mt-4" />
     </section>
   );
 }

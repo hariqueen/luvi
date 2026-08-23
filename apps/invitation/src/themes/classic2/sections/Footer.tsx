@@ -8,7 +8,7 @@
  * 공유 동작은 classic1 과 같은 `useShare()` 입니다 (카카오 → OS 공유 시트 → 링크 복사).
  */
 import { useShare } from '@/hooks/useShare';
-import { Ornament } from '../ui';
+import { Ornament, SectionText } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Footer() {
@@ -45,7 +45,12 @@ export function Footer() {
       />
 
       <div className="relative z-[2]">
-        <div className="font-pinyon text-[46px] leading-none text-c2-sage-deep">{text.title}</div>
+        <SectionText
+          section="footer"
+          zone="head"
+          blocks={text.head}
+          override={{ title: 'font-pinyon text-[46px] leading-none text-c2-sage-deep' }}
+        />
         <div className="mb-1.5 mt-[18px] font-myeongjo text-sm leading-[1.9] text-c2-ink">
           {groom.firstName} · {bride.firstName}
         </div>
@@ -74,6 +79,7 @@ export function Footer() {
         {shareNote && (
           <p className="mt-3 text-[12px] leading-relaxed text-c2-ink-soft">{shareNote}</p>
         )}
+        <SectionText section="footer" zone="foot" blocks={text.foot} className="mt-4" />
       </div>
     </section>
   );

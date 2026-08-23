@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { SectionHeading } from '@/components/common/SectionHeading';
 import { Lightbox } from '@/components/common/Lightbox';
 import { useInvitation } from '@/lib/invitationContext';
+import { SectionText } from '../ui';
 
 export function Gallery() {
   const { gallery, sectionText } = useInvitation();
@@ -15,7 +15,7 @@ export function Gallery() {
 
   return (
     <section className="bg-white px-6 py-[58px] text-center">
-      <SectionHeading eyebrow={text.eyebrow} title={text.title} />
+      <SectionText section="gallery" zone="head" blocks={text.head} />
 
       {/* 대표 이미지 */}
       {hero && (
@@ -40,10 +40,13 @@ export function Gallery() {
         ))}
       </div>
 
-      <div className="mt-3.5 text-xs text-ink-soft">
-        {text.note}
-        {gallery.length > 1 && ' · 옆으로 넘겨 다음 사진'}
-      </div>
+      <SectionText
+        section="gallery"
+        zone="foot"
+        blocks={text.foot}
+        className="mt-3.5"
+        append={gallery.length > 1 ? ' · 옆으로 넘겨 다음 사진' : null}
+      />
 
       <Lightbox
         images={images}

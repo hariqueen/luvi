@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useCopy } from '@/hooks/useCopy';
-import { SectionHeading } from '@/components/common/SectionHeading';
 import { CheckIcon, CopyIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
 import { BASE } from '@/lib/env';
+import { SectionText } from '../ui';
 
 const KAKAOPAY_ICON = `${BASE}assets/kakaopay_icon.png`;
 
@@ -15,7 +15,7 @@ export function Account() {
 
   return (
     <section className="bg-cream px-7 py-[56px] text-center">
-      <SectionHeading eyebrow={text.eyebrow} title={text.title} />
+      <SectionText section="account" zone="head" blocks={text.head} />
       <p className="mx-auto mb-[22px] mt-1.5 max-w-[280px] whitespace-pre-line text-[13px] leading-[1.7] text-ink-soft">
         {account.description}
       </p>
@@ -85,6 +85,8 @@ export function Account() {
           );
         })}
       </div>
+
+      <SectionText section="account" zone="foot" blocks={text.foot} className="mt-7" />
     </section>
   );
 }

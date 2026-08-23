@@ -1,7 +1,7 @@
 import { useCopy } from '@/hooks/useCopy';
-import { SectionHeading } from '@/components/common/SectionHeading';
 import { CheckIcon, CopyIcon, PhoneIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
+import { SectionText } from '../ui';
 
 export function Location() {
   const { location, sectionText } = useInvitation();
@@ -10,7 +10,7 @@ export function Location() {
 
   return (
     <section className="bg-white px-7 py-[58px] text-center">
-      <SectionHeading eyebrow={text.eyebrow} title={text.title} />
+      <SectionText section="location" zone="head" blocks={text.head} />
 
       <div className="mt-1.5 flex items-center justify-center gap-2">
         <span className="text-base font-bold text-ink">{location.venue}</span>
@@ -62,9 +62,13 @@ export function Location() {
           네이버지도
         </a>
       </div>
-      <div className="mx-0 my-2 mb-[18px] text-[11.5px] text-ink-soft">
-        {text.note}
-      </div>
+      <SectionText
+        section="location"
+        zone="foot"
+        blocks={text.foot}
+        className="my-2 mb-[18px]"
+        override={{ note: 'text-[11.5px] text-ink-soft' }}
+      />
 
       <div className="flex flex-col gap-2.5 text-left">
         {location.transport.map((t, i) => (

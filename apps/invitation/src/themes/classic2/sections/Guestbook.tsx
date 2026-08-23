@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useGuestbook } from '@/hooks/useGuestbook';
-import { Heading } from '../ui';
+import { SectionText } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
 
 const fmtDate = (ts: number) =>
@@ -26,11 +26,14 @@ export function Guestbook() {
 
   return (
     <section className="bg-white px-[30px] py-[60px] text-center">
-      <Heading script={text.eyebrow} label={text.title} />
-
-      <div className="mb-6 mt-2 font-myeongjo text-[12.5px] text-c2-ink-soft">
-        {text.note} ({entries.length})
-      </div>
+      <SectionText
+        section="guestbook"
+        zone="head"
+        blocks={text.head}
+        className="mb-6"
+        override={{ note: 'font-myeongjo text-[12.5px] text-c2-ink-soft' }}
+        append={` (${entries.length})`}
+      />
 
       {entries.length > 0 ? (
         <div className="mb-6 flex flex-col gap-2.5 text-left">
@@ -73,6 +76,8 @@ export function Guestbook() {
           방명록 남기기
         </button>
       </div>
+
+      <SectionText section="guestbook" zone="foot" blocks={text.foot} className="mt-8" />
     </section>
   );
 }

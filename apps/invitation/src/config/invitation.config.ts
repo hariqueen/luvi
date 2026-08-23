@@ -409,7 +409,7 @@ export const invitation: InvitationConfig = {
 
   // 예시 데이터는 디자인 기본 배경·기본 문구를 그대로 씁니다
   sectionBg: {},
-  sectionText: resolveSectionText('classic1', {}, { 신랑: '호석', 신부: '송희' }),
+  sectionText: resolveSectionText('classic1', {}, { 신랑: '신랑', 신부: '신부' }),
 
   sections: [
     'cover',

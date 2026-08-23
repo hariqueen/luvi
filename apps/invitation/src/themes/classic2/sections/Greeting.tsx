@@ -5,7 +5,7 @@
  * (에디터에서 켜고 끌 수 있는 항목). 켠 사람에게 아무것도 안 보이면 고장으로 읽히므로,
  * 이 디자인 톤(크림 원 + 세이지 글자)으로 함께 그립니다.
  */
-import { Heading, Ornament } from '../ui';
+import { Ornament, SectionText } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Greeting() {
@@ -15,7 +15,7 @@ export function Greeting() {
 
   return (
     <section className="bg-white px-[34px] py-16 text-center">
-      <Heading script={text.eyebrow} label={text.title} />
+      <SectionText section="greeting" zone="head" blocks={text.head} />
 
       {greeting.dogBubbleVisible && (
         <div className="mt-7 flex items-center justify-center gap-2.5">
@@ -48,6 +48,8 @@ export function Greeting() {
           </div>
         ))}
       </div>
+
+      <SectionText section="greeting" zone="foot" blocks={text.foot} className="mt-8" />
     </section>
   );
 }

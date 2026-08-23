@@ -6,6 +6,7 @@
  */
 import { useShare } from '@/hooks/useShare';
 import { useInvitation } from '@/lib/invitationContext';
+import { SectionText } from '../ui';
 
 export function Footer() {
   const { footer, groom, bride, share, sectionText } = useInvitation();
@@ -33,9 +34,16 @@ export function Footer() {
       />
 
       <div className="relative z-[2] text-white">
-        <div className="font-cormorant text-2xl italic tracking-[0.02em] opacity-90">
-          {text.title}
-        </div>
+        <SectionText
+          section="footer"
+          zone="head"
+          blocks={text.head}
+          override={{
+            eyebrow: 'font-myeongjo text-xs tracking-[0.34em] text-white/80',
+            title: 'font-cormorant text-2xl italic tracking-[0.02em] opacity-90',
+            note: 'text-[12px] leading-relaxed text-white/90',
+          }}
+        />
         <div className="my-3.5 mb-1.5 font-myeongjo text-[15px] leading-[1.9]">
           {groom.firstName} ♥ {bride.firstName}
         </div>
@@ -62,6 +70,17 @@ export function Footer() {
         {shareNote && (
           <p className="mt-3 text-[12px] leading-relaxed text-white/90">{shareNote}</p>
         )}
+        <SectionText
+          section="footer"
+          zone="foot"
+          blocks={text.foot}
+          className="mt-4"
+          override={{
+            eyebrow: 'font-myeongjo text-xs tracking-[0.34em] text-white/80',
+            title: 'font-cormorant text-2xl italic tracking-[0.02em] opacity-90',
+            note: 'text-[12px] leading-relaxed text-white/90',
+          }}
+        />
       </div>
     </section>
   );

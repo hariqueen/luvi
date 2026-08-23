@@ -1,5 +1,5 @@
-import { Eyebrow } from '@/components/common/SectionHeading';
 import { useInvitation } from '@/lib/invitationContext';
+import { SectionText } from '../ui';
 
 export function Greeting() {
   const invitation = useInvitation();
@@ -27,7 +27,7 @@ export function Greeting() {
         </div>
       )}
 
-      <Eyebrow className="mb-6">{text.eyebrow}</Eyebrow>
+      <SectionText section="greeting" zone="head" blocks={text.head} className="mb-6" />
 
       <p className="m-0 whitespace-pre-line font-myeongjo text-[15.5px] leading-[2.15] text-ink">
         {greeting.message}
@@ -47,6 +47,8 @@ export function Greeting() {
           </div>
         ))}
       </div>
+
+      <SectionText section="greeting" zone="foot" blocks={text.foot} className="mt-7" />
     </section>
   );
 }
