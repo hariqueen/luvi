@@ -532,6 +532,39 @@ export default function Editor() {
    * 아직 저장된 값이 없는(디자인 기본 문구) 카드도 이 경로로 첫 편집이 값으로 굳습니다.
    * 이미 지워진 줄이면 아무것도 하지 않습니다(미리보기가 한 박자 늦게 올 수 있습니다).
    */
+  /**
+   * 미리보기에서 **끌어서 옮긴** 문구를 초안에 반영합니다.
+   *
+   * 미리보기는 "어느 자리의 몇 번째" 만 보냅니다 — 화면 좌표를 저장하지 않는 이유는
+   * `blockDrag.ts` 주석에 있습니다(폰 폭·카드 높이가 달라 좌표는 깨집니다).
+   * 같은 자리 안에서 아래로 옮길 때는 **자기를 빼낸 뒤의 자리**가 되도록 index 를 당깁니다 —
+   * 이걸 빼먹으면 한 칸씩 덜 움직입니다.
+   */
+  const applyBlockMove = useCallback(
+    (section: SectionKey, fromZone: string, id: string, toZone: string, toIndex: number) => {
+      const zoneOf = (z: string) => (z === 'head' || z === 'foot' ? z : null);
+      const from = zoneOf(fromZone);
+      const to = zoneOf(toZone);
+      if (!from || !to) return;
+
+      const current = sectionBlocks(themeId, section, normalizeSectionText(doc?.core.sectionText));
+      const fromIndex = current[from].findIndex((b) => b.id === id);
+      const block = current[from][fromIndex];
+      if (!block) return;
+
+      const next = { head: [...current.head], foot: [...current.foot] };
+      next[from].splice(fromIndex, 1);
+      const at = from === to && toIndex > fromIndex ? toIndex - 1 : toIndex;
+      next[to].splice(Math.max(0, Math.min(at, next[to].length)), 0, block);
+
+      const same = (a: typeof next.head, b: typeof next.head) =>
+        a.length === b.length && a.every((x, i) => x.id === b[i]?.id);
+      if (same(next.head, current.head) && same(next.foot, current.foot)) return; // 제자리
+      setField(`core.sectionText.${section}`, next);
+    },
+    [doc, themeId, setField],
+  );
+
   const applyBlockEdit = useCallback(
     (section: SectionKey, zone: string, id: string, text: string) => {
       if (zone !== 'head' && zone !== 'foot') return;
@@ -595,7 +628,21 @@ export default function Editor() {
         __luviSectionClick?: SectionKey;
         __luviBlockClick?: { section: SectionKey; zone: string; id: string };
         __luviBlockEdit?: { section: SectionKey; zone: string; id: string; text: string };
+        __luviBlockMove?: {
+          section: SectionKey;
+          fromZone: string;
+          id: string;
+          toZone: string;
+          toIndex: number;
+        };
       } | null;
+
+      // 미리보기에서 끌어서 옮긴 문구
+      const moved = data?.__luviBlockMove;
+      if (moved?.section) {
+        applyBlockMove(moved.section, moved.fromZone, moved.id, moved.toZone, moved.toIndex);
+        return;
+      }
 
       // 미리보기에서 직접 고친 글자
       const edit = data?.__luviBlockEdit;
@@ -623,7 +670,7 @@ export default function Editor() {
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [openSectionForm, applyBlockEdit]);
+  }, [openSectionForm, applyBlockEdit, applyBlockMove]);
 
   const sheetTitle = panel.kind === 'sections' ? '청첩장 구성' : (activeForm?.label ?? '편집');
   const title = (doc?.core.share.title ?? '') as string;

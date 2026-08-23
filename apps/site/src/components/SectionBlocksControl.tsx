@@ -18,6 +18,11 @@
  *
  * 스타일(정렬·크기·색)은 **고른 것만** 저장합니다. 안 고른 값은 디자인을 따라가야
  * 나중에 디자인을 바꿨을 때 손대지 않은 문구가 같이 바뀝니다.
+ *
+ * 🔴 **순서를 바꾸는 UI 는 여기 두지 않습니다.** ▲▼ 버튼을 뒀다가 걷어냈습니다 — 순서는
+ *    보면서 하는 일이라 눈은 오른쪽 미리보기에 있는데 손은 왼쪽 버튼을 누르게 되고, 한 번
+ *    누를 때마다 어디로 갔는지 다시 확인해야 했습니다. 미리보기에서 글자를 직접 끕니다
+ *    (`apps/invitation` 의 `blockDrag.ts`).
  */
 import {
   useCallback,
@@ -25,7 +30,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import {
   SECTION_TEXT_MAX_LENGTH,
@@ -146,61 +150,11 @@ export function SectionBlocksControl({
     requestAnimationFrame(() => inputs.current.get(block.id)?.focus());
   };
 
-  const move = (zone: SectionZone, from: number, to: number) => {
-    if (to < 0 || to >= blocks[zone].length || from === to) return;
-    const next = [...blocks[zone]];
-    const [moved] = next.splice(from, 1);
-    if (moved) next.splice(to, 0, moved);
-    commit(zone, next);
-  };
-
-  /**
-   * 끌어서 옮기기.
-   *
-   * 목록 전체의 좌표를 계산하지 않고 **바로 옆 줄의 중간선을 넘었는지만** 봅니다 — 줄마다
-   * 높이가 다르고(여러 줄 문구·툴바 펼침) 드래그 중에 순서가 바뀌므로, 전체 좌표를 미리
-   * 재두면 엉뚱한 자리에 떨어집니다.
-   *
-   * `setPointerCapture` 는 빠르게 끌 때 포인터가 핸들을 벗어나도 이벤트를 계속 받기 위한
-   * 것이고(커버 캔버스와 같은 이유), 핸들의 `touch-action: none` 이 없으면 모바일에서
-   * 드래그가 페이지 스크롤로 먹힙니다.
-   */
-  const drag = useRef<{ zone: SectionZone; id: string } | null>(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-
-  const onDragStart = (zone: SectionZone, id: string) => (e: ReactPointerEvent) => {
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { zone, id };
-    setDraggingId(id);
-  };
-
-  const onDragMove = (e: ReactPointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const list = blocks[d.zone];
-    const cur = list.findIndex((b) => b.id === d.id);
-    if (cur < 0) return;
-
-    const rect = (idx: number) => {
-      const b = list[idx];
-      return b ? (rows.current.get(b.id)?.getBoundingClientRect() ?? null) : null;
-    };
-    const prev = rect(cur - 1);
-    const next = rect(cur + 1);
-    if (prev && e.clientY < prev.top + prev.height / 2) move(d.zone, cur, cur - 1);
-    else if (next && e.clientY > next.top + next.height / 2) move(d.zone, cur, cur + 1);
-  };
-
-  const onDragEnd = () => {
-    drag.current = null;
-    setDraggingId(null);
-  };
-
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-line bg-white p-3">
       <div className="flex items-baseline gap-2">
         <span className="text-[12.5px] font-semibold">{label} 문구</span>
-        <span className="text-[11px] text-muted-soft">끌어서 순서 · 🗑 로 제거</span>
+        <span className="text-[11px] text-muted-soft">🗑 로 제거 · 순서는 미리보기에서</span>
         {touched && (
           <button
             type="button"
@@ -236,7 +190,7 @@ export function SectionBlocksControl({
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
-              {blocks[zone].map((block, i) => {
+              {blocks[zone].map((block) => {
                 const selected = selectedId === block.id;
                 const lines = Math.min(4, block.text.split('\n').length);
                 return (
@@ -248,42 +202,9 @@ export function SectionBlocksControl({
                     }}
                     className={`rounded-lg border bg-surface p-1.5 ${
                       selected ? 'border-gold' : 'border-line'
-                    } ${draggingId === block.id ? 'opacity-60 shadow-md' : ''}`}
+                    }`}
                   >
                     <div className="flex items-start gap-1">
-                      {/* 순서 — ≡ 를 끌어서 옮기고, ▲▼ 는 키보드·한 손 조작용으로 함께 둡니다 */}
-                      <div className="flex flex-none flex-col items-center">
-                        <button
-                          type="button"
-                          title="위로"
-                          disabled={i === 0}
-                          onClick={() => move(zone, i, i - 1)}
-                          className="px-1 text-[10px] leading-tight text-muted disabled:opacity-25"
-                        >
-                          ▲
-                        </button>
-                        <span
-                          title="끌어서 순서 바꾸기"
-                          onPointerDown={onDragStart(zone, block.id)}
-                          onPointerMove={onDragMove}
-                          onPointerUp={onDragEnd}
-                          onPointerCancel={onDragEnd}
-                          style={{ touchAction: 'none' }}
-                          className="cursor-grab px-1 text-[11px] leading-tight text-muted-faint active:cursor-grabbing"
-                        >
-                          ≡
-                        </span>
-                        <button
-                          type="button"
-                          title="아래로"
-                          disabled={i === blocks[zone].length - 1}
-                          onClick={() => move(zone, i, i + 1)}
-                          className="px-1 text-[10px] leading-tight text-muted disabled:opacity-25"
-                        >
-                          ▼
-                        </button>
-                      </div>
-
                       <textarea
                         ref={(el) => {
                           if (el) inputs.current.set(block.id, el);
@@ -387,7 +308,8 @@ export function SectionBlocksControl({
 
       <p className="text-[11.5px] leading-relaxed text-muted">
         <b className="font-semibold">{'{신랑}'}</b> · <b className="font-semibold">{'{신부}'}</b>{' '}
-        라고 쓰면 기본 정보에 적은 이름이 들어갑니다. 미리보기의 글자를 눌러도 그 줄이 열립니다.
+        라고 쓰면 기본 정보에 적은 이름이 들어갑니다. 글자는 <b className="font-semibold">미리보기에서
+        바로</b> 고치고, 순서는 글자 왼쪽의 <b className="font-semibold">⠿</b> 를 끌어서 옮깁니다.
       </p>
     </div>
   );

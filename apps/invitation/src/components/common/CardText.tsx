@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { SectionBlock, SectionKey, SectionTextRole, SectionZone } from '@luvi/schema';
 import { IS_PREVIEW, notifyBlockEdit } from './PreviewSlot';
+import { startBlockDrag } from './blockDrag';
 
 /** 역할 → 이 디자인의 타이포 클래스 */
 export type RoleClass = Record<SectionTextRole, string>;
@@ -109,20 +110,61 @@ export function CardText({
   gap = 'gap-2',
   append,
 }: CardTextProps) {
-  if (blocks.length === 0) return null;
+  /**
+   * 문구가 없는 자리.
+   *
+   * 하객 화면에서는 아무것도 그리지 않습니다(여백까지 사라집니다). 미리보기에서는 **끌어서
+   * 옮길 목표**가 되어야 하므로 자리만 남깁니다 — 다만 평소엔 감춰 두고, 무언가를 끌고 있는
+   * 동안에만 보입니다 (`index.css` 의 `body[data-luvi-dragging]`). 항상 보이면 카드마다
+   * 점선 상자가 두 개씩 떠서 미리보기가 시끄러워집니다.
+   */
+  if (blocks.length === 0) {
+    if (!IS_PREVIEW) return null;
+    return (
+      <div
+        data-preview-zone={`${section}:${zone}`}
+        data-luvi-empty-zone
+        className={`hidden ${className}`}
+      >
+        <div className="rounded-md border border-dashed border-gold/70 py-1.5 text-[11px] text-gold-deep">
+          여기에 문구를 놓을 수 있어요
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex flex-col ${gap} ${className}`}>
+    <div
+      data-preview-zone={IS_PREVIEW ? `${section}:${zone}` : undefined}
+      className={`flex flex-col ${gap} ${className}`}
+    >
       {blocks.map((b, i) => (
         <div
           key={b.id}
           // 눌린 글자가 무엇인지 — 에디터가 그 줄을 목록에서 골라줍니다 (PreviewSlot)
           data-preview-block={IS_PREVIEW ? `${section}:${zone}:${b.id}` : undefined}
           className={`${roleClass[b.role]}${
-            IS_PREVIEW ? ' rounded-[3px] outline-offset-[3px] hover:outline hover:outline-1 hover:outline-gold/60' : ''
+            IS_PREVIEW
+              ? ' group relative rounded-[3px] outline-offset-[3px] hover:outline hover:outline-1 hover:outline-gold/60'
+              : ''
           }`}
           style={{ textAlign: b.align, color: b.color }}
         >
+          {IS_PREVIEW && (
+            // 글자는 눌러서 고치고, 이 손잡이는 끌어서 옮깁니다 — 두 동작을 손잡이로 갈라둡니다
+            // (글자에서 바로 끌면 contentEditable 의 '글자 선택' 과 부딪힙니다)
+            <span
+              title="끌어서 옮기기"
+              onPointerDown={(e) => startBlockDrag(e.nativeEvent, { section, zone, id: b.id })}
+              onClick={(e) => e.stopPropagation()}
+              style={{ touchAction: 'none' }}
+              // 항상 옅게 보입니다 — hover 로만 나타내면 터치 화면에서는 찾을 수 없고,
+              // 손잡이가 보이지 않으면 "옮길 수 있다" 는 것 자체를 모릅니다
+              className="absolute -left-[17px] top-1/2 -translate-y-1/2 cursor-grab select-none text-[12px] font-normal leading-none tracking-normal text-gold-deep opacity-30 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+            >
+              ⠿
+            </span>
+          )}
           <span
             className="whitespace-pre-line"
             style={b.scale && b.scale !== 1 ? { fontSize: `${b.scale}em` } : undefined}
