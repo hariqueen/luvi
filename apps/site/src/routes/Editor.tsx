@@ -39,7 +39,7 @@ import {
 import { api } from '@/lib/api';
 import { assetUrl, env } from '@/lib/env';
 import { logEvent } from '@/lib/log';
-import { setPath } from '@/lib/paths';
+import { getPath, setPath } from '@/lib/paths';
 import { uploadAudio, uploadImageForPath } from '@/lib/upload';
 import { EditorProvider, type EditorContextValue } from '@/lib/editorContext';
 import { BottomSheet, type SheetSnap } from '@/components/BottomSheet';
@@ -556,6 +556,53 @@ export default function Editor() {
     [doc, themeId, setField],
   );
 
+  /**
+   * 미리보기에서 고친 **초안 값** — 인사말·말풍선·오시는 길처럼 폼에 있던 글자들.
+   *
+   * `path` 는 폼의 입력칸이 쓰는 것과 같은 점 경로라, 미리보기에서 고쳐도 저장·이력·
+   * 자동저장이 폼에서 고친 것과 완전히 같은 길을 지납니다.
+   *
+   * 🔴 **배열 인덱스가 낀 경로는 그대로 저장할 수 없습니다** (`core.location.transport.0.desc`).
+   *    저장 경로는 배열을 통째로만 받습니다(`lib/paths.ts` 주석) — 인덱스를 그대로 보내면
+   *    배열이 `{"0": …}` 객체로 바뀌어 순서와 반복이 깨집니다. 그래서 그 배열을 새로 만들어
+   *    **배열 경로로** 씁니다. 항목 안에 또 배열이 있는 경우(계좌 그룹 → 항목)도 같은
+   *    방식으로 따라 내려갑니다.
+   *
+   * 모르는 모양의 경로는 무시합니다 — 미리보기는 같은 출처지만, 저장 경로에 아무 값이나
+   * 쓰이는 길을 열어두지 않습니다.
+   */
+  const applyFieldEdit = useCallback(
+    (path: string, value: string) => {
+      if (!/^(core|theme)\.[A-Za-z0-9_.]+$/.test(path)) return;
+
+      const segments = path.split('.');
+      const at = segments.findIndex((seg) => /^\d+$/.test(seg));
+      if (at === -1) {
+        setField(path, value);
+        return;
+      }
+
+      /** 배열을 배열로 유지하며 깊은 곳에 값을 씁니다 (`setPath` 는 배열을 객체로 만듭니다) */
+      const setDeep = (target: unknown, segs: string[], next: unknown): unknown => {
+        if (segs.length === 0) return next;
+        const [head, ...rest] = segs;
+        if (Array.isArray(target)) {
+          const i = Number(head);
+          if (!Number.isInteger(i) || i < 0 || i >= target.length) return target;
+          return target.map((item, k) => (k === i ? setDeep(item, rest, next) : item));
+        }
+        const obj = (target && typeof target === 'object' ? target : {}) as Record<string, unknown>;
+        return { ...obj, [String(head)]: setDeep(obj[String(head)], rest, next) };
+      };
+
+      const arrayPath = segments.slice(0, at).join('.');
+      const list = getPath(doc, arrayPath);
+      if (!Array.isArray(list)) return;
+      setField(arrayPath, setDeep(list, segments.slice(at), value));
+    },
+    [doc, setField],
+  );
+
   const applyBlockEdit = useCallback(
     (section: SectionKey, zone: string, id: string, text: string) => {
       if (zone !== 'head' && zone !== 'foot') return;
@@ -619,6 +666,7 @@ export default function Editor() {
         __luviSectionClick?: SectionKey;
         __luviBlockClick?: { section: SectionKey; zone: string; id: string };
         __luviBlockEdit?: { section: SectionKey; zone: string; id: string; text: string };
+        __luviFieldEdit?: { path: string; value: string };
         __luviBlockPlace?: {
           section: SectionKey;
           zone: string;
@@ -627,6 +675,13 @@ export default function Editor() {
           y: number;
         };
       } | null;
+
+      // 미리보기에서 고친 초안 값 (인사말·말풍선·오시는 길 …)
+      const field = data?.__luviFieldEdit;
+      if (field?.path) {
+        applyFieldEdit(field.path, field.value);
+        return;
+      }
 
       // 미리보기에서 끌어서 놓은 문구
       const placed = data?.__luviBlockPlace;
@@ -663,7 +718,7 @@ export default function Editor() {
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [openSectionForm, applyBlockEdit, applyBlockPlace]);
+  }, [openSectionForm, applyBlockEdit, applyBlockPlace, applyFieldEdit]);
 
   const sheetTitle = panel.kind === 'sections' ? '청첩장 구성' : (activeForm?.label ?? '편집');
   const title = (doc?.core.share.title ?? '') as string;

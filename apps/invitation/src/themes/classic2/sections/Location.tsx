@@ -8,6 +8,7 @@ import { useCopy } from '@/hooks/useCopy';
 import { SectionText } from '../ui';
 import { CheckIcon, CopyIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
+import { Field } from '@/components/common/Editable';
 
 export function Location() {
   const { location, sectionText } = useInvitation();
@@ -18,11 +19,17 @@ export function Location() {
     <section className="bg-c2-ivory px-[30px] py-[60px] text-center">
       <SectionText section="location" zone="head" blocks={text.head} />
 
-      <div className="mt-6 font-myeongjo text-[17px] text-c2-ink">{location.venue}</div>
-      <div className="mt-1 text-[12.5px] tracking-[0.04em] text-c2-sage-deep">{location.hall}</div>
+      <div className="mt-6 font-myeongjo text-[17px] text-c2-ink">
+        <Field path="core.location.venue" value={location.venue} />
+      </div>
+      <div className="mt-1 text-[12.5px] tracking-[0.04em] text-c2-sage-deep">
+        <Field path="core.location.hall" value={location.hall} />
+      </div>
 
       <div className="mt-3 flex items-center justify-center gap-2 px-2">
-        <span className="text-[12.5px] leading-[1.6] text-c2-ink-soft">{location.address}</span>
+        <span className="text-[12.5px] leading-[1.6] text-c2-ink-soft">
+          <Field path="core.location.address" value={location.address} />
+        </span>
         <button
           onClick={() => copy(location.addressForCopy, 'addr')}
           title="주소 복사"
@@ -71,9 +78,11 @@ export function Location() {
           {location.transport.map((t, i) => (
             <div key={i} className="border-b border-c2-line px-1 py-[18px]">
               <div className="font-myeongjo text-[13.5px] text-c2-sage-deep">
-                {t.icon} {t.title}
+                {t.icon} <Field path={`core.location.transport.${i}.title`} value={t.title} />
               </div>
-              <div className="mt-1.5 text-[12.5px] leading-[1.7] text-c2-ink-soft">{t.desc}</div>
+              <div className="mt-1.5 text-[12.5px] leading-[1.7] text-c2-ink-soft">
+                <Field path={`core.location.transport.${i}.desc`} value={t.desc} />
+              </div>
             </div>
           ))}
         </div>

@@ -66,3 +66,13 @@ export function notifyBlockEdit(section: string, zone: string, id: string, text:
     window.location.origin,
   );
 }
+
+/**
+ * 미리보기에서 고친 **초안 값**을 부모(에디터)에게 보냅니다.
+ *
+ * `path` 는 폼의 입력칸이 쓰는 것과 같은 점 경로입니다 — 그래서 미리보기에서 고쳐도
+ * 폼에서 고친 것과 완전히 같은 저장 경로를 지납니다(검증·이력·자동저장 전부 그대로).
+ */
+export function notifyFieldEdit(path: string, value: string) {
+  window.parent?.postMessage({ __luviFieldEdit: { path, value } }, window.location.origin);
+}

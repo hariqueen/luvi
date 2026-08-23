@@ -10,6 +10,7 @@
 import { useShare } from '@/hooks/useShare';
 import { Ornament, SectionText } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
+import { Field } from '@/components/common/Editable';
 
 export function Footer() {
   const { footer, groom, bride, share, sectionText } = useInvitation();
@@ -52,7 +53,8 @@ export function Footer() {
           override={{ title: 'font-pinyon text-[46px] leading-none text-c2-sage-deep' }}
         />
         <div className="mb-1.5 mt-[18px] font-myeongjo text-sm leading-[1.9] text-c2-ink">
-          {groom.firstName} · {bride.firstName}
+          <Field path="core.couple.groom.firstName" value={groom.firstName} /> ·{' '}
+          <Field path="core.couple.bride.firstName" value={bride.firstName} />
         </div>
         <div className="text-[12.5px] tracking-[0.08em] text-c2-ink-soft">{share.date}</div>
 

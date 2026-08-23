@@ -2,6 +2,7 @@ import { useCopy } from '@/hooks/useCopy';
 import { CheckIcon, CopyIcon, PhoneIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
+import { Field } from '@/components/common/Editable';
 
 export function Location() {
   const { location, sectionText } = useInvitation();
@@ -13,7 +14,9 @@ export function Location() {
       <SectionText section="location" zone="head" blocks={text.head} />
 
       <div className="mt-1.5 flex items-center justify-center gap-2">
-        <span className="text-base font-bold text-ink">{location.venue}</span>
+        <span className="text-base font-bold text-ink">
+          <Field path="core.location.venue" value={location.venue} />
+        </span>
         <a
           href={`tel:${location.tel}`}
           title="전화 문의"
@@ -22,10 +25,14 @@ export function Location() {
           <PhoneIcon />
         </a>
       </div>
-      <div className="mt-1 text-[13px] font-bold text-rose-deep">{location.hall}</div>
+      <div className="mt-1 text-[13px] font-bold text-rose-deep">
+        <Field path="core.location.hall" value={location.hall} />
+      </div>
 
       <div className="mt-1.5 flex items-center justify-center gap-[7px] px-2">
-        <span className="text-[13px] leading-[1.5] text-ink-soft">{location.address}</span>
+        <span className="text-[13px] leading-[1.5] text-ink-soft">
+          <Field path="core.location.address" value={location.address} />
+        </span>
         <button
           onClick={() => copy(location.addressForCopy, 'addr')}
           title="주소 복사"
@@ -75,8 +82,13 @@ export function Location() {
           <div key={i} className="flex gap-3 rounded-md bg-cream px-4 py-3.5">
             <div className="text-lg">{t.icon}</div>
             <div>
-              <div className="text-[13px] font-bold text-ink">{t.title}</div>
-              <div className="text-[12.5px] leading-[1.6] text-ink-soft">{t.desc}</div>
+              {/* 배열 안의 값 — 저장은 에디터가 배열을 통째로 다시 씁니다 (Editable.tsx) */}
+              <div className="text-[13px] font-bold text-ink">
+                <Field path={`core.location.transport.${i}.title`} value={t.title} />
+              </div>
+              <div className="text-[12.5px] leading-[1.6] text-ink-soft">
+                <Field path={`core.location.transport.${i}.desc`} value={t.desc} />
+              </div>
             </div>
           </div>
         ))}

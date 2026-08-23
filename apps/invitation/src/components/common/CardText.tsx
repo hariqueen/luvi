@@ -23,7 +23,7 @@
  * 크기·색·글씨체는 블록에 값이 있을 때만 덮습니다 — 손대지 않은 문구는 디자인을 바꾸면
  * 같이 따라와야 합니다. `scale` 은 배율이라 `em` 으로 겁니다.
  */
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import {
   FONT_STACK,
   alignTransform,
@@ -35,6 +35,7 @@ import {
   type SectionZone,
 } from '@luvi/schema';
 import { IS_PREVIEW, notifyBlockEdit } from './PreviewSlot';
+import { EditableText } from './Editable';
 import { startBlockDrag } from './blockDrag';
 
 /** 역할 → 이 디자인의 타이포 클래스 */
@@ -55,59 +56,6 @@ export interface CardTextProps {
    * 영역 밖에 둡니다. 블록이 하나도 없으면 같이 사라집니다.
    */
   append?: ReactNode;
-}
-
-/** 글자를 타이핑할 수 있게 만드는 부분 — 미리보기에서만 씁니다 */
-function EditableText({ text, onEdit }: { text: string; onEdit: (next: string) => void }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const timer = useRef<number | null>(null);
-
-  // 포커스가 없을 때만 DOM 을 맞춥니다 (편집 중에 덮어쓰면 커서가 튑니다)
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || document.activeElement === el) return;
-    if (el.textContent !== text) el.textContent = text;
-  }, [text]);
-
-  const flush = useCallback(() => {
-    if (timer.current !== null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-    const el = ref.current;
-    if (el) onEdit(el.textContent ?? '');
-  }, [onEdit]);
-
-  // 타이핑이 멈추면 올립니다. 매 글자마다 올리면 저장 요청과 미리보기 갱신이 과합니다
-  const schedule = useCallback(() => {
-    if (timer.current !== null) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(flush, 250);
-  }, [flush]);
-
-  useEffect(
-    () => () => {
-      if (timer.current !== null) window.clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  return (
-    <span
-      ref={ref}
-      role="textbox"
-      tabIndex={0}
-      // 'plaintext-only' — 붙여넣기로 서식·태그가 들어오면 청첩장 마크업이 깨집니다
-      contentEditable="plaintext-only"
-      suppressContentEditableWarning
-      onInput={schedule}
-      onBlur={flush}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') e.currentTarget.blur();
-      }}
-      // 빈 줄도 누를 수 있어야 합니다 — 다 지운 뒤 다시 쓰려면 집을 자리가 필요합니다
-      className="inline-block min-w-[2ch] outline-none focus:bg-white/50 focus:ring-1 focus:ring-gold"
-    />
-  );
 }
 
 /** 문구 한 줄 — 흐름 배치와 자유 배치가 같은 모양이어야 하므로 한 곳에서 그립니다 */

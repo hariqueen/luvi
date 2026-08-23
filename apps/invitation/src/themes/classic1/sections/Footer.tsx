@@ -7,6 +7,7 @@
 import { useShare } from '@/hooks/useShare';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
+import { Field } from '@/components/common/Editable';
 
 export function Footer() {
   const { footer, groom, bride, share, sectionText } = useInvitation();
@@ -45,7 +46,8 @@ export function Footer() {
           }}
         />
         <div className="my-3.5 mb-1.5 font-myeongjo text-[15px] leading-[1.9]">
-          {groom.firstName} ♥ {bride.firstName}
+          <Field path="core.couple.groom.firstName" value={groom.firstName} /> ♥{' '}
+          <Field path="core.couple.bride.firstName" value={bride.firstName} />
         </div>
         <div className="text-[13px] tracking-[0.08em] opacity-90">{share.date}</div>
 

@@ -4,6 +4,7 @@ import { CheckIcon, CopyIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
 import { BASE } from '@/lib/env';
 import { SectionText } from '../ui';
+import { Field } from '@/components/common/Editable';
 
 const KAKAOPAY_ICON = `${BASE}assets/kakaopay_icon.png`;
 
@@ -17,7 +18,7 @@ export function Account() {
     <section className="bg-cream px-7 py-[56px] text-center">
       <SectionText section="account" zone="head" blocks={text.head} />
       <p className="mx-auto mb-[22px] mt-1.5 max-w-[280px] whitespace-pre-line text-[13px] leading-[1.7] text-ink-soft">
-        {account.description}
+        <Field path="core.account.description" value={account.description} />
       </p>
 
       <div className="flex flex-col gap-3">
@@ -32,7 +33,9 @@ export function Account() {
                 onClick={() => setOpenIndex(open ? null : gi)}
                 className="flex w-full items-center justify-between border-none bg-transparent px-[18px] py-4 text-[15px] font-bold text-ink"
               >
-                <span>{group.title}</span>
+                <span>
+                  <Field path={`core.account.groups.${gi}.title`} value={group.title} />
+                </span>
                 <span
                   className="mt-[-3px] inline-block h-[9px] w-[9px] border-b border-r border-ink-soft transition-transform duration-[250ms]"
                   style={{ transform: open ? 'rotate(-135deg)' : 'rotate(45deg)' }}
@@ -49,8 +52,19 @@ export function Account() {
                         className="flex items-center justify-between gap-2.5 rounded-md bg-cream px-3.5 py-3 text-left"
                       >
                         <div className="min-w-0">
-                          <div className="text-[13px] font-bold text-ink">{item.label}</div>
-                          <div className="font-mono text-[12.5px] text-ink-soft">{item.bank}</div>
+                          <div className="text-[13px] font-bold text-ink">
+                            <Field
+                              path={`core.account.groups.${gi}.items.${ii}.label`}
+                              value={item.label}
+                            />
+                          </div>
+                          {/* 복사에 쓰이는 값은 `number` 라 여기서 고쳐도 복사가 깨지지 않습니다 */}
+                          <div className="font-mono text-[12.5px] text-ink-soft">
+                            <Field
+                              path={`core.account.groups.${gi}.items.${ii}.bank`}
+                              value={item.bank}
+                            />
+                          </div>
                         </div>
                         <div className="flex flex-none items-center gap-1.5">
                           <button
