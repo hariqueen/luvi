@@ -941,11 +941,6 @@ export default function Editor() {
                (커버 문구 렌더·배선은 뷰어의 `CoverLayers`).
           */}
           <div className="flex h-full w-full min-w-0 flex-col lg:flex-1 lg:border-r lg:border-line">
-            <div className="flex flex-none items-center gap-1 border-b border-line bg-surface px-3 py-2">
-              <span className="text-[12px] font-medium text-ink">미리보기</span>
-              <span className="ml-auto text-[10.5px] text-muted-faint">편집 즉시 반영</span>
-            </div>
-
             <div className="relative min-h-0 flex-1 lg:bg-surface-sunken">
               {/*
                 라이브 미리보기 (실제 하객 뷰어를 iframe 으로, 초안 실시간 반영).
