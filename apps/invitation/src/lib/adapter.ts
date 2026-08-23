@@ -15,6 +15,7 @@ import {
   resolveSectionText,
 } from '@luvi/schema';
 import type { GameSprite, InvitationConfig } from '@/config/invitation.config';
+import { IS_PREVIEW } from '@/components/common/PreviewSlot';
 import { BASE } from './env';
 
 const MONTHS = [
@@ -157,10 +158,13 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
      * 카드마다 적히는 문구. **고른 값 + 디자인 기본값 + 이름 치환을 여기서 끝냅니다** —
      * 섹션 컴포넌트는 결과만 읽습니다. 테마마다 기본 문구를 다시 적으면 한쪽만 바뀝니다.
      */
-    sectionText: resolveSectionText(pub.themeId, c.sectionText, {
-      신랑: c.couple.groom.firstName,
-      신부: c.couple.bride.firstName,
-    }),
+    sectionText: resolveSectionText(
+      pub.themeId,
+      c.sectionText,
+      { 신랑: c.couple.groom.firstName, 신부: c.couple.bride.firstName },
+      // 미리보기에서는 글자를 직접 고칩니다 — 다 지웠다고 줄을 없애면 커서를 잃습니다
+      { keepEmpty: IS_PREVIEW },
+    ),
 
     showPetals: pub.features.petals,
 

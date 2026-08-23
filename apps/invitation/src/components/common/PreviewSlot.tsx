@@ -52,3 +52,17 @@ export function notifySectionClick(e: MouseEvent) {
   const key = target.closest('[data-preview-section]')?.getAttribute('data-preview-section');
   if (key) post({ __luviSectionClick: key });
 }
+
+/**
+ * 미리보기에서 **그 자리에서 고친 글자**를 부모(에디터)에게 보냅니다.
+ *
+ * 에디터가 이 값을 초안에 반영하면 초안이 다시 미리보기로 내려옵니다 — 그래서 편집 중인
+ * 글자를 다시 덮어쓰지 않도록, 받는 쪽(`CardText`)이 **포커스된 요소의 DOM 은 건드리지
+ * 않습니다.** 안 그러면 한 글자 칠 때마다 커서가 맨 앞으로 튑니다.
+ */
+export function notifyBlockEdit(section: string, zone: string, id: string, text: string) {
+  window.parent?.postMessage(
+    { __luviBlockEdit: { section, zone, id, text } },
+    window.location.origin,
+  );
+}

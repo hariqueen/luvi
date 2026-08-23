@@ -29,6 +29,8 @@ import {
   type LayerFont,
   type SectionDef,
   type SectionKey,
+  normalizeSectionText,
+  sectionBlocks,
   type SectionBlocks,
   type TextLayer,
   type ThemeId,
@@ -520,8 +522,29 @@ export default function Editor() {
     [setField],
   );
 
-  /** 미리보기에서 탭한 문구 — 그 카드를 열고 그 줄에 커서를 둡니다 */
-  const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
+  /** 미리보기에서 누른 문구 — 왼쪽 목록에서 그 줄을 골라 둡니다 (커서는 미리보기에 있습니다) */
+  const [selectBlockId, setSelectBlockId] = useState<string | null>(null);
+
+  /**
+   * 미리보기에서 **그 자리에서 고친 글자**를 초안에 반영합니다.
+   *
+   * 화면에 보이는 목록(`sectionBlocks`)을 기준으로 그 id 를 찾아 글자만 갈아끼웁니다 —
+   * 아직 저장된 값이 없는(디자인 기본 문구) 카드도 이 경로로 첫 편집이 값으로 굳습니다.
+   * 이미 지워진 줄이면 아무것도 하지 않습니다(미리보기가 한 박자 늦게 올 수 있습니다).
+   */
+  const applyBlockEdit = useCallback(
+    (section: SectionKey, zone: string, id: string, text: string) => {
+      if (zone !== 'head' && zone !== 'foot') return;
+      const current = sectionBlocks(themeId, section, normalizeSectionText(doc?.core.sectionText));
+      const list = current[zone];
+      if (!list.some((b) => b.id === id)) return;
+      setField(`core.sectionText.${section}`, {
+        ...current,
+        [zone]: list.map((b) => (b.id === id ? { ...b, text } : b)),
+      });
+    },
+    [doc, themeId, setField],
+  );
 
   const setSectionBg = useCallback(
     (key: SectionKey, color: string) => setField(`core.design.sectionBg.${key}`, color),
@@ -571,13 +594,25 @@ export default function Editor() {
       const data = e.data as {
         __luviSectionClick?: SectionKey;
         __luviBlockClick?: { section: SectionKey; zone: string; id: string };
+        __luviBlockEdit?: { section: SectionKey; zone: string; id: string; text: string };
       } | null;
 
-      // 글자를 탭했으면 그 카드를 열고 그 줄에 커서를 둔다 (자리·id 는 컨트롤이 찾는다)
+      // 미리보기에서 직접 고친 글자
+      const edit = data?.__luviBlockEdit;
+      if (edit?.section) {
+        applyBlockEdit(edit.section, edit.zone, edit.id, edit.text);
+        return;
+      }
+
+      /**
+       * 글자를 눌렀다 — 그 카드를 열고 목록에서 그 줄을 **고르기만** 한다.
+       * 🔴 왼쪽 입력칸에 `focus()` 를 걸면 안 된다: 커서는 방금 누른 미리보기의 글자에
+       *    있는데, 부모 문서의 요소에 포커스를 주면 iframe 의 커서를 빼앗아 타이핑이 끊긴다.
+       */
       const block = data?.__luviBlockClick;
       if (block?.section) {
         openSectionForm(block.section);
-        setFocusBlockId(block.id);
+        setSelectBlockId(block.id);
         return;
       }
 
@@ -588,7 +623,7 @@ export default function Editor() {
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [openSectionForm]);
+  }, [openSectionForm, applyBlockEdit]);
 
   const sheetTitle = panel.kind === 'sections' ? '청첩장 구성' : (activeForm?.label ?? '편집');
   const title = (doc?.core.share.title ?? '') as string;
@@ -658,8 +693,8 @@ export default function Editor() {
             label={SECTION_META[formSectionKey].label}
             stored={sectionText}
             onChange={(next) => setSectionText(formSectionKey, next)}
-            focusBlockId={focusBlockId}
-            onFocusHandled={() => setFocusBlockId(null)}
+            selectBlockId={selectBlockId}
+            onSelectHandled={() => setSelectBlockId(null)}
           />
           <SectionBgControl
             themeId={themeId}

@@ -64,9 +64,13 @@ interface Props {
   stored: SectionTextMap;
   /** 이 카드의 문구를 통째로 저장합니다 (`core.sectionText.{키}`) */
   onChange: (next: Required<SectionBlocks>) => void;
-  /** 미리보기에서 탭한 블록 — 열자마자 그 줄에 커서를 둡니다 */
-  focusBlockId?: string | null;
-  onFocusHandled?: () => void;
+  /**
+   * 미리보기에서 누른 블록 — 그 줄을 **골라서 보여주기만** 합니다.
+   * 🔴 `focus()` 를 걸지 않습니다: 커서는 방금 누른 미리보기의 글자에 있고, 여기에
+   *    포커스를 주면 iframe 의 커서를 빼앗아 타이핑이 끊깁니다.
+   */
+  selectBlockId?: string | null;
+  onSelectHandled?: () => void;
 }
 
 export function SectionBlocksControl({
@@ -75,8 +79,8 @@ export function SectionBlocksControl({
   label,
   stored,
   onChange,
-  focusBlockId,
-  onFocusHandled,
+  selectBlockId,
+  onSelectHandled,
 }: Props) {
   // 저장된 값은 검사하지 않은 원본입니다 — 범위 밖 크기·빈 색·id 없는 줄을 여기서 걸러야
   // 에디터가 그리는 목록과 뷰어가 그리는 목록이 같아집니다 (뷰어도 같은 함수를 씁니다)
@@ -89,19 +93,15 @@ export function SectionBlocksControl({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const inputs = useRef(new Map<string, HTMLTextAreaElement>());
+  const rows = useRef(new Map<string, HTMLLIElement>());
 
-  /** 미리보기에서 글자를 탭하면 그 줄을 열고 커서를 둡니다 */
+  /** 미리보기에서 글자를 누르면 그 줄을 골라 보여줍니다 (스타일 툴바가 열립니다) */
   useEffect(() => {
-    if (!focusBlockId) return;
-    const el = inputs.current.get(focusBlockId);
-    if (el) {
-      setSelectedId(focusBlockId);
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-      el.scrollIntoView({ block: 'nearest' });
-    }
-    onFocusHandled?.();
-  }, [focusBlockId, onFocusHandled]);
+    if (!selectBlockId) return;
+    setSelectedId(selectBlockId);
+    rows.current.get(selectBlockId)?.scrollIntoView({ block: 'nearest' });
+    onSelectHandled?.();
+  }, [selectBlockId, onSelectHandled]);
 
   const commit = useCallback(
     (zone: SectionZone, next: SectionBlock[]) =>
@@ -167,7 +167,6 @@ export function SectionBlocksControl({
    */
   const drag = useRef<{ zone: SectionZone; id: string } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const rows = useRef(new Map<string, HTMLLIElement>());
 
   const onDragStart = (zone: SectionZone, id: string) => (e: ReactPointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);

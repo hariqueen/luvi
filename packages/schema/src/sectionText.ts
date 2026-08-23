@@ -236,13 +236,23 @@ export const SECTION_TEXT_DEFAULTS: Record<ThemeId, Partial<Record<SectionKey, D
 };
 
 /** 이 디자인·이 카드·이 자리의 기본 문구 (없으면 빈 배열) */
+/**
+ * 이 디자인·이 카드·이 자리의 기본 문구 (없으면 빈 배열).
+ *
+ * 🔴 **id 를 무작위로 만들지 않습니다.** 뷰어(iframe)와 에디터는 서로 다른 프로세스에서
+ *    각자 이 함수를 부릅니다. 무작위 id 를 쓰면 같은 문구인데 양쪽 id 가 달라서,
+ *    미리보기의 글자를 눌렀을 때 에디터가 그 줄을 **못 찾습니다**(실제로 그래서 눌러도
+ *    아무 일이 없었습니다). 게다가 미리보기는 초안이 바뀔 때마다 다시 그려지는데,
+ *    그때마다 id 가 새로 생기면 React 가 매번 다시 마운트해 편집 중인 커서가 날아갑니다.
+ *    그래서 **자리와 순서로 결정되는 id** 를 씁니다.
+ */
 export function defaultSectionBlocks(
   themeId: ThemeId,
   key: SectionKey,
   zone: SectionZone,
 ): SectionBlock[] {
   const defaults = SECTION_TEXT_DEFAULTS[themeId][key]?.[zone] ?? [];
-  return defaults.map((b) => createSectionBlock(b.role, b.text));
+  return defaults.map((b, i) => ({ id: `d.${key}.${zone}.${i}`, text: b.text, role: b.role }));
 }
 
 const isRole = (v: unknown): v is SectionTextRole =>
@@ -251,13 +261,13 @@ const isAlign = (v: unknown): v is SectionTextAlign =>
   v === 'left' || v === 'center' || v === 'right';
 
 /** 저장된 블록 하나를 검사합니다. 글자가 아닌 것·역할이 없는 것은 버립니다 */
-function asBlock(value: unknown, index: number): SectionBlock | null {
+function asBlock(value: unknown, index: number, zone: SectionZone): SectionBlock | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const raw = value as Record<string, unknown>;
   if (typeof raw.text !== 'string') return null;
   const role = isRole(raw.role) ? raw.role : 'note';
   const block: SectionBlock = {
-    id: typeof raw.id === 'string' && raw.id ? raw.id : `sb-stored-${index}`,
+    id: typeof raw.id === 'string' && raw.id ? raw.id : `s.${zone}.${index}`,
     text: raw.text,
     role,
   };
@@ -270,9 +280,11 @@ function asBlock(value: unknown, index: number): SectionBlock | null {
   return block;
 }
 
-function asZone(value: unknown): SectionBlock[] | undefined {
+function asZone(value: unknown, zone: SectionZone): SectionBlock[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  return value.map(asBlock).filter((b): b is SectionBlock => b !== null);
+  return value
+    .map((v, i) => asBlock(v, i, zone))
+    .filter((b): b is SectionBlock => b !== null);
 }
 
 /**
@@ -290,8 +302,8 @@ export function normalizeSectionText(value: unknown): SectionTextMap {
     const entry = raw as Record<string, unknown>;
     const stored: StoredSectionText = {};
 
-    const head = asZone(entry.head);
-    const foot = asZone(entry.foot);
+    const head = asZone(entry.head, 'head');
+    const foot = asZone(entry.foot, 'foot');
     if (head) stored.head = head;
     if (foot) stored.foot = foot;
 
@@ -411,20 +423,24 @@ export function resolveSectionText(
   themeId: ThemeId,
   overrides: unknown,
   vars: { 신랑?: string; 신부?: string },
+  /**
+   * `keepEmpty` — 글자가 빈 줄도 남깁니다. **에디터 미리보기 전용**입니다:
+   * 미리보기에서 글자를 직접 고칠 수 있는데, 다 지운 순간 줄이 사라지면 **입력하던 상자가
+   * 없어져 커서를 잃습니다.** 하객 화면에서는 빈 줄이 빈 여백이 되므로 그대로 버립니다.
+   */
+  options: { keepEmpty?: boolean } = {},
 ): ResolvedSectionText {
   const chosen = normalizeSectionText(overrides);
   const out = {} as ResolvedSectionText;
 
   for (const key of SECTION_KEYS) {
     const blocks = sectionBlocks(themeId, key, chosen);
-    out[key] = {
-      head: blocks.head
-        .filter((b) => b.text.trim())
-        .map((b) => ({ ...b, text: fillSectionText(b.text, vars) })),
-      foot: blocks.foot
-        .filter((b) => b.text.trim())
-        .map((b) => ({ ...b, text: fillSectionText(b.text, vars) })),
-    };
+    const keep = (list: SectionBlock[]) =>
+      (options.keepEmpty ? list : list.filter((b) => b.text.trim())).map((b) => ({
+        ...b,
+        text: fillSectionText(b.text, vars),
+      }));
+    out[key] = { head: keep(blocks.head), foot: keep(blocks.foot) };
   }
   return out;
 }
