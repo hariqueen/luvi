@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url';
 export default defineConfig({
   plugins: [react()],
   /**
-   * `.env` 는 모노레포 루트에 하나만 둡니다 (`.env.example` 이 있는 곳).
+   * `.env` 는 모노레포 루트(`luvi/`)에 하나만 둡니다.
    *
    * 🔴 **이 설정이 없으면 Vite 는 이 앱 폴더에서만 `.env` 를 찾습니다.**
    *    루트에 값을 채워도 조용히 무시되어, 빌드는 성공하는데 로그인만 안 되는 상태가 됩니다.
