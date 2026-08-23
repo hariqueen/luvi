@@ -45,7 +45,7 @@ export function SectionBgControl({ themeId, sectionKey, label, value, onChange }
           />
           <p className="text-[11.5px] leading-relaxed text-muted">
             글자색은 디자인이 정한 색 그대로예요. 어두운 색을 고르면 글이 잘 안 보일 수
-            있어요 — 오른쪽 미리보기로 확인해 주세요.
+            있어요 — 가운데 미리보기로 확인해 주세요.
           </p>
         </>
       ) : (

@@ -176,7 +176,7 @@ export default function Editor() {
   const [features, setFeatures] = useState<Features>({ bgm: false, petals: true });
   const [themeId, setThemeId] = useState<ThemeId>('classic1');
 
-  // ── 우측 라이브 미리보기 (실제 뷰어를 iframe 으로) ──
+  // ── 가운데 라이브 미리보기 (실제 뷰어를 iframe 으로) ──
   const previewReady = useRef(false);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -215,7 +215,7 @@ export default function Editor() {
    * 초안이 유일한 원본이라 잘못 지운 문구를 되찾을 지점이 남지 않습니다. 실제로 테스트가
    * 인사말을 덮어쓴 뒤 그대로 발행돼 하객 화면까지 나간 사고가 있었습니다.
    *
-   * 대신 우측 미리보기는 저장 여부와 무관하게 즉시 반영됩니다(로컬 상태를 iframe 에 보냅니다).
+   * 대신 가운데 미리보기는 저장 여부와 무관하게 즉시 반영됩니다(로컬 상태를 iframe 에 보냅니다).
    * 저장하지 않은 변경은 **새로고침·탭 닫기·화면 이탈에서 경고 후 사라집니다.**
    */
   const pendingPatch = useRef<Record<string, unknown>>({});
@@ -327,7 +327,7 @@ export default function Editor() {
   }, [save]);
 
   // ─────────────── 라이브 미리보기 전송 ───────────────
-  // 편집 중인 초안을 iframe(실제 뷰어)에 실시간으로 보내 우측에 그대로 그려지게 한다.
+  // 편집 중인 초안을 iframe(실제 뷰어)에 실시간으로 보내 가운데에 그대로 그려지게 한다.
   const postPreview = useCallback(() => {
     if (!doc) return;
     // invitationId 를 비워 보냅니다 — 미리보기에서 방명록·랭킹을 쓰면 하객 글 사이에
@@ -440,7 +440,7 @@ export default function Editor() {
 
   /**
    * 미리보기에서 누른 문구 — 미리보기 **바로 아래 툴바**가 이 문구의 서식을 다룹니다.
-   * 왼쪽 폼에는 문구 편집을 두지 않습니다 (같은 일을 하는 자리가 두 곳이 되면 어느 쪽이
+   * 폼에는 문구 편집을 두지 않습니다 (같은 일을 하는 자리가 두 곳이 되면 어느 쪽이
    * 원본인지 헷갈립니다 — `BlockToolbar` 주석).
    */
   const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
@@ -704,7 +704,7 @@ export default function Editor() {
     <div className="flex max-w-[520px] flex-col gap-4">
       {hasPreviewText(activeForm.fields) && (
         <p className="rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] leading-relaxed text-muted">
-          이 카드의 <b className="font-semibold text-ink-soft">글자는 오른쪽 미리보기에서</b> 눌러
+          이 카드의 <b className="font-semibold text-ink-soft">글자는 가운데 미리보기에서</b> 눌러
           고칩니다 — 색·정렬·글씨체는 미리보기 아래 툴바에서 바꿔요.
         </p>
       )}
@@ -822,7 +822,7 @@ export default function Editor() {
             + 문구 추가
           </button>
           <p className="text-[12px] leading-relaxed text-muted">
-            위치는 오른쪽 미리보기에서 문구 왼쪽의 손잡이(⠿)를 끌어 옮기세요. 글자는 미리보기에서
+            위치는 가운데 미리보기에서 문구 왼쪽의 손잡이(⠿)를 끌어 옮기세요. 글자는 미리보기에서
             눌러 바로 고칠 수 있어요.
           </p>
         </div>
@@ -851,7 +851,7 @@ export default function Editor() {
       {/* 사진을 모아 보여주는 폼 — 여기에 없는 사진은 어디 있는지 알려준다 */}
       {activeForm.key === 'photos' && (
         <p className="text-[12px] leading-relaxed text-muted">
-          커버 문구의 위치는 오른쪽 미리보기에서 끌어 옮기고, 카톡 미리보기 사진은 “공유 설정”에
+          커버 문구의 위치는 가운데 미리보기에서 끌어 옮기고, 카톡 미리보기 사진은 “공유 설정”에
           있어요.
         </p>
       )}
@@ -928,8 +928,63 @@ export default function Editor() {
             {sectionsPanel}
           </aside>
 
-          {/* lg 이상 — 폼 열 */}
-          <div className="hidden min-w-0 flex-1 overflow-y-auto p-5 lg:block">
+          {/*
+            프리뷰 — **가운데 열**. 실제 뷰어를 iframe 으로 띄우고, 편집은 전부 이 안에서 합니다:
+            글자는 눌러서 고치고, 위치는 손잡이(⠿)를 끌어서, 서식은 아래 툴바에서.
+
+            가운데에 두는 이유: 여기가 실제 작업면입니다. 눈이 가장 오래 머무는 것을 화면
+            중앙에 두고, 값을 고르는 폼은 오른쪽으로 보냅니다.
+
+            🔴 예전에는 여기 [미리보기] / [커버 편집] 탭이 있었습니다. 커버 문구만 별도 캔버스에서
+               편집했는데, 카드 문구가 미리보기에서 직접 편집되게 바뀐 뒤로는 **같은 일을 하는
+               화면이 두 개**가 됐습니다. 이제 커버 문구도 미리보기에서 다루므로 탭을 없앴습니다
+               (커버 문구 렌더·배선은 뷰어의 `CoverLayers`).
+          */}
+          <div className="flex h-full w-full min-w-0 flex-col lg:flex-1 lg:border-r lg:border-line">
+            <div className="flex flex-none items-center gap-1 border-b border-line bg-surface px-3 py-2">
+              <span className="text-[12px] font-medium text-ink">미리보기</span>
+              <span className="ml-auto text-[10.5px] text-muted-faint">편집 즉시 반영</span>
+            </div>
+
+            <div className="relative min-h-0 flex-1 lg:bg-surface-sunken">
+              {/*
+                라이브 미리보기 (실제 하객 뷰어를 iframe 으로, 초안 실시간 반영).
+
+                가운데 열은 화면이 넓어지면 함께 넓어지지만, 청첩장은 **폭 430px 고정**입니다.
+                iframe 을 그만큼만 두고 가운데 정렬합니다 — 늘려버리면 하객이 보는 화면과
+                다른 여백이 생겨 "발행하면 그대로" 가 깨져 보입니다.
+              */}
+              <div className="absolute inset-0 flex justify-center">
+                <div className="h-full w-full max-w-[460px] overflow-hidden bg-ivory lg:border-x lg:border-line">
+                  <iframe
+                    data-luvi-preview
+                    src="/i/?preview=1"
+                    title="청첩장 미리보기"
+                    className="h-full w-full border-0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 문구 툴바 — 미리보기 **바로 아래**. 글자를 누른 자리에서 눈을 떼지 않고
+                색·정렬·글씨체를 바꿉니다 (오른쪽 폼에는 문구 편집을 두지 않습니다) */}
+            <BlockToolbar
+              themeId={themeId}
+              target={blockTarget}
+              addTo={formSectionKey ?? null}
+              addToLabel={formSectionKey ? SECTION_META[formSectionKey].label : undefined}
+              stored={sectionText}
+              onChange={setSectionText}
+              onSelect={setBlockTarget}
+            />
+          </div>
+
+          {/*
+            lg 이상 — 폼 열(**오른쪽**). 사진·계좌·지도처럼 미리보기에서 직접 고칠 수 없는
+            값을 여기서 고릅니다. 폭을 고정하는 이유: 미리보기가 화면 여유를 가져가야 하고,
+            폼이 넓어질수록 입력칸이 가로로 늘어나 읽기 나빠집니다.
+          */}
+          <div className="hidden overflow-y-auto p-5 lg:block lg:w-[clamp(340px,32vw,460px)] lg:flex-none">
             {panel.kind === 'form' && activeForm ? (
               <>
                 <button
@@ -943,12 +998,12 @@ export default function Editor() {
                 {formBody}
               </>
             ) : (
-              <div className="xl:mx-auto xl:max-w-[520px]">
+              <div>
                 <h2 className="mb-1.5 text-[17px] font-bold tracking-[-.03em]">
                   미리보기에서 바로 고치세요
                 </h2>
                 <p className="mb-4 text-[12.5px] leading-relaxed text-muted">
-                  오른쪽 미리보기의 글자를 눌러 그 자리에서 고치고, 왼쪽 손잡이(⠿)를 끌어 옮깁니다.
+                  가운데 미리보기의 글자를 눌러 그 자리에서 고치고, 왼쪽 손잡이(⠿)를 끌어 옮깁니다.
                   색·정렬·글씨체는 미리보기 아래 툴바에 있어요.
                   <br />
                   사진은 “사진”, 카톡 미리보기는 “공유 설정”에서 바꿉니다.
@@ -958,48 +1013,6 @@ export default function Editor() {
                 <div className="xl:hidden">{sectionsPanel}</div>
               </div>
             )}
-          </div>
-
-          {/*
-            프리뷰 — 실제 뷰어를 iframe 으로 띄웁니다. 편집은 전부 이 안에서 합니다:
-            글자는 눌러서 고치고, 위치는 손잡이(⠿)를 끌어서, 서식은 아래 툴바에서.
-
-            🔴 예전에는 여기 [미리보기] / [커버 편집] 탭이 있었습니다. 커버 문구만 별도 캔버스에서
-               편집했는데, 카드 문구가 미리보기에서 직접 편집되게 바뀐 뒤로는 **같은 일을 하는
-               화면이 두 개**가 됐습니다. 이제 커버 문구도 미리보기에서 다루므로 탭을 없앴습니다
-               (커버 문구 렌더·배선은 뷰어의 `CoverLayers`).
-          */}
-          <div className="flex h-full w-full flex-col lg:w-[clamp(340px,34vw,460px)] lg:flex-none lg:border-l lg:border-line">
-            <div className="flex flex-none items-center gap-1 border-b border-line bg-surface px-3 py-2">
-              <span className="text-[12px] font-medium text-ink">미리보기</span>
-              <span className="ml-auto text-[10.5px] text-muted-faint">편집 즉시 반영</span>
-            </div>
-
-            <div className="relative min-h-0 flex-1">
-              {/* 라이브 미리보기 (실제 하객 뷰어를 iframe 으로, 초안 실시간 반영) */}
-              <div className="absolute inset-0">
-                <div className="h-full w-full overflow-hidden bg-ivory">
-                  <iframe
-                    data-luvi-preview
-                    src="/i/?preview=1"
-                    title="청첩장 미리보기"
-                    className="h-full w-full border-0"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 문구 툴바 — 미리보기 **바로 아래**. 글자를 누른 자리에서 눈을 떼지 않고
-                색·정렬·글씨체를 바꿉니다 (왼쪽 폼에는 문구 편집을 두지 않습니다) */}
-            <BlockToolbar
-              themeId={themeId}
-              target={blockTarget}
-              addTo={formSectionKey ?? null}
-              addToLabel={formSectionKey ? SECTION_META[formSectionKey].label : undefined}
-              stored={sectionText}
-              onChange={setSectionText}
-              onSelect={setBlockTarget}
-            />
           </div>
 
           {/* 모바일 바텀시트 */}
