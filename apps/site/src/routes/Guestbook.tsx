@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { GuestbookEntry, InvitationSummary } from '@luvi/schema';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 /** 관리 화면은 넉넉히 봐야 합니다 (서버 상한 100) */
 const LIMIT = 100;
@@ -71,6 +72,8 @@ const toTarget = (inv: InvitationSummary): Target => ({
 export default function Guestbook() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // 운영자만 전체 목록을 받을 수 있습니다 — 아니면 그 요청을 아예 하지 않습니다 (아래 주석)
+  const { isAdmin } = useAuth();
 
   const [load, setLoad] = useState<Load>({ state: 'loading' });
   const [targets, setTargets] = useState<Target[]>([]);
@@ -95,26 +98,39 @@ export default function Guestbook() {
   /**
    * 볼 수 있는 청첩장을 모읍니다.
    *
-   * 내 것(`/invitations`) + 전체(`/admin/invitations`). 운영자가 아니면 이 두 번째 요청은
-   * **403 이 정상**이며 그대로 무시합니다 (클라이언트는 던지지 않고 `ok: false` 를 돌려줍니다).
-   * 운영자는 남의 청첩장을 대신 손봐주는 입장이라, 여기서도 그 청첩장의 방명록을 봐야 합니다.
+   * 내 것(`/invitations`) + 운영자라면 전체(`/admin/invitations`). 운영자는 남의 청첩장을
+   * 대신 손봐주는 입장이라, 여기서도 그 청첩장의 방명록을 봐야 합니다.
    * URL 의 청첩장이 목록에 없어도(막 인계받은 경우 등) **빠뜨리지 않고** 넣습니다 —
    * 링크를 타고 들어왔는데 아무것도 안 보이면 고장으로 읽힙니다.
+   *
+   * 🔴 예전에는 운영자 여부와 무관하게 `/admin/invitations` 를 **항상** 불렀습니다. 서버가
+   *    403 을 주고 코드는 그것을 무시했지만, 브라우저는 4xx 를 콘솔에 그대로 찍습니다 —
+   *    앱이 잡을 수 없는 로그라 **모든 사용자의 콘솔에 403 이 한 건 남았고**, 진짜 오류를
+   *    찾을 때 매번 이것부터 걸러내야 했습니다(E2E 의 '콘솔 에러 0건' 도 항상 실패).
+   *    권한 판단의 근거는 여전히 서버입니다. 여기서는 **부를 필요가 없는 요청을 부르지 않을
+   *    뿐**입니다.
+   *
+   * `isAdmin` 은 로그인 직후 `auth.session()` 응답으로 확정되므로, 처음 한 번은 false 로
+   * 들어올 수 있습니다. 그래서 의존성에 넣어 확정된 뒤 다시 모읍니다 — 운영자에게만
+   * 목록 조회가 한 번 더 일어납니다(일반 사용자는 그대로 한 번).
    */
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const [mine, all] = await Promise.all([api.invitations.list(), api.admin.invitations()]);
+      const [mine, all] = await Promise.all([
+        api.invitations.list(),
+        isAdmin ? api.admin.invitations() : null,
+      ]);
       if (!alive) return;
 
-      if (!mine.ok && !all.ok) {
+      if (!mine.ok && !all?.ok) {
         setLoad({ state: 'error', message: mine.error.message });
         return;
       }
 
       const map = new Map<string, Target>();
       if (mine.ok) for (const inv of mine.data) map.set(inv.id, toTarget(inv));
-      if (all.ok) {
+      if (all?.ok) {
         for (const inv of all.data) {
           if (map.has(inv.id)) continue;
           map.set(inv.id, {
@@ -141,7 +157,7 @@ export default function Guestbook() {
     return () => {
       alive = false;
     };
-  }, [id, fetchBoard]);
+  }, [id, fetchBoard, isAdmin]);
 
   const current = targets.find((t) => t.id === id) ?? targets[0];
   const board = current ? boards[current.id] : undefined;
