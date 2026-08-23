@@ -78,8 +78,12 @@ export function loadAuth(): Promise<Auth> {
  */
 export async function currentUser(): Promise<User | null> {
   if (!firebaseConfigured()) return null;
-  // 로그인 흔적이 없으면 firebase 를 불러올 이유가 없습니다
-  if (!hasSessionHint()) return null;
+  // 아직 불러오지 않았고 로그인 흔적도 없으면 firebase 를 불러올 이유가 없습니다.
+  //
+  // 🔴 이미 불러온 뒤라면 힌트를 보지 않고 **실제 상태**를 봅니다. 힌트는 "언제 불러올지" 를
+  //    정하는 값일 뿐 로그인 여부의 근거가 아닙니다 — localStorage 저장이 막힌 브라우저에서
+  //    힌트만 없고 세션은 살아 있으면, 여기서 null 을 돌려주는 순간 토큰 없이 요청해 401 이 납니다.
+  if (!authPromise && !hasSessionHint()) return null;
 
   const auth = await loadAuth();
   await waitForAuthReady(auth);

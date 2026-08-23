@@ -93,7 +93,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** 로그인 직후 users/{uid} 를 한 번만 갱신하기 위해 */
   const syncedUid = useRef<string | null>(null);
 
-  const needsAuth = pathNeedsAuth(pathname);
+  /**
+   * firebase 를 불러와 로그인 상태를 구독할지. **한 번 켜지면 다시 꺼지지 않습니다(래치).**
+   *
+   * 🔴 예전에는 이 조건을 현재 경로에서 매번 계산해 아래 effect 의 의존성으로 썼습니다.
+   *    그래서 로고를 눌러 `/app` → `/` 로 나오는 순간 인증 구독이 **해제**되고, 재구독 여부를
+   *    `luvi:session` 힌트만 보고 결정했습니다. 힌트는 localStorage 에 있으므로 저장이 막힌
+   *    브라우저(프라이빗 모드 등)에서는 firebase 세션이 IndexedDB 에 살아 있는데도 힌트가
+   *    없어서 상태가 'signed-out' 으로 덮였습니다 → **로고를 누르면 로그아웃된 것처럼 보임.**
+   *    래치로 두면 홈으로 나가도 구독이 유지되어 로그인이 그대로 남습니다.
+   */
+  const [engaged, setEngaged] = useState(
+    () => firebaseConfigured() && (pathNeedsAuth(pathname) || hasSessionHint()),
+  );
+
+  // 마케팅 화면에서 로그인 경로로 들어가는 순간 한 번만 켜집니다
+  useEffect(() => {
+    if (engaged || !firebaseConfigured()) return;
+    if (pathNeedsAuth(pathname) || hasSessionHint()) setEngaged(true);
+  }, [engaged, pathname]);
 
   useEffect(() => {
     if (!firebaseConfigured()) {
@@ -103,10 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 마케팅 화면만 보는 방문자에게 firebase 번들을 받게 하지 않습니다.
     // 로그인 흔적이 없고 로그인이 필요한 경로도 아니면 그냥 '비로그인' 으로 확정합니다.
-    if (!needsAuth && !hasSessionHint()) {
+    if (!engaged) {
       setStatus('signed-out');
       return;
     }
+    // 이제부터 확인에 들어갑니다 — 확정 전까지 가드가 기다려야 합니다.
+    // ('signed-out' 그대로 두면 RequireAuth 가 로그인 화면으로 한 번 튕깁니다)
+    setStatus((prev) => (prev === 'signed-out' ? 'loading' : prev));
+
     if (subscribed.current) return;
     subscribed.current = true;
 
@@ -173,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stop?.();
       subscribed.current = false;
     };
-  }, [needsAuth]);
+  }, [engaged]);
 
   const signInWithGoogle = useCallback(async () => {
     const auth = await loadAuth();

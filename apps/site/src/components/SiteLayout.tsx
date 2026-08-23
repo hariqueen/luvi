@@ -7,6 +7,7 @@
  */
 import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '@/lib/auth';
 
 const NAV = [
   { to: '/invitation', label: '모바일 청첩장' },
@@ -22,6 +23,38 @@ function Wordmark() {
         L
       </span>
       <span className="font-script text-[28px] leading-none text-ink">Luvi</span>
+    </Link>
+  );
+}
+
+/**
+ * 상단 오른쪽 계정 영역.
+ *
+ * 🔴 예전에는 로그인 여부와 무관하게 **항상 [로그인]** 이었습니다. 그래서 에디터·대시보드에서
+ *    로고를 눌러 홈으로 나오면 세션은 그대로인데 화면만 로그아웃처럼 보였습니다.
+ *
+ * 복원 중(`loading`)에는 자리만 잡고 아무것도 그리지 않습니다 — [로그인] 이 한 번 번쩍인 뒤
+ * [내 청첩장] 으로 바뀌면 그게 더 헷갈립니다.
+ */
+function AccountArea() {
+  const { status } = useAuth();
+
+  if (status === 'loading') return <span className="h-[30px] w-[64px] flex-none" aria-hidden />;
+
+  if (status === 'signed-in') {
+    return (
+      <Link
+        to="/app"
+        className="flex-none rounded-full border border-line-strong bg-white px-3 py-[7px] text-[12.5px] text-ink"
+      >
+        내 청첩장
+      </Link>
+    );
+  }
+
+  return (
+    <Link to="/login" className="px-2.5 py-[7px] text-[12.5px] text-muted">
+      로그인
     </Link>
   );
 }
@@ -52,9 +85,7 @@ export function SiteLayout() {
           </nav>
 
           <div className="ml-auto flex flex-none items-center gap-2">
-            <Link to="/login" className="px-2.5 py-[7px] text-[12.5px] text-muted">
-              로그인
-            </Link>
+            <AccountArea />
             <Link
               to="/app/new"
               className="rounded-full bg-ink px-4 py-[9px] text-[12.5px] text-paper-soft"
