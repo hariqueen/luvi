@@ -4,12 +4,13 @@ import { CheckIcon, CopyIcon, PhoneIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Location() {
-  const { location } = useInvitation();
+  const { location, sectionText } = useInvitation();
+  const text = sectionText.location;
   const { copy, isCopied } = useCopy();
 
   return (
     <section className="bg-white px-7 py-[58px] text-center">
-      <SectionHeading eyebrow="🐾 LOCATION" title="오시는 길" />
+      <SectionHeading eyebrow={text.eyebrow} title={text.title} />
 
       <div className="mt-1.5 flex items-center justify-center gap-2">
         <span className="text-base font-bold text-ink">{location.venue}</span>
@@ -62,7 +63,7 @@ export function Location() {
         </a>
       </div>
       <div className="mx-0 my-2 mb-[18px] text-[11.5px] text-ink-soft">
-        버튼을 누르면 지도 앱에서 길찾기가 열려요
+        {text.note}
       </div>
 
       <div className="flex flex-col gap-2.5 text-left">

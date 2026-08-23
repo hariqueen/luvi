@@ -6,12 +6,14 @@
 import { useState } from 'react';
 import { useGuestbook } from '@/hooks/useGuestbook';
 import { Heading } from '../ui';
+import { useInvitation } from '@/lib/invitationContext';
 
 const fmtDate = (ts: number) =>
   new Date(ts).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
 
 export function Guestbook() {
   const { entries, submit } = useGuestbook();
+  const text = useInvitation().sectionText.guestbook;
   const [name, setName] = useState('');
   const [msg, setMsg] = useState('');
 
@@ -24,10 +26,10 @@ export function Guestbook() {
 
   return (
     <section className="bg-white px-[30px] py-[60px] text-center">
-      <Heading script="Guestbook" label="축하 방명록" />
+      <Heading script={text.eyebrow} label={text.title} />
 
       <div className="mb-6 mt-2 font-myeongjo text-[12.5px] text-c2-ink-soft">
-        저희 둘에게 따뜻한 방명록을 남겨주세요 ({entries.length})
+        {text.note} ({entries.length})
       </div>
 
       {entries.length > 0 ? (

@@ -8,6 +8,7 @@
  */
 
 import type { SectionBgMap } from './design';
+import type { SectionTextMap } from './sectionText';
 
 /** 이미지·오디오 참조. 절대 URL을 저장하지 않는다 — 도메인이 바뀌면 전부 고쳐야 한다. */
 export interface AssetRef {
@@ -300,6 +301,15 @@ export interface CoreContent {
   footer: { image: AssetRef | null };
   bgm: AssetRef | null;
   /**
+   * 카드마다 적히는 문구 — 윗줄·제목·안내를 섹션별로 덮어씁니다.
+   *
+   * **비어 있으면 그 디자인의 기본 문구**입니다 (기본값은 `sectionText.ts` 한 곳).
+   *
+   * ⚠️ 이 필드가 생기기 전 문서·스냅샷에는 없습니다. 읽는 쪽은
+   *    `resolveSectionText(themeId, core.sectionText, …)` 를 통과시키세요.
+   */
+  sectionText: SectionTextMap;
+  /**
    * 화면 꾸미기 — 섹션마다 다르게 정할 수 있는 것.
    *
    * ⚠️ 이 필드가 생기기 전 문서·스냅샷에는 없습니다. 읽는 쪽은
@@ -384,6 +394,27 @@ export type SectionKey =
   | 'account'
   | 'guestbook'
   | 'footer';
+
+/**
+ * 모든 섹션 키 — 청첩장에 넣을 수 있는 것 전부.
+ *
+ * 타입(`SectionKey`)만으로는 "전부 훑기" 를 할 수 없어 값으로도 둡니다
+ * (예: 카드별 문구 기본값 채우기 `resolveSectionText`).
+ *
+ * 🔴 목록은 여기 하나뿐이어야 합니다. 예전에는 에디터의 섹션 목록이 자기 배열을 따로 들고
+ *    있어서, 섹션을 추가하면 한쪽에만 나타났습니다.
+ */
+export const SECTION_KEYS: readonly SectionKey[] = [
+  'cover',
+  'greeting',
+  'calendar',
+  'gallery',
+  'minigame',
+  'location',
+  'account',
+  'guestbook',
+  'footer',
+];
 
 /** 섹션이 아닌 전역 연출 토글 */
 export interface Features {

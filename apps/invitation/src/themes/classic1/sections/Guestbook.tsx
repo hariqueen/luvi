@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useGuestbook } from '@/hooks/useGuestbook';
 import { SectionHeading } from '@/components/common/SectionHeading';
+import { useInvitation } from '@/lib/invitationContext';
 
 const fmtDate = (ts: number) =>
   new Date(ts).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
 
 export function Guestbook() {
   const { entries, submit } = useGuestbook();
+  const text = useInvitation().sectionText.guestbook;
   const [name, setName] = useState('');
   const [msg, setMsg] = useState('');
 
@@ -19,9 +21,9 @@ export function Guestbook() {
 
   return (
     <section className="bg-white px-7 py-[56px] text-center">
-      <SectionHeading eyebrow="🐾 GUESTBOOK" title="축하 방명록" />
+      <SectionHeading eyebrow={text.eyebrow} title={text.title} />
       <div className="mb-[22px] mt-1 text-[12.5px] text-ink-soft">
-        저희 둘에게 따뜻한 방명록을 남겨주세요 ({entries.length})
+        {text.note} ({entries.length})
       </div>
 
       {entries.length > 0 ? (

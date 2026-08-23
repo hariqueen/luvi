@@ -30,7 +30,8 @@ function CountUnit({ value, label }: { value: number; label: string }) {
 }
 
 export function Calendar() {
-  const { calendar, weddingAt, groom, bride } = useInvitation();
+  const { calendar, weddingAt, sectionText } = useInvitation();
+  const text = sectionText.calendar;
   const cd = useCountdown(weddingAt);
 
   const target = new Date(weddingAt);
@@ -38,7 +39,7 @@ export function Calendar() {
 
   return (
     <section className="bg-c2-ivory px-[30px] py-[60px] text-center">
-      <Heading script="The Day" label="예식일" />
+      <Heading script={text.eyebrow} label={text.title} />
 
       <div className="mt-[26px] rounded-[18px] border border-c2-line bg-white px-5 py-6 shadow-[0_6px_20px_rgba(62,58,51,.05)]">
         <div className="mb-4 font-cormorant text-2xl font-medium tracking-[0.04em] text-c2-ink">
@@ -76,9 +77,8 @@ export function Calendar() {
         <CountUnit value={cd.s} label="SEC" />
       </div>
 
-      <div className="mt-4 font-myeongjo text-[13px] text-c2-ink-soft">
-        {groom.firstName} · {bride.firstName}의 결혼식까지
-      </div>
+      {/* 이름은 어댑터가 이미 치환했습니다 ({신랑}·{신부}) */}
+      <div className="mt-4 font-myeongjo text-[13px] text-c2-ink-soft">{text.note}</div>
     </section>
   );
 }

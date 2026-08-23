@@ -29,6 +29,7 @@ import {
   type LayerFont,
   type SectionDef,
   type SectionKey,
+  type SectionTextSlot,
   type TextLayer,
   type ThemeId,
   type UpdateDraftBody,
@@ -46,6 +47,7 @@ import { FieldRenderer } from '@/components/FieldRenderer';
 import { LayerToolbar } from '@/components/LayerToolbar';
 import { SaveState, type SaveStatus } from '@/components/SaveState';
 import { SectionBgControl } from '@/components/SectionBgControl';
+import { SectionTextControl } from '@/components/SectionTextControl';
 import { SectionManager } from '@/components/SectionManager';
 import { TextEditorOverlay } from '@/components/TextEditorOverlay';
 import { FORM_TO_SECTION, SECTION_META, SECTION_TO_FORM } from '@/lib/sectionMeta';
@@ -498,6 +500,19 @@ export default function Editor() {
    * '디자인 기본' 칩을 켜진 상태로 보여줘야 합니다 (없는 값과 같은 뜻입니다).
    */
   const sectionBg = doc?.core.design?.sectionBg ?? {};
+  /**
+   * 카드마다 고른 문구 (`core.sectionText`). 빈 문자열 = 그 디자인의 기본 문구.
+   *
+   * 색과 같은 형태로 둡니다 — 섹션 키 아래에 값을 하나씩 넣고, 읽는 쪽이 "비었으면 기본"
+   * 한 가지 규칙으로만 판단합니다 (`resolveSectionText`).
+   */
+  const sectionText = doc?.core.sectionText ?? {};
+  const setSectionText = useCallback(
+    (key: SectionKey, slot: SectionTextSlot, text: string) =>
+      setField(`core.sectionText.${key}.${slot}`, text),
+    [setField],
+  );
+
   const setSectionBg = useCallback(
     (key: SectionKey, color: string) => setField(`core.design.sectionBg.${key}`, color),
     [setField],
@@ -509,11 +524,11 @@ export default function Editor() {
     panel.kind === 'form' ? formSections.find((s) => s.key === panel.formKey) : undefined;
 
   /**
-   * 지금 열린 폼이 **어느 섹션**의 것인지 — 배경색은 섹션 단위 값입니다.
+   * 지금 열린 폼이 **어느 섹션**의 것인지 — 배경색·카드 문구는 섹션 단위 값입니다.
    * 섹션이 아닌 폼(기본 정보·연출·공유 설정)과 청첩장에서 빼둔 섹션은 `null` 이라
-   * 배경색 컨트롤이 뜨지 않습니다 (보이지 않는 섹션의 색을 정하게 하지 않습니다).
+   * 두 컨트롤이 모두 뜨지 않습니다 (보이지 않는 섹션을 꾸미게 하지 않습니다).
    */
-  const bgSectionKey: SectionKey | null = useMemo(() => {
+  const formSectionKey: SectionKey | null = useMemo(() => {
     const key = activeForm ? FORM_TO_SECTION[activeForm.key] : undefined;
     return key && sections.includes(key) ? key : null;
   }, [activeForm, sections]);
@@ -612,14 +627,24 @@ export default function Editor() {
   const formBody = activeForm ? (
     <div className="flex max-w-[520px] flex-col gap-4">
       {/* 배경색은 섹션 전체에 걸리는 값이라 필드들 위에 둡니다 */}
-      {bgSectionKey && (
-        <SectionBgControl
-          themeId={themeId}
-          sectionKey={bgSectionKey}
-          label={SECTION_META[bgSectionKey].label}
-          value={sectionBg[bgSectionKey] ?? ''}
-          onChange={(color) => setSectionBg(bgSectionKey, color)}
-        />
+      {formSectionKey && (
+        <>
+          {/* 카드에 적힌 글자 — 화면에서 가장 먼저 눈에 띄는 값이라 맨 위에 둡니다 */}
+          <SectionTextControl
+            themeId={themeId}
+            sectionKey={formSectionKey}
+            label={SECTION_META[formSectionKey].label}
+            value={sectionText[formSectionKey] ?? {}}
+            onChange={(slot, text) => setSectionText(formSectionKey, slot, text)}
+          />
+          <SectionBgControl
+            themeId={themeId}
+            sectionKey={formSectionKey}
+            label={SECTION_META[formSectionKey].label}
+            value={sectionBg[formSectionKey] ?? ''}
+            onChange={(color) => setSectionBg(formSectionKey, color)}
+          />
+        </>
       )}
 
       {activeForm.fields.map((f) => (
@@ -730,8 +755,8 @@ export default function Editor() {
 
       {activeForm.fields.length === 0 && activeForm.key !== 'effects' && activeForm.key !== 'cover' && (
         <p className="text-[13px] text-muted">
-          {bgSectionKey
-            ? '이 섹션은 배경색과 켜고 끄는 것만 정할 수 있어요.'
+          {formSectionKey
+            ? '이 섹션은 위의 문구·배경색과 켜고 끄는 것만 정할 수 있어요.'
             : '이 섹션은 켜고 끄는 것만 정할 수 있어요.'}
         </p>
       )}

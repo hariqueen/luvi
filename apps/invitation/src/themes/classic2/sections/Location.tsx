@@ -10,12 +10,13 @@ import { CheckIcon, CopyIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Location() {
-  const { location } = useInvitation();
+  const { location, sectionText } = useInvitation();
+  const text = sectionText.location;
   const { copy, isCopied } = useCopy();
 
   return (
     <section className="bg-c2-ivory px-[30px] py-[60px] text-center">
-      <Heading script="Location" label="오시는 길" />
+      <Heading script={text.eyebrow} label={text.title} />
 
       <div className="mt-6 font-myeongjo text-[17px] text-c2-ink">{location.venue}</div>
       <div className="mt-1 text-[12.5px] tracking-[0.04em] text-c2-sage-deep">{location.hall}</div>

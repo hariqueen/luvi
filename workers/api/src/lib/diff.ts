@@ -58,6 +58,8 @@ const EXTRA_LABELS: Record<string, string> = {
   // 섹션별 배경색. 섹션마다 한 줄씩 늘어놓지 않습니다 — 색만 바꿨는데 발행 요약이
   // 아홉 줄로 뜨면 정작 무엇이 바뀌었는지 안 보입니다
   'core.design.sectionBg': '꾸미기 · 섹션 배경색',
+  // 카드 문구도 같은 이유로 한 줄입니다 (섹션×칸 만큼 늘어놓으면 요약이 요약이 아닙니다)
+  'core.sectionText': '카드 문구',
 };
 
 export interface DiffInput {

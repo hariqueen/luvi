@@ -9,12 +9,13 @@ import { Heading, Ornament } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Greeting() {
-  const { greeting, groom, bride } = useInvitation();
+  const { greeting, groom, bride, sectionText } = useInvitation();
+  const text = sectionText.greeting;
   const parents = [groom, bride];
 
   return (
     <section className="bg-white px-[34px] py-16 text-center">
-      <Heading script="Invitation" label="초대합니다" />
+      <Heading script={text.eyebrow} label={text.title} />
 
       {greeting.dogBubbleVisible && (
         <div className="mt-7 flex items-center justify-center gap-2.5">

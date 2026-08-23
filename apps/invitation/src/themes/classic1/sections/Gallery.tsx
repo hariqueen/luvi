@@ -4,7 +4,8 @@ import { Lightbox } from '@/components/common/Lightbox';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Gallery() {
-  const { gallery } = useInvitation();
+  const { gallery, sectionText } = useInvitation();
+  const text = sectionText.gallery;
   /** 확대해서 보고 있는 사진의 순번. null 이면 닫힘 */
   const [openAt, setOpenAt] = useState<number | null>(null);
 
@@ -14,7 +15,7 @@ export function Gallery() {
 
   return (
     <section className="bg-white px-6 py-[58px] text-center">
-      <SectionHeading eyebrow="🐾 OUR MOMENTS" title="Gallery" />
+      <SectionHeading eyebrow={text.eyebrow} title={text.title} />
 
       {/* 대표 이미지 */}
       {hero && (
@@ -40,7 +41,8 @@ export function Gallery() {
       </div>
 
       <div className="mt-3.5 text-xs text-ink-soft">
-        사진을 누르면 크게 볼 수 있어요{gallery.length > 1 && ' · 옆으로 넘겨 다음 사진'}
+        {text.note}
+        {gallery.length > 1 && ' · 옆으로 넘겨 다음 사진'}
       </div>
 
       <Lightbox

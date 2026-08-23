@@ -13,9 +13,11 @@ import {
   DEFAULT_GAME_TEXTS,
   defaultCoverLayers,
   defaultGameIntro,
+  resolveSectionText,
   type GameId,
   type GameLeaderboard,
   type GameTexts,
+  type ResolvedSectionText,
   type SectionBgMap,
   type SectionKey,
   type TextBlock,
@@ -198,6 +200,15 @@ export interface InvitationConfig {
    * 여기 담긴 값은 그대로 `style` 에 쓸 수 있습니다. 칠하는 곳은 `SectionSkin` 하나입니다.
    */
   sectionBg: SectionBgMap;
+
+  /**
+   * 카드마다 적히는 문구 (윗줄·제목·안내) — **이미 해결된 값**입니다.
+   *
+   * 어댑터가 `resolveSectionText` 로 "사용자가 고른 값 → 없으면 디자인 기본값 →
+   * `{신랑}`·`{신부}` 치환" 까지 끝내서 넣습니다. 섹션 컴포넌트는 비었는지 따지지 말고
+   * 그대로 그리면 됩니다 (빈 문자열이면 그 디자인에 그 자리가 없다는 뜻입니다).
+   */
+  sectionText: ResolvedSectionText;
 
   /** 떨어지는 효과 노출 여부 (모양·양은 아래 petals) */
   showPetals: boolean;
@@ -396,8 +407,9 @@ export const invitation: InvitationConfig = {
 
   bgm: '',
 
-  // 예시 데이터는 디자인 기본 배경을 그대로 씁니다
+  // 예시 데이터는 디자인 기본 배경·기본 문구를 그대로 씁니다
   sectionBg: {},
+  sectionText: resolveSectionText('classic1', {}, { 신랑: '호석', 신부: '송희' }),
 
   sections: [
     'cover',

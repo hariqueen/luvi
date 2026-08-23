@@ -3,6 +3,7 @@ export * from './fonts';
 export * from './games';
 export * from './layers';
 export * from './design';
+export * from './sectionText';
 export * from './manifest';
 export * from './derive';
 export * from './api';

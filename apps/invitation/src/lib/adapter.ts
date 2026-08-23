@@ -12,6 +12,7 @@ import {
   normalizeGame,
   normalizePetalItems,
   normalizeSectionBg,
+  resolveSectionText,
 } from '@luvi/schema';
 import type { GameSprite, InvitationConfig } from '@/config/invitation.config';
 import { BASE } from './env';
@@ -151,6 +152,15 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
      * 남아 있습니다 — `normalizeSectionBg` 가 둘 다 '없음' 으로 정리합니다.
      */
     sectionBg: normalizeSectionBg(c.design?.sectionBg),
+
+    /**
+     * 카드마다 적히는 문구. **고른 값 + 디자인 기본값 + 이름 치환을 여기서 끝냅니다** —
+     * 섹션 컴포넌트는 결과만 읽습니다. 테마마다 기본 문구를 다시 적으면 한쪽만 바뀝니다.
+     */
+    sectionText: resolveSectionText(pub.themeId, c.sectionText, {
+      신랑: c.couple.groom.firstName,
+      신부: c.couple.bride.firstName,
+    }),
 
     showPetals: pub.features.petals,
 

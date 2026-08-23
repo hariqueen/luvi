@@ -12,7 +12,8 @@ import { Ornament } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Footer() {
-  const { footer, groom, bride, share } = useInvitation();
+  const { footer, groom, bride, share, sectionText } = useInvitation();
+  const text = sectionText.footer;
   const { kakaoAvailable, sharing, shareNote, linkCopied, shareToKakao, copyLink } = useShare();
 
   return (
@@ -44,7 +45,7 @@ export function Footer() {
       />
 
       <div className="relative z-[2]">
-        <div className="font-pinyon text-[46px] leading-none text-c2-sage-deep">Thank You</div>
+        <div className="font-pinyon text-[46px] leading-none text-c2-sage-deep">{text.title}</div>
         <div className="mb-1.5 mt-[18px] font-myeongjo text-sm leading-[1.9] text-c2-ink">
           {groom.firstName} · {bride.firstName}
         </div>

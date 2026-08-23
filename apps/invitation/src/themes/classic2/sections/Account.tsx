@@ -14,13 +14,14 @@ import { BASE } from '@/lib/env';
 const KAKAOPAY_ICON = `${BASE}assets/kakaopay_icon.png`;
 
 export function Account() {
-  const { account } = useInvitation();
+  const { account, sectionText } = useInvitation();
+  const text = sectionText.account;
   const { copy, isCopied } = useCopy();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
     <section className="bg-white px-[30px] py-[60px] text-center">
-      <Heading script="With Heart" label="마음 전하기" />
+      <Heading script={text.eyebrow} label={text.title} />
 
       <p className="mx-auto mt-6 mb-6 max-w-[290px] whitespace-pre-line font-myeongjo text-[13px] leading-[1.9] text-c2-ink-soft">
         {account.description}

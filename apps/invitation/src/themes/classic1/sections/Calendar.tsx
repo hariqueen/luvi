@@ -41,7 +41,8 @@ function CountBox({ value, label, primary }: { value: number; label: string; pri
 
 export function Calendar() {
   const invitation = useInvitation();
-  const { calendar, weddingAt, groom, bride } = invitation;
+  const { calendar, weddingAt, sectionText } = invitation;
+  const text = sectionText.calendar;
   const cd = useCountdown(weddingAt);
 
   const target = new Date(weddingAt);
@@ -49,7 +50,7 @@ export function Calendar() {
 
   return (
     <section className="bg-cream px-7 py-[58px] text-center">
-      <Eyebrow className="mb-2">🐾 THE DAY</Eyebrow>
+      <Eyebrow className="mb-2">{text.eyebrow}</Eyebrow>
       <div className="font-cormorant text-[34px] font-medium text-ink">{calendar.monthLabel}</div>
 
       <div className="my-6 rounded-2xl border border-line bg-white px-[18px] py-[22px] shadow-sm">
@@ -76,9 +77,8 @@ export function Calendar() {
         </div>
       </div>
 
-      <div className="mb-[18px] font-myeongjo text-sm text-ink-soft">
-        {groom.firstName} ♥ {bride.firstName}의 결혼식까지
-      </div>
+      {/* 이름은 어댑터가 이미 치환했습니다 ({신랑}·{신부}) */}
+      <div className="mb-[18px] font-myeongjo text-sm text-ink-soft">{text.note}</div>
       <div className="flex justify-center gap-2">
         <CountBox value={cd.d} label="DAYS" primary />
         <CountBox value={cd.h} label="HOURS" />

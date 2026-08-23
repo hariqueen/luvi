@@ -8,13 +8,14 @@ import { BASE } from '@/lib/env';
 const KAKAOPAY_ICON = `${BASE}assets/kakaopay_icon.png`;
 
 export function Account() {
-  const { account } = useInvitation();
+  const { account, sectionText } = useInvitation();
+  const text = sectionText.account;
   const { copy, isCopied } = useCopy();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
     <section className="bg-cream px-7 py-[56px] text-center">
-      <SectionHeading eyebrow="🐾 WITH HEART" title="마음 전하기" />
+      <SectionHeading eyebrow={text.eyebrow} title={text.title} />
       <p className="mx-auto mb-[22px] mt-1.5 max-w-[280px] whitespace-pre-line text-[13px] leading-[1.7] text-ink-soft">
         {account.description}
       </p>

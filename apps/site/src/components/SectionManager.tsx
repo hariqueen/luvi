@@ -7,7 +7,7 @@
  *
  * 필수 섹션은 제거 버튼을 아예 안 보여줍니다 — 누르고 나서 거절당하는 것보다 낫습니다.
  */
-import { canRemoveSection, type SectionBgMap, type SectionKey } from '@luvi/schema';
+import { SECTION_KEYS, canRemoveSection, type SectionBgMap, type SectionKey } from '@luvi/schema';
 
 export interface SectionMeta {
   key: SectionKey;
@@ -33,18 +33,6 @@ interface Props {
   onEdit: (key: SectionKey) => void;
 }
 
-const ALL_KEYS: SectionKey[] = [
-  'cover',
-  'greeting',
-  'calendar',
-  'gallery',
-  'minigame',
-  'location',
-  'account',
-  'guestbook',
-  'footer',
-];
-
 function move<T>(list: T[], from: number, to: number): T[] {
   if (to < 0 || to >= list.length) return list;
   const next = [...list];
@@ -55,7 +43,9 @@ function move<T>(list: T[], from: number, to: number): T[] {
 }
 
 export function SectionManager({ active, meta, bg, onReorder, onRemove, onAdd, onEdit }: Props) {
-  const available = ALL_KEYS.filter((k) => !active.includes(k));
+  // 목록은 스키마(SECTION_KEYS)에서 옵니다 — 여기 따로 적어 두면 섹션을 추가했을 때
+  // '추가할 수 있는 것' 에만 안 나타납니다
+  const available = SECTION_KEYS.filter((k) => !active.includes(k));
 
   return (
     <div className="flex flex-col gap-5">

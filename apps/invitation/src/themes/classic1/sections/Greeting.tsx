@@ -3,7 +3,8 @@ import { useInvitation } from '@/lib/invitationContext';
 
 export function Greeting() {
   const invitation = useInvitation();
-  const { greeting, groom, bride } = invitation;
+  const { greeting, groom, bride, sectionText } = invitation;
+  const text = sectionText.greeting;
   const parents = [groom, bride];
 
   return (
@@ -26,7 +27,7 @@ export function Greeting() {
         </div>
       )}
 
-      <Eyebrow className="mb-6">🐾 INVITATION</Eyebrow>
+      <Eyebrow className="mb-6">{text.eyebrow}</Eyebrow>
 
       <p className="m-0 whitespace-pre-line font-myeongjo text-[15.5px] leading-[2.15] text-ink">
         {greeting.message}

@@ -8,7 +8,8 @@ import { useShare } from '@/hooks/useShare';
 import { useInvitation } from '@/lib/invitationContext';
 
 export function Footer() {
-  const { footer, groom, bride, share } = useInvitation();
+  const { footer, groom, bride, share, sectionText } = useInvitation();
+  const text = sectionText.footer;
   const {
     kakaoAvailable,
     sharing,
@@ -33,7 +34,7 @@ export function Footer() {
 
       <div className="relative z-[2] text-white">
         <div className="font-cormorant text-2xl italic tracking-[0.02em] opacity-90">
-          Thank You
+          {text.title}
         </div>
         <div className="my-3.5 mb-1.5 font-myeongjo text-[15px] leading-[1.9]">
           {groom.firstName} ♥ {bride.firstName}
