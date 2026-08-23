@@ -99,6 +99,17 @@ export interface FieldDef {
   pickedLabel?: string;
   /** `petals`·`items` 가 비었을 때 보여줄 안내. 없으면 낙하 연출용 기본 문구 */
   emptyHint?: string;
+  /**
+   * **미리보기에서 고치는 글자** — 폼에는 입력칸을 두지 않습니다.
+   *
+   * 뷰어가 그리는 글자는 미리보기에서 눌러 바로 고칩니다(`Editable` 의 `Field`).
+   * 폼에 같은 입력칸을 또 두면 **같은 일을 하는 자리가 두 곳**이 되어, 어느 쪽이 원본인지
+   * 헷갈리고 왼쪽을 고치면서 눈은 오른쪽을 봐야 합니다.
+   *
+   * ⚠️ 화면에 그려지지 않는 값에는 붙이지 마세요 — 미리보기에 없으면 고칠 길이 사라집니다
+   *    (예: 복사용 주소·복사용 계좌번호·전화·지도 링크는 폼에 남깁니다).
+   */
+  previewEdit?: boolean;
 }
 
 export interface SectionDef {
@@ -133,16 +144,16 @@ export const CORE_SECTIONS: SectionDef[] = [
     fields: [
       { path: 'core.couple.groom.name', type: 'text', label: '신랑 이름', required: true, maxLength: 20 },
       { path: 'core.couple.groom.nameEn', type: 'text', label: '신랑 영문 이름', maxLength: 30 },
-      { path: 'core.couple.groom.firstName', type: 'text', label: '신랑 이름만', hint: '성을 뺀 이름. 커버·푸터에 쓰입니다', maxLength: 10 },
-      { path: 'core.couple.groom.father', type: 'text', label: '신랑 아버지', maxLength: 20 },
-      { path: 'core.couple.groom.mother', type: 'text', label: '신랑 어머니', maxLength: 20 },
-      { path: 'core.couple.groom.relation', type: 'text', label: '관계', hint: '장남 · 차남 등', maxLength: 10 },
+      { path: 'core.couple.groom.firstName', type: 'text', label: '신랑 이름만', hint: '성을 뺀 이름. 커버·푸터에 쓰입니다', maxLength: 10, previewEdit: true },
+      { path: 'core.couple.groom.father', type: 'text', label: '신랑 아버지', maxLength: 20, previewEdit: true },
+      { path: 'core.couple.groom.mother', type: 'text', label: '신랑 어머니', maxLength: 20, previewEdit: true },
+      { path: 'core.couple.groom.relation', type: 'text', label: '관계', hint: '장남 · 차남 등', maxLength: 10, previewEdit: true },
       { path: 'core.couple.bride.name', type: 'text', label: '신부 이름', required: true, maxLength: 20 },
       { path: 'core.couple.bride.nameEn', type: 'text', label: '신부 영문 이름', maxLength: 30 },
-      { path: 'core.couple.bride.firstName', type: 'text', label: '신부 이름만', maxLength: 10 },
-      { path: 'core.couple.bride.father', type: 'text', label: '신부 아버지', maxLength: 20 },
-      { path: 'core.couple.bride.mother', type: 'text', label: '신부 어머니', maxLength: 20 },
-      { path: 'core.couple.bride.relation', type: 'text', label: '관계', hint: '장녀 · 차녀 등', maxLength: 10 },
+      { path: 'core.couple.bride.firstName', type: 'text', label: '신부 이름만', maxLength: 10, previewEdit: true },
+      { path: 'core.couple.bride.father', type: 'text', label: '신부 아버지', maxLength: 20, previewEdit: true },
+      { path: 'core.couple.bride.mother', type: 'text', label: '신부 어머니', maxLength: 20, previewEdit: true },
+      { path: 'core.couple.bride.relation', type: 'text', label: '관계', hint: '장녀 · 차녀 등', maxLength: 10, previewEdit: true },
     ],
   },
   {
@@ -187,9 +198,9 @@ export const CORE_SECTIONS: SectionDef[] = [
     label: '인사말',
     required: true,
     fields: [
-      { path: 'core.greeting.message', type: 'textarea', label: '인사말', hint: '줄바꿈이 그대로 보입니다', rows: 8, required: true, maxLength: 1000 },
+      { path: 'core.greeting.message', type: 'textarea', label: '인사말', hint: '줄바꿈이 그대로 보입니다', rows: 8, required: true, maxLength: 1000, previewEdit: true },
       { path: 'core.greeting.showBubble', type: 'toggle', label: '말풍선 표시', hint: '끄면 강아지 말풍선(아이콘+문구)이 청첩장에서 사라집니다' },
-      { path: 'core.greeting.bubbleText', type: 'textarea', label: '말풍선 문구', rows: 2, maxLength: 100 },
+      { path: 'core.greeting.bubbleText', type: 'textarea', label: '말풍선 문구', rows: 2, maxLength: 100, previewEdit: true },
       { path: 'core.greeting.bubbleImage', type: 'image', label: '말풍선 아이콘', hint: '배경이 투명한 PNG를 권합니다' },
     ],
   },
@@ -212,10 +223,10 @@ export const CORE_SECTIONS: SectionDef[] = [
     label: '오시는 길',
     required: true,
     fields: [
-      { path: 'core.location.venue', type: 'text', label: '예식장 이름', required: true, maxLength: 40 },
-      { path: 'core.location.hall', type: 'text', label: '홀', hint: '예: 6층 갤럭시홀', maxLength: 40 },
+      { path: 'core.location.venue', type: 'text', label: '예식장 이름', required: true, maxLength: 40, previewEdit: true },
+      { path: 'core.location.hall', type: 'text', label: '홀', hint: '예: 6층 갤럭시홀', maxLength: 40, previewEdit: true },
       { path: 'core.location.tel', type: 'tel', label: '예식장 전화' },
-      { path: 'core.location.address', type: 'text', label: '주소', required: true, maxLength: 120 },
+      { path: 'core.location.address', type: 'text', label: '주소', required: true, maxLength: 120, previewEdit: true },
       { path: 'core.location.addressForCopy', type: 'text', label: '복사용 주소', hint: '하객이 내비에 붙여넣을 짧은 주소', maxLength: 80 },
       { path: 'core.location.kakaoMapUrl', type: 'url', label: '카카오맵 링크' },
       { path: 'core.location.naverMapUrl', type: 'url', label: '네이버지도 링크' },
@@ -231,8 +242,8 @@ export const CORE_SECTIONS: SectionDef[] = [
             { value: '🚌', label: '시외버스' },
             { value: '🚇', label: '지하철' },
           ] },
-          { path: 'title', type: 'text', label: '수단', maxLength: 20 },
-          { path: 'desc', type: 'textarea', label: '안내', rows: 2, maxLength: 200 },
+          { path: 'title', type: 'text', label: '수단', maxLength: 20, previewEdit: true },
+          { path: 'desc', type: 'textarea', label: '안내', rows: 2, maxLength: 200, previewEdit: true },
         ],
       },
     ],
@@ -242,17 +253,17 @@ export const CORE_SECTIONS: SectionDef[] = [
     label: '마음 전하기',
     required: false,
     fields: [
-      { path: 'core.account.description', type: 'textarea', label: '안내 문구', rows: 3, maxLength: 300 },
+      { path: 'core.account.description', type: 'textarea', label: '안내 문구', rows: 3, maxLength: 300, previewEdit: true },
       {
         path: 'core.account.groups',
         type: 'repeatGroup',
         label: '계좌',
         hint: '신랑측 · 신부측으로 묶어 보여줍니다',
         fields: [
-          { path: 'title', type: 'text', label: '묶음 이름', hint: '예: 신랑에게', maxLength: 20 },
+          { path: 'title', type: 'text', label: '묶음 이름', hint: '예: 신랑에게', maxLength: 20, previewEdit: true },
           { path: 'items', type: 'repeat', label: '계좌 목록', fields: [
-            { path: 'label', type: 'text', label: '예금주 표기', maxLength: 30 },
-            { path: 'bank', type: 'text', label: '은행 · 계좌번호', maxLength: 40 },
+            { path: 'label', type: 'text', label: '예금주 표기', maxLength: 30, previewEdit: true },
+            { path: 'bank', type: 'text', label: '은행 · 계좌번호', maxLength: 40, previewEdit: true },
             { path: 'number', type: 'text', label: '복사용 번호', maxLength: 30 },
             { path: 'kakaoPay', type: 'url', label: '카카오페이 송금 링크' },
           ] },

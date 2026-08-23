@@ -776,8 +776,18 @@ export default function Editor() {
     </div>
   );
 
+  /** 이 카드의 글자를 미리보기에서 고치는지 — 폼에서 입력칸이 사라진 이유를 한 줄로 알립니다 */
+  const hasPreviewText = (fields: FieldDef[]): boolean =>
+    fields.some((f) => f.previewEdit || (f.fields ? hasPreviewText(f.fields) : false));
+
   const formBody = activeForm ? (
     <div className="flex max-w-[520px] flex-col gap-4">
+      {hasPreviewText(activeForm.fields) && (
+        <p className="rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] leading-relaxed text-muted">
+          이 카드의 <b className="font-semibold text-ink-soft">글자는 오른쪽 미리보기에서</b> 눌러
+          고칩니다 — 색·정렬·글씨체는 미리보기 아래 툴바에서 바꿔요.
+        </p>
+      )}
       {/* 배경색은 섹션 전체에 걸리는 값이라 필드들 위에 둡니다 */}
       {formSectionKey && (
         <>

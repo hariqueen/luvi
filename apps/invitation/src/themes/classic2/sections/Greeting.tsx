@@ -34,13 +34,17 @@ export function Greeting() {
             )}
           </div>
           <div className="whitespace-pre-line border border-c2-line bg-c2-ivory px-4 py-2.5 text-left font-myeongjo text-[12.5px] leading-[1.6] text-c2-sage-deep">
-            <Field path="core.greeting.bubbleText" value={greeting.dogBubble} />
+            <Field
+              path="core.greeting.bubbleText"
+              value={greeting.dogBubble}
+              placeholder="말풍선 문구"
+            />
           </div>
         </div>
       )}
 
       <p className="m-0 mt-[30px] whitespace-pre-line font-myeongjo text-[15px] leading-[2.2] text-c2-ink">
-        <Field path="core.greeting.message" value={greeting.message} />
+        <Field path="core.greeting.message" value={greeting.message} placeholder="인사말" />
       </p>
 
       <Ornament className="mt-9" />

@@ -783,6 +783,17 @@ export function FieldRenderer({
 
   const str = typeof bound.value === 'string' ? bound.value : '';
 
+  /**
+   * 🔴 **미리보기에서 고치는 글자는 폼에 그리지 않습니다.**
+   *
+   * 인사말·말풍선·오시는 길처럼 화면에 보이는 글자는 미리보기에서 눌러 바로 고칩니다.
+   * 폼에 같은 입력칸을 또 두면 같은 일을 하는 자리가 두 곳이 되어, 어느 쪽이 원본인지
+   * 헷갈리고 왼쪽을 고치면서 눈은 오른쪽을 봐야 했습니다. 표시는 매니페스트 한 곳에서
+   * 합니다(`previewEdit`) — 반복 항목(교통편·계좌)의 하위 필드도 이 함수를 지나므로
+   * 여기 한 줄로 함께 걸러집니다.
+   */
+  if (field.previewEdit) return null;
+
   switch (field.type) {
     case 'textarea':
       return (

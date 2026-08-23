@@ -27,7 +27,11 @@ export function Greeting() {
             )}
           </div>
           <div className="whitespace-pre-line rounded-[6px_16px_16px_16px] bg-cream px-[15px] py-[11px] text-left text-[13px] font-semibold leading-[1.5] text-ink">
-            <Field path="core.greeting.bubbleText" value={greeting.dogBubble} />
+            <Field
+              path="core.greeting.bubbleText"
+              value={greeting.dogBubble}
+              placeholder="말풍선 문구"
+            />
           </div>
         </div>
       )}
@@ -35,7 +39,7 @@ export function Greeting() {
       <SectionText section="greeting" zone="head" blocks={text.head} className="mb-6" />
 
       <p className="m-0 whitespace-pre-line font-myeongjo text-[15.5px] leading-[2.15] text-ink">
-        <Field path="core.greeting.message" value={greeting.message} />
+        <Field path="core.greeting.message" value={greeting.message} placeholder="인사말" />
       </p>
 
       {/* 발자국 구분선 */}

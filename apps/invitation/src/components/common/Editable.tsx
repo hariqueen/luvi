@@ -25,10 +25,22 @@ interface EditableTextProps {
   text: string;
   onEdit: (next: string) => void;
   className?: string;
+  /**
+   * 다 지웠을 때 그 자리에 보이는 안내 (`index.css` 의 `:empty::before`).
+   *
+   * 🔴 이게 없으면 **글자를 다 지운 순간 누를 자리가 사라집니다.** 폼에 입력칸을 두지
+   *    않기로 했으므로(같은 일을 두 곳에서 하지 않기 위해) 여기가 유일한 회복 경로입니다.
+   */
+  placeholder?: string;
 }
 
 /** 타이핑을 받는 조각. 값은 **비제어**로 다룹니다 (커서 보존) */
-export function EditableText({ text, onEdit, className = '' }: EditableTextProps) {
+export function EditableText({
+  text,
+  onEdit,
+  className = '',
+  placeholder = '글자 입력',
+}: EditableTextProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const timer = useRef<number | null>(null);
 
@@ -75,6 +87,7 @@ export function EditableText({ text, onEdit, className = '' }: EditableTextProps
         if (e.key === 'Escape') e.currentTarget.blur();
       }}
       // 빈 값도 누를 수 있어야 합니다 — 다 지운 뒤 다시 쓰려면 집을 자리가 필요합니다
+      data-luvi-editable={placeholder}
       className={`inline-block min-w-[2ch] outline-none focus:bg-white/50 focus:ring-1 focus:ring-gold ${className}`}
     />
   );
@@ -85,6 +98,8 @@ interface FieldProps {
   path: string;
   value: string;
   className?: string;
+  /** 다 지웠을 때 보이는 안내 (예: '인사말'). 없으면 '글자 입력' */
+  placeholder?: string;
 }
 
 /**
@@ -94,12 +109,13 @@ interface FieldProps {
  * 인덱스를 받지 못하므로(`apps/site` 의 `paths.ts`), **에디터가 그 배열을 통째로 다시
  * 씁니다** — 뷰어는 어디를 고쳤는지만 알려주면 됩니다.
  */
-export function Field({ path, value, className }: FieldProps) {
+export function Field({ path, value, className, placeholder }: FieldProps) {
   if (!IS_PREVIEW) return <>{value}</>;
   return (
     <EditableText
       text={value}
       className={className}
+      placeholder={placeholder}
       onEdit={(next) => notifyFieldEdit(path, next)}
     />
   );
