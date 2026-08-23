@@ -86,6 +86,18 @@ export function toColorInputValue(color: string): string {
   return (normalizeHexColor(color) ?? '#FFFFFF').toLowerCase();
 }
 
+/**
+ * 미리보기 편집 메시지에서 커버 문구가 쓰는 **자리 이름**.
+ *
+ * 카드 문구는 자리가 head/foot 두 개지만(`sectionText.ts`), 커버 문구는 사진 위 자유 배치라
+ * 자리 구분이 없습니다. 그래도 메시지 형식(`section:zone:id`)을 카드 문구와 똑같이 맞춰야
+ * 뷰어의 드래그·글자 편집 코드를 그대로 쓸 수 있어, 자리 이름 하나를 정해둡니다.
+ *
+ * 🔴 보내는 쪽(뷰어 `CoverLayers`)과 받는 쪽(에디터 `applyBlockEdit`·`applyBlockPlace`)이
+ *    같은 값을 봐야 합니다. 한쪽만 고치면 커버 문구를 옮겨도 아무 일이 없습니다.
+ */
+export const COVER_ZONE = 'layer';
+
 export const LAYER_SIZE_RANGE = { min: 0.035, max: 0.16 } as const;
 
 let seq = 0;

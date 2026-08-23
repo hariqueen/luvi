@@ -79,8 +79,14 @@ export function startBlockDrag(
   e.stopPropagation();
   if (session) finish();
 
-  const handle = e.currentTarget as HTMLElement | null;
-  const el = handle?.closest<HTMLElement>('[data-preview-block]') ?? null;
+  /**
+   * 🔴 `e.currentTarget` 을 쓰면 안 됩니다. React 는 이벤트를 루트 컨테이너에 위임하므로
+   *    핸들러가 받는 **네이티브** 이벤트의 currentTarget 은 손잡이가 아니라 그 루트입니다.
+   *    거기서 `closest('[data-preview-block]')` 는 못 찾고 조용히 빠져나가, 끌어도 아무 일이
+   *    없었습니다(메시지가 안 갑니다). 눌린 지점(`target`)에서 위로 올라가야 합니다.
+   */
+  const from = e.target as HTMLElement | null;
+  const el = from?.closest<HTMLElement>('[data-preview-block]') ?? null;
   const frame = el ? frameOf(el) : null;
   if (!el || !frame) return;
 

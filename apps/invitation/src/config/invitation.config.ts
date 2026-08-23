@@ -110,7 +110,7 @@ export interface InvitationConfig {
     image: string;
     /**
      * 사진 위에 자유 배치되는 텍스트 레이어. 에디터가 편집한 좌표(비율)를 그대로 렌더합니다.
-     * 에디터(CoverCanvas)와 같은 계산(@luvi/schema 의 layers.ts)을 씁니다.
+     * 에디터와 같은 계산(@luvi/schema 의 layers.ts)을 씁니다.
      */
     layers: TextLayer[];
   };

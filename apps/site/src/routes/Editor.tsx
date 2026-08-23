@@ -18,13 +18,14 @@ import {
   FONT_CATEGORY_LABEL,
   FONT_GROUPS,
   FONTS,
+  COVER_ZONE,
   LAYER_SIZE_RANGE,
   createTextLayer,
   normalizeGame,
   normalizeSectionBg,
-  type AssetRef,
   type ContentDoc,
   type Features,
+  type LayerAlign,
   type FieldDef,
   type LayerFont,
   type SectionDef,
@@ -37,21 +38,18 @@ import {
   type UpdateDraftBody,
 } from '@luvi/schema';
 import { api } from '@/lib/api';
-import { assetUrl, env } from '@/lib/env';
+import { env } from '@/lib/env';
 import { logEvent } from '@/lib/log';
 import { getPath, setPath } from '@/lib/paths';
 import { uploadAudio, uploadImageForPath } from '@/lib/upload';
 import { EditorProvider, type EditorContextValue } from '@/lib/editorContext';
 import { BottomSheet, type SheetSnap } from '@/components/BottomSheet';
 import { ColorControl } from '@/components/ColorControl';
-import { CoverCanvas } from '@/components/CoverCanvas';
 import { FieldRenderer } from '@/components/FieldRenderer';
-import { LayerToolbar } from '@/components/LayerToolbar';
 import { SaveState, type SaveStatus } from '@/components/SaveState';
 import { SectionBgControl } from '@/components/SectionBgControl';
 import { BlockToolbar, type BlockTarget } from '@/components/BlockToolbar';
 import { SectionManager } from '@/components/SectionManager';
-import { TextEditorOverlay } from '@/components/TextEditorOverlay';
 import { FORM_TO_SECTION, SECTION_META, SECTION_TO_FORM } from '@/lib/sectionMeta';
 
 /** 시트가 무엇을 보여주는지. 디자인의 panelList / panelEdit 에 대응한다 */
@@ -129,52 +127,12 @@ function ToggleRow({
   );
 }
 
-/**
- * 커버 캔버스 툴바의 사진 슬롯 버튼.
- *
- * 썸네일을 함께 보여주는 이유: 커버는 캔버스에 깔려 있어 결과가 보이지만, 마지막 사진은
- * 이 화면에 나타나지 않습니다. 라벨만 있으면 무엇을 바꿨는지 확인할 방법이 없어
- * 같은 사진을 두 번 올리는 일이 생깁니다.
- */
-function PhotoSlotButton({
-  label,
-  url,
-  busy,
-  inherited,
-  onClick,
-}: {
-  label: string;
-  url: string | null;
-  busy: boolean;
-  /** 자기 사진이 없어 다른 사진을 물려받아 보여주는 중 */
-  inherited?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={onClick}
-      className="flex items-center gap-2 rounded-lg border border-line-strong bg-white py-1.5 pl-1.5 pr-3 text-[12px] disabled:opacity-50"
-    >
-      {url ? (
-        <img
-          src={url}
-          alt=""
-          className={`h-7 w-7 flex-none rounded-md object-cover ${inherited ? 'opacity-60' : ''}`}
-        />
-      ) : (
-        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-md bg-surface-sunken text-[13px] text-muted">
-          +
-        </span>
-      )}
-      <span className="whitespace-nowrap">
-        {busy ? '올리는 중…' : label}
-        {!busy && inherited && <span className="text-muted-soft"> · 커버와 같음</span>}
-      </span>
-    </button>
-  );
-}
+/** 커버 문구 정렬 — align 은 좌표의 **기준점**도 바꾼다 (`alignTransform`) */
+const LAYER_ALIGNS: { value: LayerAlign; label: string }[] = [
+  { value: 'left', label: '⇤' },
+  { value: 'center', label: '↔' },
+  { value: 'right', label: '⇥' },
+];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const timeLabel = (iso: string) => {
@@ -193,6 +151,7 @@ const timeLabel = (iso: string) => {
  * 이것만으로는 초안이 '변경됨' 이 되지 않습니다 (저장은 사용자가 필드를 고칠 때).
  */
 function withGameDefaults(draft: ContentDoc): ContentDoc {
+
   return {
     ...draft,
     theme: {
@@ -218,17 +177,10 @@ export default function Editor() {
   const [themeId, setThemeId] = useState<ThemeId>('classic1');
 
   // ── 우측 라이브 미리보기 (실제 뷰어를 iframe 으로) ──
-  const [rightView, setRightView] = useState<'preview' | 'cover'>('preview');
   const previewReady = useRef(false);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [savedAt, setSavedAt] = useState<string | undefined>();
-
-  // ── 커버 편집 (UI 상태만 로컬, 데이터는 doc.core.cover) ──
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
-  const footerInputRef = useRef<HTMLInputElement>(null);
 
   // ── 시트 ──
   const [panel, setPanel] = useState<PanelMode>({ kind: 'sections' });
@@ -435,10 +387,6 @@ export default function Editor() {
 
   // ─────────────── 커버 ───────────────
   const layers = doc?.core.cover.layers ?? [];
-  const coverImage = doc?.core.cover.image ?? null;
-  const photoUrl = coverImage ? assetUrl(coverImage.key) : null;
-  const selectedLayer = layers.find((l) => l.id === selectedId) ?? null;
-  const editingLayer = layers.find((l) => l.id === editingTextId) ?? null;
 
   const setLayers = useCallback(
     (next: TextLayer[]) => setField('core.cover.layers', next),
@@ -450,48 +398,16 @@ export default function Editor() {
     [layers, setLayers],
   );
   const removeLayer = useCallback(
-    (layerId: string) => {
-      setLayers(layers.filter((l) => l.id !== layerId));
-      setSelectedId(null);
-    },
+    (layerId: string) => setLayers(layers.filter((l) => l.id !== layerId)),
     [layers, setLayers],
   );
+  /**
+   * 커버 문구 한 줄 추가. 기본 문구('문구를 입력하세요')가 미리보기 가운데에 나타나므로,
+   * 곧바로 그 글자를 눌러 고치고 끌어서 옮깁니다 — 여기서 편집 상태를 잡아둘 필요가 없습니다.
+   */
   const addLayer = useCallback(() => {
-    const layer = createTextLayer();
-    setLayers([...layers, layer]);
-    setSelectedId(layer.id);
-    setEditingTextId(layer.id);
+    setLayers([...layers, createTextLayer()]);
   }, [layers, setLayers]);
-
-  /**
-   * 맨 아래 '마무리' 사진. 비워두면 뷰어가 커버 사진을 씁니다
-   * (`apps/invitation/src/lib/adapter.ts`) — 그래서 여기서도 커버를 물려받아 보여줍니다.
-   */
-  const footerImage = doc?.core.footer?.image ?? null;
-  const footerUrl = footerImage ? assetUrl(footerImage.key) : photoUrl;
-
-  /**
-   * 커버 사진과 마지막 사진은 업로드 절차가 같아 한 함수로 둡니다.
-   *
-   * 두 장을 **같은 화면에서** 바꿀 수 있어야 합니다 — 처음과 끝은 짝이라 한자리에서
-   * 고르게 되고, 마지막 사진만 다른 곳에 숨겨두면 커버만 바꾼 채 발행됩니다.
-   */
-  const [photoBusy, setPhotoBusy] = useState<'cover' | 'footer' | null>(null);
-  const onPhotoFile = async (slot: 'cover' | 'footer', file: File | undefined) => {
-    if (!file) return;
-    const path = slot === 'cover' ? 'core.cover.image' : 'core.footer.image';
-    const input = slot === 'cover' ? coverInputRef : footerInputRef;
-    setPhotoBusy(slot);
-    try {
-      const ref: AssetRef = await uploadImageForPath(id, path, file);
-      setField(path, ref);
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : '사진 업로드에 실패했습니다');
-    } finally {
-      setPhotoBusy(null);
-      if (input.current) input.current.value = '';
-    }
-  };
 
   // ─────────────── 섹션 배경색 ───────────────
   /**
@@ -545,6 +461,11 @@ export default function Editor() {
    */
   const applyBlockPlace = useCallback(
     (section: SectionKey, zone: string, id: string, x: number, y: number) => {
+      // 커버 문구는 카드 문구(sectionText)가 아니라 자유 배치 레이어(core.cover.layers)다
+      if (section === 'cover') {
+        if (zone === COVER_ZONE) patchLayer(id, { x, y });
+        return;
+      }
       if (zone !== 'head' && zone !== 'foot') return;
       const current = sectionBlocks(themeId, section, normalizeSectionText(doc?.core.sectionText));
       if (!current[zone].some((b) => b.id === id)) return;
@@ -553,7 +474,7 @@ export default function Editor() {
         [zone]: current[zone].map((b) => (b.id === id ? { ...b, pos: { x, y } } : b)),
       });
     },
-    [doc, themeId, setField],
+    [doc, themeId, setField, patchLayer],
   );
 
   /**
@@ -605,6 +526,10 @@ export default function Editor() {
 
   const applyBlockEdit = useCallback(
     (section: SectionKey, zone: string, id: string, text: string) => {
+      if (section === 'cover') {
+        if (zone === COVER_ZONE) patchLayer(id, { text });
+        return;
+      }
       if (zone !== 'head' && zone !== 'foot') return;
       const current = sectionBlocks(themeId, section, normalizeSectionText(doc?.core.sectionText));
       const list = current[zone];
@@ -614,7 +539,7 @@ export default function Editor() {
         [zone]: list.map((b) => (b.id === id ? { ...b, text } : b)),
       });
     },
-    [doc, themeId, setField],
+    [doc, themeId, setField, patchLayer],
   );
 
   const setSectionBg = useCallback(
@@ -645,10 +570,8 @@ export default function Editor() {
   const openSectionForm = useCallback(
     (key: SectionKey) => {
       if (key === 'cover') {
-        // 커버는 가운데에 문구 편집 폼을 띄우고(다른 섹션과 동일한 경험),
-        // 오른쪽은 캔버스로 전환해 위치를 드래그로 잡을 수 있게 한다
+        // 커버도 다른 섹션과 같다 — 폼은 문구 목록·서식, 위치와 글자는 미리보기에서
         openForm('cover');
-        setRightView('cover');
         return;
       }
       const formKey = SECTION_TO_FORM[key];
@@ -657,8 +580,7 @@ export default function Editor() {
     [openForm],
   );
 
-  // 미리보기(iframe)에서 섹션을 클릭하면 해당 편집을 연다.
-  // 커버는 폼이 없으므로 우측을 "커버 편집" 캔버스로 전환한다.
+  // 미리보기(iframe)에서 섹션을 클릭하면 해당 편집을 연다 (커버도 다른 섹션과 같다).
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
@@ -712,9 +634,7 @@ export default function Editor() {
       }
 
       const key = data?.__luviSectionClick;
-      if (!key) return;
-      if (key === 'cover') setRightView('cover');
-      else openSectionForm(key);
+      if (key) openSectionForm(key);
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
@@ -863,6 +783,34 @@ export default function Editor() {
                     className="w-[72px] accent-gold"
                   />
                 </label>
+                {/* 정렬 — 끌어서 놓은 자리의 기준점이 함께 바뀝니다 */}
+                <div className="flex gap-0.5 rounded-lg bg-surface-sunken p-0.5">
+                  {LAYER_ALIGNS.map((a) => (
+                    <button
+                      key={a.value}
+                      type="button"
+                      aria-label={`${a.value} 정렬`}
+                      onClick={() => patchLayer(layer.id, { align: a.value })}
+                      className={`rounded-md px-2.5 py-1.5 text-[12px] ${
+                        layer.align === a.value
+                          ? 'bg-white font-semibold shadow-sm'
+                          : 'text-ink-soft'
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+                {/* 그림자 — 밝은 사진 위에 흰 글씨를 얹었을 때 읽히게 합니다 */}
+                <button
+                  type="button"
+                  onClick={() => patchLayer(layer.id, { shadow: !layer.shadow })}
+                  className={`rounded-lg px-2.5 py-2 text-[11.5px] ${
+                    layer.shadow ? 'bg-ink text-paper-soft' : 'bg-surface-sunken text-ink-soft'
+                  }`}
+                >
+                  그림자
+                </button>
               </div>
             </div>
           ))}
@@ -874,7 +822,8 @@ export default function Editor() {
             + 문구 추가
           </button>
           <p className="text-[12px] leading-relaxed text-muted">
-            위치는 오른쪽 “커버 편집” 화면에서 문구를 끌어 옮길 수 있어요.
+            위치는 오른쪽 미리보기에서 문구 왼쪽의 손잡이(⠿)를 끌어 옮기세요. 글자는 미리보기에서
+            눌러 바로 고칠 수 있어요.
           </p>
         </div>
       )}
@@ -902,7 +851,7 @@ export default function Editor() {
       {/* 사진을 모아 보여주는 폼 — 여기에 없는 사진은 어디 있는지 알려준다 */}
       {activeForm.key === 'photos' && (
         <p className="text-[12px] leading-relaxed text-muted">
-          커버 문구의 위치는 “커버” 편집에서 끌어 옮기고, 카톡 미리보기 사진은 “공유 설정”에
+          커버 문구의 위치는 오른쪽 미리보기에서 끌어 옮기고, 카톡 미리보기 사진은 “공유 설정”에
           있어요.
         </p>
       )}
@@ -916,85 +865,6 @@ export default function Editor() {
       )}
     </div>
   ) : null;
-
-  // ── 프리뷰 (커버 캔버스 + 서식 도구) ──
-  const canvas = (
-    <div className="relative flex h-full w-full flex-col">
-      <input
-        ref={coverInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => void onPhotoFile('cover', e.target.files?.[0])}
-      />
-      <input
-        ref={footerInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => void onPhotoFile('footer', e.target.files?.[0])}
-      />
-      <div className="relative min-h-0 flex-1">
-        <CoverCanvas
-          photoUrl={photoUrl}
-          layers={layers}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onChange={patchLayer}
-          onEditText={setEditingTextId}
-          onPickPhoto={() => coverInputRef.current?.click()}
-          onAddText={addLayer}
-        />
-        {editingLayer && (
-          <TextEditorOverlay
-            layer={editingLayer}
-            onCancel={() => setEditingTextId(null)}
-            onDone={(text) => {
-              patchLayer(editingLayer.id, { text });
-              setEditingTextId(null);
-            }}
-          />
-        )}
-      </div>
-
-      {selectedLayer && !editingLayer && (
-        <LayerToolbar
-          layer={selectedLayer}
-          onChange={(patch) => patchLayer(selectedLayer.id, patch)}
-          onEditText={() => setEditingTextId(selectedLayer.id)}
-          onRemove={() => removeLayer(selectedLayer.id)}
-        />
-      )}
-
-      {!selectedLayer && !editingLayer && (
-        <div className="flex flex-none flex-wrap items-center gap-2 border-t border-line bg-surface px-3 py-2.5">
-          <button
-            type="button"
-            onClick={addLayer}
-            className="rounded-lg bg-ink px-3 py-2 text-[12px] text-paper-soft"
-          >
-            + 텍스트
-          </button>
-          {/* 첫 사진(커버) · 끝 사진(마무리) — 순서대로 둔다 */}
-          <PhotoSlotButton
-            label="커버 사진"
-            url={photoUrl}
-            busy={photoBusy === 'cover'}
-            onClick={() => coverInputRef.current?.click()}
-          />
-          <PhotoSlotButton
-            label="마지막 사진"
-            url={footerUrl}
-            // 커버를 물려받아 보여주는 중이라는 표시 — 바꾸면 마무리에만 적용된다
-            inherited={!footerImage && !!photoUrl}
-            busy={photoBusy === 'footer'}
-            onClick={() => footerInputRef.current?.click()}
-          />
-          <span className="ml-auto text-[11px] text-muted-soft">문구를 탭해서 옮기세요</span>
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <EditorProvider value={editorValue}>
@@ -1074,52 +944,40 @@ export default function Editor() {
               </>
             ) : (
               <div className="xl:mx-auto xl:max-w-[520px]">
-                <h2 className="mb-1.5 text-[17px] font-bold tracking-[-.03em]">커버 편집</h2>
+                <h2 className="mb-1.5 text-[17px] font-bold tracking-[-.03em]">
+                  미리보기에서 바로 고치세요
+                </h2>
                 <p className="mb-4 text-[12.5px] leading-relaxed text-muted">
-                  오른쪽 사진 위 문구를 끌어서 옮기고, 탭하면 서식을 바꿀 수 있어요.
+                  오른쪽 미리보기의 글자를 눌러 그 자리에서 고치고, 왼쪽 손잡이(⠿)를 끌어 옮깁니다.
+                  색·정렬·글씨체는 미리보기 아래 툴바에 있어요.
                   <br />
-                  첫 화면(커버)과 맨 아래 마지막 사진은 오른쪽 아래 버튼에서 바꿉니다.
+                  사진은 “사진”, 카톡 미리보기는 “공유 설정”에서 바꿉니다.
                   <br />
-                  다른 항목은 아래에서 편집하세요.
+                  카드를 누르면 그 항목 편집이 열립니다.
                 </p>
                 <div className="xl:hidden">{sectionsPanel}</div>
               </div>
             )}
           </div>
 
-          {/* 프리뷰 — 미리보기(실제 뷰어) / 커버 편집 토글 */}
+          {/*
+            프리뷰 — 실제 뷰어를 iframe 으로 띄웁니다. 편집은 전부 이 안에서 합니다:
+            글자는 눌러서 고치고, 위치는 손잡이(⠿)를 끌어서, 서식은 아래 툴바에서.
+
+            🔴 예전에는 여기 [미리보기] / [커버 편집] 탭이 있었습니다. 커버 문구만 별도 캔버스에서
+               편집했는데, 카드 문구가 미리보기에서 직접 편집되게 바뀐 뒤로는 **같은 일을 하는
+               화면이 두 개**가 됐습니다. 이제 커버 문구도 미리보기에서 다루므로 탭을 없앴습니다
+               (커버 문구 렌더·배선은 뷰어의 `CoverLayers`).
+          */}
           <div className="flex h-full w-full flex-col lg:w-[clamp(340px,34vw,460px)] lg:flex-none lg:border-l lg:border-line">
-            <div className="flex flex-none items-center gap-1 border-b border-line bg-surface px-1.5 py-1.5">
-              <button
-                type="button"
-                onClick={() => setRightView('preview')}
-                className={`rounded-md px-3 py-1.5 text-[12px] font-medium ${rightView === 'preview' ? 'bg-ink text-paper' : 'text-muted'}`}
-              >
-                미리보기
-              </button>
-              <button
-                type="button"
-                onClick={() => setRightView('cover')}
-                className={`rounded-md px-3 py-1.5 text-[12px] font-medium ${rightView === 'cover' ? 'bg-ink text-paper' : 'text-muted'}`}
-              >
-                커버 편집
-              </button>
-              <span className="ml-auto pr-1 text-[10.5px] text-muted-faint">편집 즉시 반영</span>
+            <div className="flex flex-none items-center gap-1 border-b border-line bg-surface px-3 py-2">
+              <span className="text-[12px] font-medium text-ink">미리보기</span>
+              <span className="ml-auto text-[10.5px] text-muted-faint">편집 즉시 반영</span>
             </div>
 
             <div className="relative min-h-0 flex-1">
-              {/* 커버 편집 (사진 위 문구 드래그 배치)
-                  폰 목업 테두리를 두면 편집 영역이 좁아진다 — 우측 열을 그대로 채운다 */}
-              <div className={`absolute inset-0 ${rightView === 'cover' ? '' : 'hidden'}`}>
-                {/* 활성일 때만 마운트한다 — 숨긴 채(display:none) 마운트하면 캔버스 크기를
-                    0 으로 재어 글자가 0px(안 보임)·클릭 불가가 된다 */}
-                <div className="h-full w-full overflow-hidden bg-surface">
-                  {rightView === 'cover' && canvas}
-                </div>
-              </div>
-
               {/* 라이브 미리보기 (실제 하객 뷰어를 iframe 으로, 초안 실시간 반영) */}
-              <div className={`absolute inset-0 ${rightView === 'preview' ? '' : 'hidden'}`}>
+              <div className="absolute inset-0">
                 <div className="h-full w-full overflow-hidden bg-ivory">
                   <iframe
                     data-luvi-preview
@@ -1133,17 +991,15 @@ export default function Editor() {
 
             {/* 문구 툴바 — 미리보기 **바로 아래**. 글자를 누른 자리에서 눈을 떼지 않고
                 색·정렬·글씨체를 바꿉니다 (왼쪽 폼에는 문구 편집을 두지 않습니다) */}
-            {rightView === 'preview' && (
-              <BlockToolbar
-                themeId={themeId}
-                target={blockTarget}
-                addTo={formSectionKey ?? null}
-                addToLabel={formSectionKey ? SECTION_META[formSectionKey].label : undefined}
-                stored={sectionText}
-                onChange={setSectionText}
-                onSelect={setBlockTarget}
-              />
-            )}
+            <BlockToolbar
+              themeId={themeId}
+              target={blockTarget}
+              addTo={formSectionKey ?? null}
+              addToLabel={formSectionKey ? SECTION_META[formSectionKey].label : undefined}
+              stored={sectionText}
+              onChange={setSectionText}
+              onSelect={setBlockTarget}
+            />
           </div>
 
           {/* 모바일 바텀시트 */}

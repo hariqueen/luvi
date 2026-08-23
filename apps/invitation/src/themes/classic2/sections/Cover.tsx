@@ -4,14 +4,16 @@
  * classic1 은 사진이 화면을 가득 채우고 문구가 그 위에 얹히는 구성입니다.
  * 여기서는 사진을 골드 테두리 액자에 넣고, 액자 밖에 예식장 정보를 활자로 정돈합니다.
  *
- * 🔴 문구는 classic1 과 **같은 텍스트 레이어**(에디터 커버 편집 결과)를 그립니다.
+ * 🔴 문구는 classic1 과 **같은 텍스트 레이어**(`core.cover.layers`)를 그립니다 — 렌더와 편집
+ *    배선은 공용 `CoverLayers` 에 있습니다.
  *    좌표 계산도 같은 함수(@luvi/schema 의 layers.ts)를 쓰되, 기준 박스가 화면 전체가
  *    아니라 **액자** 입니다 — 그래서 에디터에서 가운데 놓은 문구가 사진 가운데에 옵니다.
  *    날짜·이름을 여기서 또 활자로 찍지 않는 이유: 레이어에 이미 들어 있어 두 번 나옵니다.
  */
 import { useEffect, useRef, useState } from 'react';
-import { FONT_STACK, alignTransform, ensureFonts, layerToPx } from '@luvi/schema';
+import { ensureFonts } from '@luvi/schema';
 import { useInvitation } from '@/lib/invitationContext';
+import { CoverLayers } from '@/components/common/CoverLayers';
 
 export function Cover() {
   const { cover, location } = useInvitation();
@@ -50,6 +52,8 @@ export function Cover() {
         <div className="relative mx-auto w-[268px] max-w-full">
           <div
             ref={frameRef}
+            /* 문구 좌표의 기준 박스 — classic2 는 액자가 기준입니다 (CoverLayers 주석 참고) */
+            data-preview-frame="cover"
             className="relative aspect-[3/4] overflow-hidden bg-c2-cream shadow-[0_18px_38px_rgba(62,58,51,.18)]"
           >
             {cover.image && (
@@ -67,31 +71,7 @@ export function Cover() {
               }}
             />
 
-            {cover.layers.map((layer) => {
-              const px = layerToPx(layer, size);
-              return (
-                <div
-                  key={layer.id}
-                  className="absolute whitespace-pre-wrap"
-                  style={{
-                    left: px.left,
-                    top: px.top,
-                    transform: alignTransform(layer.align),
-                    fontSize: px.fontSize,
-                    fontFamily: FONT_STACK[layer.font],
-                    fontWeight: layer.weight,
-                    lineHeight: layer.lineHeight,
-                    letterSpacing: `${layer.letterSpacing}em`,
-                    color: layer.color,
-                    textAlign: layer.align,
-                    textShadow: layer.shadow ? '0 1px 12px rgba(0,0,0,.45)' : 'none',
-                    maxWidth: '88%',
-                  }}
-                >
-                  {layer.text}
-                </div>
-              );
-            })}
+            <CoverLayers layers={cover.layers} size={size} maxWidth="88%" />
           </div>
 
           {/* 액자 테두리 — 골드 실선 + 안쪽 흰 실선 */}
