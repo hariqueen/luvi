@@ -627,8 +627,16 @@ export default function Editor() {
       const block = data?.__luviBlockClick;
       if (block?.section) {
         openSectionForm(block.section);
-        if (block.zone === 'head' || block.zone === 'foot') {
+        /**
+         * 🔴 **누른 문구를 반드시 툴바가 잡아야 합니다.** 커버 문구(zone `layer`)를 여기서
+         *    빼두면, 툴바는 직전에 고른 카드 문구를 계속 잡고 있습니다 — 그 상태로 글씨체·
+         *    크기를 바꾸면 화면에 안 보이는 다른 문구가 바뀌어, 사용자에게는 "만져도 미리보기가
+         *    안 바뀐다" 로 보입니다. 모르는 자리는 잡지 않고 **비웁니다**(잘못된 대상보다 낫습니다).
+         */
+        if (block.zone === 'head' || block.zone === 'foot' || block.zone === COVER_ZONE) {
           setBlockTarget({ section: block.section, zone: block.zone, id: block.id });
+        } else {
+          setBlockTarget(null);
         }
         return;
       }
@@ -970,6 +978,10 @@ export default function Editor() {
               addToLabel={formSectionKey ? SECTION_META[formSectionKey].label : undefined}
               stored={sectionText}
               onChange={setSectionText}
+              layers={layers}
+              onPatchLayer={patchLayer}
+              onRemoveLayer={removeLayer}
+              onAddLayer={addLayer}
               onSelect={setBlockTarget}
             />
           </div>
