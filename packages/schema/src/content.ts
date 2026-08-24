@@ -8,6 +8,7 @@
  */
 
 import type { SectionBgMap } from './design';
+import { escapeRich } from './richText';
 import type { SectionTextMap } from './sectionText';
 
 /** 이미지·오디오 참조. 절대 URL을 저장하지 않는다 — 도메인이 바뀌면 전부 고쳐야 한다. */
@@ -147,10 +148,37 @@ export interface Person {
   nameEn: string;
   /** 이름만 (성 제외) */
   firstName: string;
+  /**
+   * 인사말 아래 **혼주 줄 한 줄 통째로** (예: `아버지 · 어머니 <b>의 장남</b> 신랑`).
+   *
+   * 예전에는 아버지·어머니·관계·이름이 각각 다른 칸이었고 사이의 `·` 와 `의` 는 화면에
+   * 박혀 있었습니다 — 그래서 `故 아버지`, `아버지 · 어머니의 장남` 처럼 **줄 모양 자체를
+   * 바꾸는 것**은 아예 할 수 없었습니다. 지금은 미리보기에서 이 줄을 통째로 고칩니다.
+   *
+   * 굵게·기울임은 값 안에 담깁니다 (`richText.ts`).
+   */
+  parentsLine: string;
+  /** @deprecated `parentsLine` 이전의 칸. 옛 청첩장의 혼주 줄을 만들 때만 읽습니다 */
   father: string;
+  /** @deprecated `parentsLine` 이전의 칸 */
   mother: string;
-  /** 장남 / 장녀 등 */
+  /** @deprecated `parentsLine` 이전의 칸 (장남 / 장녀 등) */
   relation: string;
+}
+
+/**
+ * 화면에 그릴 혼주 줄.
+ *
+ * 🔴 값이 없는 청첩장은 **예전 네 칸으로 같은 줄을 만들어** 돌려줍니다. 이미 발행된
+ *    청첩장은 예식까지 몇 달을 살아 있고 그 스냅샷에는 `parentsLine` 이 없습니다 —
+ *    빈 줄을 그리면 하객 화면에서 혼주가 통째로 사라집니다.
+ */
+export function resolveParentsLine(p: Person): string {
+  if (p.parentsLine?.trim()) return p.parentsLine;
+
+  const parents = [p.father, p.mother].filter(Boolean).map(escapeRich).join(' · ');
+  const relation = p.relation ? `<b>의 ${escapeRich(p.relation)}</b>` : '';
+  return [parents, relation, escapeRich(p.firstName)].filter(Boolean).join(' ');
 }
 
 export interface TransportItem {

@@ -20,6 +20,7 @@ import {
   FONTS,
   COVER_ZONE,
   LAYER_SIZE_RANGE,
+  createSectionBlock,
   createTextLayer,
   normalizeGame,
   normalizeSectionBg,
@@ -31,6 +32,7 @@ import {
   type SectionDef,
   type SectionKey,
   normalizeSectionText,
+  richToPlain,
   sectionBlocks,
   type SectionBlocks,
   type TextLayer,
@@ -524,10 +526,27 @@ export default function Editor() {
     [doc, setField],
   );
 
+  /**
+   * 🔴 **다 지운 텍스트 상자는 없어집니다** (PPT 와 같습니다) — 단, 손을 뗐을 때(`final`)만.
+   *
+   * 타이핑 도중에 없애면 전부 선택해 새로 쓰려던 사람의 커서가 사라집니다. 그래서 뷰어가
+   * "편집을 마쳤다" 를 함께 보내고(`Editable.tsx` 의 `final`), 그때 빈 것만 지웁니다.
+   * 자리가 정해진 값(인사말·예식장 …)은 이 경로가 아니라 `applyFieldEdit` 로 오므로
+   * 지워지지 않습니다 — 없어지면 다시 넣을 곳이 없기 때문입니다.
+   */
   const applyBlockEdit = useCallback(
-    (section: SectionKey, zone: string, id: string, text: string) => {
+    (section: SectionKey, zone: string, id: string, text: string, final: boolean) => {
+      /**
+       * 🔴 **글자로 판정합니다** (`richToPlain`). 값에는 굵게·기울임 태그가 섞여 있어서,
+       *    다 지운 뒤 남은 `<b></b>` 같은 껍데기를 문자열째로 재면 "비었는데 안 지워지는"
+       *    상자가 됩니다.
+       */
+      const emptied = final && richToPlain(text).trim() === '';
+
       if (section === 'cover') {
-        if (zone === COVER_ZONE) patchLayer(id, { text });
+        if (zone !== COVER_ZONE) return;
+        if (emptied) removeLayer(id);
+        else patchLayer(id, { text });
         return;
       }
       if (zone !== 'head' && zone !== 'foot') return;
@@ -536,10 +555,13 @@ export default function Editor() {
       if (!list.some((b) => b.id === id)) return;
       setField(`core.sectionText.${section}`, {
         ...current,
-        [zone]: list.map((b) => (b.id === id ? { ...b, text } : b)),
+        [zone]: emptied
+          ? list.filter((b) => b.id !== id)
+          : list.map((b) => (b.id === id ? { ...b, text } : b)),
       });
+      if (emptied) setBlockTarget((t) => (t?.id === id ? null : t));
     },
-    [doc, themeId, setField, patchLayer],
+    [doc, themeId, setField, patchLayer, removeLayer],
   );
 
   const setSectionBg = useCallback(
@@ -561,6 +583,33 @@ export default function Editor() {
     const key = activeForm ? FORM_TO_SECTION[activeForm.key] : undefined;
     return key && sections.includes(key) ? key : null;
   }, [activeForm, sections]);
+
+  /**
+   * 지금 보고 있는 카드 — 텍스트 상자를 얹을 자리.
+   * 폼이 열려 있으면 그 카드, 아니면 방금 미리보기에서 누른 문구의 카드입니다.
+   */
+  const textBoxTarget: SectionKey | null = formSectionKey ?? blockTarget?.section ?? null;
+
+  /**
+   * **텍스트 상자 추가** (PPT 의 '텍스트 상자' 와 같은 자리).
+   *
+   * 미리보기 한가운데에 상자가 하나 생기고, 그 글자를 눌러 바로 고칩니다. 다 지우면
+   * 사라집니다(`applyBlockEdit`) — 넣는 것과 빼는 것이 같은 동작이라 따로 배울 것이 없습니다.
+   *
+   * 커버는 카드 문구가 아니라 사진 위 자유 배치 레이어라 그쪽에 넣습니다.
+   */
+  const addTextBox = useCallback(() => {
+    const section = textBoxTarget;
+    if (!section) return;
+    if (section === 'cover') {
+      addLayer();
+      return;
+    }
+    const current = sectionBlocks(themeId, section, normalizeSectionText(doc?.core.sectionText));
+    const created = createSectionBlock('note', '새 문구');
+    setField(`core.sectionText.${section}`, { ...current, head: [...current.head, created] });
+    setBlockTarget({ section, zone: 'head', id: created.id });
+  }, [textBoxTarget, themeId, doc, setField, addLayer]);
 
   const openForm = useCallback((formKey: string) => {
     setPanel({ kind: 'form', formKey });
@@ -587,7 +636,13 @@ export default function Editor() {
       const data = e.data as {
         __luviSectionClick?: SectionKey;
         __luviBlockClick?: { section: SectionKey; zone: string; id: string };
-        __luviBlockEdit?: { section: SectionKey; zone: string; id: string; text: string };
+        __luviBlockEdit?: {
+          section: SectionKey;
+          zone: string;
+          id: string;
+          text: string;
+          final?: boolean;
+        };
         __luviFieldEdit?: { path: string; value: string };
         __luviBlockPlace?: {
           section: SectionKey;
@@ -615,7 +670,7 @@ export default function Editor() {
       // 미리보기에서 직접 고친 글자
       const edit = data?.__luviBlockEdit;
       if (edit?.section) {
-        applyBlockEdit(edit.section, edit.zone, edit.id, edit.text);
+        applyBlockEdit(edit.section, edit.zone, edit.id, edit.text, edit.final === true);
         return;
       }
 
@@ -688,8 +743,59 @@ export default function Editor() {
     </div>
   );
 
+  /**
+   * 왼쪽 맨 위의 **텍스트 상자 추가** — PPT 의 그 버튼과 같은 자리, 같은 동작.
+   *
+   * 어느 카드에 얹을지는 지금 보고 있는 카드로 정합니다(`textBoxTarget`). 고른 카드가
+   * 없으면 누를 수 없게 두고 그 이유를 함께 적습니다 — 눌러도 아무 일이 없으면
+   * 고장으로 읽힙니다.
+   */
+  const addTextBoxButton = (
+    <button
+      type="button"
+      onClick={addTextBox}
+      disabled={!textBoxTarget}
+      title={
+        textBoxTarget
+          ? `${SECTION_META[textBoxTarget].label}에 텍스트 상자를 얹습니다`
+          : '먼저 아래에서 카드를 고르거나, 미리보기의 글자를 눌러주세요'
+      }
+      className={`mb-2.5 flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-[12.5px] font-semibold ${
+        textBoxTarget
+          ? 'border-line-strong bg-white text-ink-soft hover:border-gold hover:text-gold-deep'
+          : 'cursor-default border-line bg-surface text-muted-faint'
+      }`}
+    >
+      <svg viewBox="0 0 20 20" className="size-[18px] flex-none" aria-hidden="true">
+        <rect
+          x="1.75"
+          y="3.75"
+          width="16.5"
+          height="12.5"
+          rx="2"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeDasharray="3 2"
+        />
+        <path
+          d="M6.5 7.75h7M10 7.75v5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+      </svg>
+      텍스트 상자 추가
+      <span className="ml-auto text-[11px] font-normal text-muted">
+        {textBoxTarget ? SECTION_META[textBoxTarget].label : '카드 선택'}
+      </span>
+    </button>
+  );
+
   const sectionsPanel = (
     <div>
+      {addTextBoxButton}
       {quickForms}
       <SectionManager
         active={sections}
@@ -713,7 +819,8 @@ export default function Editor() {
       {hasPreviewText(activeForm.fields) && (
         <p className="rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] leading-relaxed text-muted">
           이 카드의 <b className="font-semibold text-ink-soft">글자는 가운데 미리보기에서</b> 눌러
-          고칩니다 — 색·정렬·글씨체는 미리보기 아래 툴바에서 바꿔요.
+          고칩니다 — 굵게는 ⌘/Ctrl+B, 기울임은 ⌘/Ctrl+I, 색·정렬·글씨체는 미리보기 아래
+          툴바에서 바꿔요.
         </p>
       )}
       {/* 배경색은 섹션 전체에 걸리는 값이라 필드들 위에 둡니다 */}
@@ -1011,7 +1118,9 @@ export default function Editor() {
                 </h2>
                 <p className="mb-4 text-[12.5px] leading-relaxed text-muted">
                   가운데 미리보기의 글자를 눌러 그 자리에서 고치고, 왼쪽 손잡이(⠿)를 끌어 옮깁니다.
-                  색·정렬·글씨체는 미리보기 아래 툴바에 있어요.
+                  굵게는 ⌘/Ctrl+B, 기울임은 ⌘/Ctrl+I. 색·정렬·글씨체는 미리보기 아래 툴바에 있어요.
+                  <br />
+                  왼쪽 위 “텍스트 상자 추가”로 글자를 새로 얹고, 다 지우면 그 상자는 사라져요.
                   <br />
                   사진은 “사진”, 카톡 미리보기는 “공유 설정”에서 바꿉니다.
                   <br />

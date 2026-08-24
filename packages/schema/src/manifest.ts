@@ -145,15 +145,15 @@ export const CORE_SECTIONS: SectionDef[] = [
       { path: 'core.couple.groom.name', type: 'text', label: '신랑 이름', required: true, maxLength: 20 },
       { path: 'core.couple.groom.nameEn', type: 'text', label: '신랑 영문 이름', maxLength: 30 },
       { path: 'core.couple.groom.firstName', type: 'text', label: '신랑 이름만', hint: '성을 뺀 이름. 커버·푸터에 쓰입니다', maxLength: 10, previewEdit: true },
-      { path: 'core.couple.groom.father', type: 'text', label: '신랑 아버지', maxLength: 20, previewEdit: true },
-      { path: 'core.couple.groom.mother', type: 'text', label: '신랑 어머니', maxLength: 20, previewEdit: true },
-      { path: 'core.couple.groom.relation', type: 'text', label: '관계', hint: '장남 · 차남 등', maxLength: 10, previewEdit: true },
+      // 혼주 줄은 아버지·어머니·관계로 쪼개지 않습니다 — 사이의 '·' 와 '의' 까지
+      // 미리보기에서 통째로 고칩니다 (`resolveParentsLine`)
+      { path: 'core.couple.groom.parentsLine', type: 'text', label: '신랑 혼주 줄', hint: '아버지 · 어머니 의 장남 이름', maxLength: 120, previewEdit: true },
       { path: 'core.couple.bride.name', type: 'text', label: '신부 이름', required: true, maxLength: 20 },
       { path: 'core.couple.bride.nameEn', type: 'text', label: '신부 영문 이름', maxLength: 30 },
       { path: 'core.couple.bride.firstName', type: 'text', label: '신부 이름만', maxLength: 10, previewEdit: true },
-      { path: 'core.couple.bride.father', type: 'text', label: '신부 아버지', maxLength: 20, previewEdit: true },
-      { path: 'core.couple.bride.mother', type: 'text', label: '신부 어머니', maxLength: 20, previewEdit: true },
-      { path: 'core.couple.bride.relation', type: 'text', label: '관계', hint: '장녀 · 차녀 등', maxLength: 10, previewEdit: true },
+      // 혼주 줄은 아버지·어머니·관계로 쪼개지 않습니다 — 사이의 '·' 와 '의' 까지
+      // 미리보기에서 통째로 고칩니다 (`resolveParentsLine`)
+      { path: 'core.couple.bride.parentsLine', type: 'text', label: '신부 혼주 줄', hint: '아버지 · 어머니 의 장녀 이름', maxLength: 120, previewEdit: true },
     ],
   },
   {

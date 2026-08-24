@@ -6,15 +6,16 @@
  *
  * 🔴 여기가 "발행하면 그대로 뜬다"의 실제 지점입니다 — 스냅샷의 모든 값이 화면 값으로 1:1 매핑됩니다.
  */
-import type { AssetRef, PetalItem, PublicInvitation } from '@luvi/schema';
+import type { AssetRef, PetalItem, Person as StoredPerson, PublicInvitation } from '@luvi/schema';
 import {
   DEFAULT_PETAL_COUNT,
   normalizeGame,
   normalizePetalItems,
   normalizeSectionBg,
+  resolveParentsLine,
   resolveSectionText,
 } from '@luvi/schema';
-import type { GameSprite, InvitationConfig } from '@/config/invitation.config';
+import type { GameSprite, InvitationConfig, Person } from '@/config/invitation.config';
 import { IS_PREVIEW } from '@/components/common/PreviewSlot';
 import { BASE } from './env';
 
@@ -73,6 +74,17 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
   const idleItem = spriteList(game.idleItems)[0];
   const shareImage = url(c.share.image) || url(c.cover.image);
 
+  /**
+   * 뷰어는 혼주를 **한 줄로만** 압니다. 아버지·어머니·관계로 쪼개져 있던 옛 스냅샷은
+   * 여기서 같은 모양의 한 줄로 합쳐집니다 (`resolveParentsLine`).
+   */
+  const person = (p: StoredPerson): Person => ({
+    name: p.name,
+    nameEn: p.nameEn,
+    firstName: p.firstName,
+    parentsLine: resolveParentsLine(p),
+  });
+
   return {
     themeId: pub.themeId,
 
@@ -80,8 +92,8 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
     // 슬러그로 대체 추론하면 안 됩니다: 방명록 경로는 문서 ID 기준이라 엉뚱한 곳에 씁니다.
     invitationId: pub.invitationId ?? '',
 
-    groom: c.couple.groom,
-    bride: c.couple.bride,
+    groom: person(c.couple.groom),
+    bride: person(c.couple.bride),
     weddingAt,
 
     cover: {

@@ -36,6 +36,7 @@ import {
 } from '@luvi/schema';
 import { IS_PREVIEW, notifyBlockEdit } from './PreviewSlot';
 import { EditableText } from './Editable';
+import { Rich } from './Rich';
 import { startBlockDrag } from './blockDrag';
 
 /** 역할 → 이 디자인의 타이포 클래스 */
@@ -106,10 +107,12 @@ function Block({
         {IS_PREVIEW ? (
           <EditableText
             text={block.text}
-            onEdit={(next) => notifyBlockEdit(section, zone, block.id, next)}
+            onEdit={(next, final) => notifyBlockEdit(section, zone, block.id, next, final)}
+            // 다 지우면 이 문구는 사라집니다 (에디터가 목록에서 뺍니다)
+            onDelete={() => notifyBlockEdit(section, zone, block.id, '', true)}
           />
         ) : (
-          block.text
+          <Rich text={block.text} />
         )}
         {append}
       </span>

@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ensureFonts } from '@luvi/schema';
 import { useInvitation } from '@/lib/invitationContext';
 import { CoverLayers } from '@/components/common/CoverLayers';
+import { Rich } from '@/components/common/Rich';
 
 export function Cover() {
   const { cover, location } = useInvitation();
@@ -85,8 +86,13 @@ export function Cover() {
         */}
         {location.venue && (
           <div className="mt-9 font-myeongjo text-[15px] tracking-[0.04em] text-c2-ink">
-            {location.venue}
-            {location.hall && <span className="text-c2-ink-soft"> · {location.hall}</span>}
+            <Rich text={location.venue} />
+            {location.hall && (
+              <span className="text-c2-ink-soft">
+                {' · '}
+                <Rich text={location.hall} />
+              </span>
+            )}
           </div>
         )}
 

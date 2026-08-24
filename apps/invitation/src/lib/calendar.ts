@@ -10,6 +10,7 @@
  * 그래서 버튼은 자기 도메인(`?calendar=1`)을 가리키고,
  * 그 페이지에서 구글 캘린더로 넘기는 방식을 씁니다.
  */
+import { richToPlain } from '@luvi/schema';
 import type { InvitationConfig } from '@/config/invitation.config';
 
 const KST_OFFSET_MIN = 9 * 60;
@@ -65,7 +66,8 @@ export function weddingCalendarEvent(cfg: InvitationConfig): CalendarEvent {
     title: share.title,
     startKst: weddingAt,
     durationMinutes: share.durationMinutes,
-    location: `${location.venue} ${location.hall} (${location.addressForCopy})`,
+    // 예식장 이름은 미리보기에서 굵게 할 수 있습니다 — 캘린더에는 글자만 넣습니다
+    location: `${richToPlain(location.venue)} ${richToPlain(location.hall)} (${location.addressForCopy})`,
     details: `${share.date}\n${baseUrl}`,
   };
 }

@@ -2,6 +2,7 @@ import { useCopy } from '@/hooks/useCopy';
 import { CheckIcon, CopyIcon, PhoneIcon } from '@/components/common/icons';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
+import { richToPlain } from '@luvi/schema';
 import { Field } from '@/components/common/Editable';
 
 export function Location() {
@@ -44,7 +45,7 @@ export function Location() {
 
       <div className="my-[18px] mb-2.5 overflow-hidden rounded-xl border border-line bg-[#e8eaed] shadow-sm">
         <iframe
-          title={`${location.venue} 지도`}
+          title={`${richToPlain(location.venue)} 지도`}
           src={location.mapEmbedSrc}
           className="block h-[200px] w-full border-0"
           loading="lazy"

@@ -60,9 +60,20 @@ export function notifySectionClick(e: MouseEvent) {
  * 글자를 다시 덮어쓰지 않도록, 받는 쪽(`CardText`)이 **포커스된 요소의 DOM 은 건드리지
  * 않습니다.** 안 그러면 한 글자 칠 때마다 커서가 맨 앞으로 튑니다.
  */
-export function notifyBlockEdit(section: string, zone: string, id: string, text: string) {
+export function notifyBlockEdit(
+  section: string,
+  zone: string,
+  id: string,
+  text: string,
+  /**
+   * 편집을 **마쳤는지**(포커스가 빠졌는지). 에디터는 이때만 "다 지운 텍스트 상자를
+   * 없앤다" 를 판단합니다 — 타이핑 도중에 없애면 전부 선택해 새로 쓰려던 사람의 커서가
+   * 사라집니다 (`Editable.tsx` 의 `final`).
+   */
+  final: boolean,
+) {
   window.parent?.postMessage(
-    { __luviBlockEdit: { section, zone, id, text } },
+    { __luviBlockEdit: { section, zone, id, text, final } },
     window.location.origin,
   );
 }

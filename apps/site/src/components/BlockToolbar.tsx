@@ -351,7 +351,8 @@ export function BlockToolbar({
       {!block ? (
         <div className="flex items-center gap-2 px-1 py-0.5">
           <span className="text-[11.5px] text-muted">
-            미리보기의 글자를 누르면 색·정렬·글씨체를 바꿀 수 있어요
+            미리보기의 글자를 누르면 색·정렬·글씨체를 바꿀 수 있어요 · 굵게 ⌘/Ctrl+B · 기울임
+            ⌘/Ctrl+I
           </span>
           {addTo && (
             <button type="button" onClick={add} className={`ml-auto ${addClass}`}>

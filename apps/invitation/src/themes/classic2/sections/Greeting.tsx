@@ -50,15 +50,16 @@ export function Greeting() {
       <Ornament className="mt-9" />
 
       <div className="mt-[26px] font-myeongjo text-sm leading-[2.1] text-c2-ink-soft">
-        {/* 혼주 — 배열이 아니라 신랑/신부 두 사람이므로 경로를 그때그때 만듭니다 */}
+        {/* 혼주 — **한 사람당 한 줄, 통째로** 고칩니다. 사이의 '·' 와 '의' 까지 값의
+            일부입니다 (예전에는 네 칸으로 쪼개져 있어 그 사이 글자는 손댈 수 없었습니다).
+            굵게는 값 안의 <b> 입니다 — ⌘/Ctrl+B */}
         {parents.map(({ p, key }) => (
           <div key={key}>
-            <Field path={`core.couple.${key}.father`} value={p.father} /> ·{' '}
-            <Field path={`core.couple.${key}.mother`} value={p.mother} />{' '}
-            <span className="text-c2-ink">
-              의 <Field path={`core.couple.${key}.relation`} value={p.relation} />
-            </span>{' '}
-            <Field path={`core.couple.${key}.firstName`} value={p.firstName} />
+            <Field
+              path={`core.couple.${key}.parentsLine`}
+              value={p.parentsLine}
+              placeholder="혼주"
+            />
           </div>
         ))}
       </div>

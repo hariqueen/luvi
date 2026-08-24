@@ -19,6 +19,7 @@
 import { COVER_ZONE, FONT_STACK, alignTransform, layerToPx, type TextLayer } from '@luvi/schema';
 import { IS_PREVIEW, notifyBlockEdit } from './PreviewSlot';
 import { EditableText } from './Editable';
+import { Rich } from './Rich';
 import { startBlockDrag } from './blockDrag';
 
 interface Props {
@@ -87,10 +88,13 @@ export function CoverLayers({ layers, size, maxWidth }: Props) {
               {IS_PREVIEW ? (
                 <EditableText
                   text={layer.text}
-                  onEdit={(next) => notifyBlockEdit('cover', COVER_ZONE, layer.id, next)}
+                  onEdit={(next, final) =>
+                    notifyBlockEdit('cover', COVER_ZONE, layer.id, next, final)
+                  }
+                  onDelete={() => notifyBlockEdit('cover', COVER_ZONE, layer.id, '', true)}
                 />
               ) : (
-                layer.text
+                <Rich text={layer.text} />
               )}
             </div>
           </div>

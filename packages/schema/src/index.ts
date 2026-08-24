@@ -1,4 +1,5 @@
 export * from './content';
+export * from './richText';
 export * from './fonts';
 export * from './games';
 export * from './layers';

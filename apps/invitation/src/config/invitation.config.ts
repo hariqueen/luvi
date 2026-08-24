@@ -32,12 +32,11 @@ export interface Person {
   nameEn: string;
   /** 이름만 (예: 신랑) */
   firstName: string;
-  /** 아버지 성함 */
-  father: string;
-  /** 어머니 성함 */
-  mother: string;
-  /** 관계 (예: 장남 / 장녀) */
-  relation: string;
+  /**
+   * 인사말 아래 혼주 줄 **한 줄 통째로** (예: `아버지 · 어머니 <b>의 장남</b> 신랑`).
+   * 굵게·기울임은 값 안에 담깁니다 — 어댑터가 옛 청첩장의 네 칸도 이 한 줄로 만들어 줍니다.
+   */
+  parentsLine: string;
 }
 
 export interface GalleryItem {
@@ -263,17 +262,13 @@ export const invitation: InvitationConfig = {
     name: '신랑',
     nameEn: 'Groom',
     firstName: '신랑',
-    father: '아버지',
-    mother: '어머니',
-    relation: '장남',
+    parentsLine: '아버지 · 어머니 <b>의 장남</b> 신랑',
   },
   bride: {
     name: '신부',
     nameEn: 'Bride',
     firstName: '신부',
-    father: '아버지',
-    mother: '어머니',
-    relation: '장녀',
+    parentsLine: '아버지 · 어머니 <b>의 장녀</b> 신부',
   },
 
   weddingAt: '2026-10-24T13:00:00',
