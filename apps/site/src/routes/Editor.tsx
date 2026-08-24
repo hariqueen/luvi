@@ -744,58 +744,61 @@ export default function Editor() {
   );
 
   /**
-   * 왼쪽 맨 위의 **텍스트 상자 추가** — PPT 의 그 버튼과 같은 자리, 같은 동작.
+   * 왼쪽 열 **맨 아래**의 텍스트 상자 추가 — PPT·Figma 의 그 **T 아이콘**과 같은 자리·같은 동작.
    *
-   * 어느 카드에 얹을지는 지금 보고 있는 카드로 정합니다(`textBoxTarget`). 고른 카드가
-   * 없으면 누를 수 없게 두고 그 이유를 함께 적습니다 — 눌러도 아무 일이 없으면
-   * 고장으로 읽힙니다.
+   * 🔴 문구를 새로 넣는 자리는 **여기 한 곳**입니다. 예전에는 미리보기 아래 툴바에도
+   *    작은 `+ 문구` 가 있었는데, 지우기(🗑) 바로 옆이라 잘못 누르기 쉽고 "지금 고른 문구"
+   *    와 "새로 넣을 문구" 가 한 줄에 섞여 있었습니다. 툴바는 **고른 문구를 고치는 곳**으로
+   *    두고, 넣는 것은 구성 목록 끝(= 청첩장에 무엇이 있는지 보고 있는 자리)으로 모았습니다.
+   *
+   * 글자 라벨 대신 **아이콘 하나**입니다 — 도구는 이름을 읽는 것이 아니라 모양으로 집습니다
+   * (편집기라면 어디서나 T 가 텍스트입니다). 이름은 `aria-label`·`title` 에 남겨 스크린리더와
+   * 마우스를 올린 사람에게는 그대로 읽힙니다.
+   *
+   * 어느 카드에 얹을지는 지금 보고 있는 카드로 정합니다(`textBoxTarget`). 고른 카드가 없으면
+   * 누를 수 없게 두고 **그 이유를 아이콘 옆에 적습니다** — 아이콘만 흐려져 있으면 왜 안 눌리는지
+   * 알 수 없어 고장으로 읽힙니다. 고른 카드가 있으면 아이콘만 남깁니다.
    */
   const addTextBoxButton = (
-    <button
-      type="button"
-      onClick={addTextBox}
-      disabled={!textBoxTarget}
-      title={
-        textBoxTarget
-          ? `${SECTION_META[textBoxTarget].label}에 텍스트 상자를 얹습니다`
-          : '먼저 아래에서 카드를 고르거나, 미리보기의 글자를 눌러주세요'
-      }
-      className={`mb-2.5 flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-[12.5px] font-semibold ${
-        textBoxTarget
-          ? 'border-line-strong bg-white text-ink-soft hover:border-gold hover:text-gold-deep'
-          : 'cursor-default border-line bg-surface text-muted-faint'
-      }`}
-    >
-      <svg viewBox="0 0 20 20" className="size-[18px] flex-none" aria-hidden="true">
-        <rect
-          x="1.75"
-          y="3.75"
-          width="16.5"
-          height="12.5"
-          rx="2"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.2"
-          strokeDasharray="3 2"
-        />
-        <path
-          d="M6.5 7.75h7M10 7.75v5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-        />
-      </svg>
-      텍스트 상자 추가
-      <span className="ml-auto text-[11px] font-normal text-muted">
-        {textBoxTarget ? SECTION_META[textBoxTarget].label : '카드 선택'}
-      </span>
-    </button>
+    <div className="mt-4 flex items-center gap-2">
+      <button
+        type="button"
+        onClick={addTextBox}
+        disabled={!textBoxTarget}
+        aria-label="텍스트 상자 추가"
+        title={
+          textBoxTarget
+            ? `텍스트 상자 추가 — ${SECTION_META[textBoxTarget].label}에 얹습니다`
+            : '텍스트 상자 추가 — 먼저 위에서 카드를 고르거나, 미리보기의 글자를 눌러주세요'
+        }
+        className={`flex size-10 flex-none items-center justify-center rounded-xl border ${
+          textBoxTarget
+            ? 'border-line-strong bg-white text-ink-soft hover:border-gold hover:text-gold-deep'
+            : 'cursor-default border-line bg-surface text-muted-faint'
+        }`}
+      >
+        {/* 세리프 T — 굴림 없는 막대 T 는 숫자 1·괄호와 섞여 보입니다 */}
+        <svg viewBox="0 0 20 20" className="size-[19px]" aria-hidden="true">
+          <path
+            d="M4 5.5V4h12v1.5M10 4v12M7.25 16h5.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {!textBoxTarget && (
+        <span className="text-[11px] leading-snug text-muted-faint">
+          카드를 먼저 고르면 켜집니다
+        </span>
+      )}
+    </div>
   );
 
   const sectionsPanel = (
     <div>
-      {addTextBoxButton}
       {quickForms}
       <SectionManager
         active={sections}
@@ -807,6 +810,7 @@ export default function Editor() {
         onAdd={(key) => queueSections([...sections, key])}
         onEdit={openSectionForm}
       />
+      {addTextBoxButton}
     </div>
   );
 

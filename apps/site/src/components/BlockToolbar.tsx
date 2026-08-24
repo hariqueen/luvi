@@ -285,10 +285,6 @@ export function BlockToolbar({
             >
               🗑
             </button>
-
-            <button type="button" onClick={onAddLayer} className={addClass}>
-              + 문구
-            </button>
           </div>
 
           {openColor && (
@@ -423,10 +419,6 @@ export function BlockToolbar({
 
             <button type="button" onClick={remove} title="이 문구 제거" className={trashClass}>
               🗑
-            </button>
-
-            <button type="button" onClick={add} className={addClass}>
-              + 문구
             </button>
           </div>
 

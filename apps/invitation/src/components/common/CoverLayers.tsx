@@ -85,6 +85,23 @@ export function CoverLayers({ layers, size, maxWidth }: Props) {
                   ⠿
                 </span>
               )}
+              {IS_PREVIEW && (
+                // 이 문구 지우기 — 카드 문구와 같은 규칙 (사진 위라 그림자를 함께 겁니다)
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  title="이 문구 지우기"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    notifyBlockEdit('cover', COVER_ZONE, layer.id, '', true);
+                  }}
+                  style={{ textShadow: '0 1px 6px rgba(0,0,0,.6)' }}
+                  className="absolute -right-[17px] top-1/2 -translate-y-1/2 cursor-pointer select-none text-[12px] font-normal leading-none tracking-normal text-gold opacity-60 transition-opacity group-hover:opacity-100"
+                >
+                  ✕
+                </span>
+              )}
               {IS_PREVIEW ? (
                 <EditableText
                   text={layer.text}

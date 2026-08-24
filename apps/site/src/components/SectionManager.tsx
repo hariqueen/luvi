@@ -123,13 +123,13 @@ export function SectionManager({ active, meta, bg, onReorder, onRemove, onAdd, o
         </div>
       </section>
 
-      <section>
-        <h3 className="mb-2 text-[11px] tracking-wide text-muted-soft">추가할 수 있는 것</h3>
-        {available.length === 0 ? (
-          <p className="px-0.5 py-3 text-[11.5px] text-muted-soft">
-            더 추가할 수 있는 항목이 없습니다
-          </p>
-        ) : (
+      {/*
+        더 넣을 것이 없으면 이 묶음을 **아예 그리지 않습니다** — 빈 자리에 "없습니다" 를
+        적어두면 목록 끝이 비어 보이기만 하고, 그 자리는 아래의 '텍스트 상자 추가' 가 씁니다.
+      */}
+      {available.length > 0 && (
+        <section>
+          <h3 className="mb-2 text-[11px] tracking-wide text-muted-soft">추가할 수 있는 것</h3>
           <div className="flex flex-col gap-1.5">
             {available.map((key) => {
               const m = meta[key];
@@ -153,8 +153,8 @@ export function SectionManager({ active, meta, bg, onReorder, onRemove, onAdd, o
               );
             })}
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

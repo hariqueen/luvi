@@ -100,6 +100,26 @@ function Block({
           ⠿
         </span>
       )}
+      {IS_PREVIEW && (
+        /**
+         * **이 문구 지우기.** 글자를 다 지워도 사라지지만, PPT 처럼 "상자를 고르고 지운다" 를
+         * 기대한 사람에게는 **누를 것이 보여야** 합니다 — 다 지웠는데도 안 사라지는 것처럼
+         * 보이던 자리입니다. 손잡이(⠿)와 같은 규칙으로 항상 옅게 보입니다.
+         */
+        <span
+          role="button"
+          tabIndex={-1}
+          title="이 문구 지우기"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            notifyBlockEdit(section, zone, block.id, '', true);
+          }}
+          className="absolute -right-[17px] top-1/2 -translate-y-1/2 cursor-pointer select-none text-[12px] font-normal leading-none tracking-normal text-gold-deep opacity-30 transition-opacity group-hover:opacity-100"
+        >
+          ✕
+        </span>
+      )}
       <span
         className="whitespace-pre-line"
         style={block.scale && block.scale !== 1 ? { fontSize: `${block.scale}em` } : undefined}
