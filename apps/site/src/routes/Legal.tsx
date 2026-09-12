@@ -47,7 +47,9 @@ export default function Legal({ kind }: { kind: DocKind }) {
   const isCurrent = version === current;
 
   return (
-    <main className="mx-auto w-full max-w-[760px] px-[clamp(16px,4vw,28px)] py-[clamp(32px,6vw,64px)]">
+    // ⚠️ `<main>` 을 쓰지 않습니다 — `SiteLayout` 이 이미 `<main>` 안에서 Outlet 을 그립니다.
+    //    중첩되면 잘못된 HTML 이고 스크린리더가 문서의 주 영역을 둘로 봅니다.
+    <article className="mx-auto w-full max-w-[760px] px-[clamp(16px,4vw,28px)] py-[clamp(32px,6vw,64px)]">
       <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-muted">Legal</p>
 
       <div className="mb-8 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -91,6 +93,6 @@ export default function Legal({ kind }: { kind: DocKind }) {
       <p className="mt-10 text-[12px] text-muted">
         문의: <a href="mailto:help@luv-ai.co.kr" className="text-gold underline underline-offset-2">help@luv-ai.co.kr</a>
       </p>
-    </main>
+    </article>
   );
 }
