@@ -194,31 +194,15 @@ try {
     201,
   );
 
-  console.log('\n[3] 청첩장 생성 · 발행');
+  console.log('\n[3] 청첩장 생성');
   invitationId = must(
     '청첩장 생성',
     await api('POST', '/api/invitations', { token: idToken, body: {} }),
     201,
   ).id;
-  slug = `e2e-del-${stamp.toString(36)}`;
-  const published = must(
-    '발행',
-    await api('POST', `/api/invitations/${invitationId}/publish`, {
-      token: idToken,
-      body: { slug },
-    }),
-  );
-  console.log(`  invitationId=${invitationId} slug=${published.slug}`);
-  slug = published.slug;
+  console.log(`  invitationId=${invitationId}`);
 
-  console.log('\n[4] 방명록 · 업로드 자산 남기기');
-  must(
-    '방명록',
-    await api('POST', `/api/invitations/${invitationId}/guestbook`, {
-      body: { name: 'E2E하객', msg: '탈퇴 검증용 글입니다' },
-    }),
-    201,
-  );
+  console.log('\n[4] 사진 업로드');
   {
     // 1x1 투명 PNG
     const png = Buffer.from(
@@ -229,12 +213,7 @@ try {
       '업로드 서명',
       await api('POST', '/api/assets/sign', {
         token: idToken,
-        body: {
-          invitationId,
-          kind: 'gallery',
-          contentType: 'image/png',
-          size: png.byteLength,
-        },
+        body: { invitationId, kind: 'cover', contentType: 'image/png', size: png.byteLength },
       }),
     );
     assetKey = signed.key;
@@ -251,17 +230,47 @@ try {
     console.log(`  assetKey=${assetKey}`);
   }
 
-  console.log('\n[5] 삭제 전 — 실제로 존재하는지 확인 (검사 자체가 맞는지 보는 대조군)');
+  console.log('\n[5] 커버 지정 · 발행');
+  // 커버 사진이 없으면 발행이 막힙니다 (하객이 빈칸을 보는 것보다 낫다는 판단).
+  // 에디터와 같은 경로로 채웁니다 — 점 표기 패치.
+  must(
+    '커버 지정',
+    await api('PATCH', `/api/invitations/${invitationId}`, {
+      token: idToken,
+      body: { patch: { 'core.cover.image': { key: assetKey, w: 1, h: 1, alt: 'e2e' } } },
+    }),
+  );
+  slug = `e2e-del-${stamp.toString(36)}`;
+  const published = must(
+    '발행',
+    await api('POST', `/api/invitations/${invitationId}/publish`, {
+      token: idToken,
+      body: { slug },
+    }),
+  );
+  slug = published.slug;
+  console.log(`  slug=${slug}`);
+
+  console.log('\n[6] 방명록 남기기');
+  must(
+    '방명록',
+    await api('POST', `/api/invitations/${invitationId}/guestbook`, {
+      body: { name: 'E2E하객', msg: '탈퇴 검증용 글입니다' },
+    }),
+    201,
+  );
+
+  console.log('\n[7] 삭제 전 — 실제로 존재하는지 확인 (검사 자체가 맞는지 보는 대조군)');
   check('발행본이 공개 조회된다', (await api('GET', `/api/public/i/${slug}`)).status === 200);
   check('업로드 자산이 서빙된다', (await fetch(`${API}/api/assets/${assetKey}`)).status === 200);
   check('방명록이 1건 있다', (await fsSubCount(`invitations/${invitationId}`, 'guestbook')) === 1);
   check('동의 이력이 4건 있다', (await fsCountBy('consents', 'uid', uid)) === 4);
 
-  console.log('\n[6] 🔴 탈퇴 실행');
+  console.log('\n[8] 🔴 탈퇴 실행');
   const result = must('탈퇴', await api('DELETE', '/api/account', { token: idToken }));
   console.log(`  삭제된 청첩장 ${result.deletedInvitations}건`);
 
-  console.log('\n[7] 잔존물 검사 — 여기서 하나라도 🔴 면 방침 제7조가 허위가 됩니다');
+  console.log('\n[9] 잔존물 검사 — 여기서 하나라도 🔴 면 방침 제7조가 허위가 됩니다');
 
   check('users/{uid} 문서 없음', (await fsGet(`users/${uid}`)) === null);
   check('invitations 소유 문서 0건', (await fsCountBy('invitations', 'ownerUid', uid)) === 0);
@@ -302,17 +311,43 @@ try {
   console.error(`\n🔴 중단: ${e.message}`);
   results.push({ label: `예외: ${e.message}`, passed: false });
 } finally {
-  // 테스트가 중간에 죽어 계정이 남았으면 치웁니다 (남기면 다음 실행이 이메일 중복으로 깨집니다)
+  /**
+   * 테스트가 중간에 죽었을 때의 정리.
+   *
+   * 🔴 **Auth 계정만 지우면 안 됩니다.** 2026-09-12 에 그렇게 만들어 돌렸다가, 발행
+   *    단계에서 실패하자 계정만 사라지고 **청첩장 문서가 고아로 남았습니다**
+   *    (ownerUid 가 존재하지 않는 계정을 가리킴 — 아무도 지울 수 없는 상태).
+   *
+   * 그래서 정상 탈퇴 경로(`DELETE /api/account`)를 먼저 부릅니다. 그게 청첩장·자산·
+   * 스냅샷·동의이력·Auth 계정을 순서대로 치웁니다. 실패했을 때만 Auth 계정을 직접
+   * 지우고, 남은 것을 사람이 볼 수 있게 ID 를 출력합니다.
+   */
   if (uid) {
-    try {
-      const token = await saToken('https://www.googleapis.com/auth/identitytoolkit');
-      await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:delete`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ localId: uid }),
-      });
-    } catch {
-      console.warn(`  ⚠️ 정리 실패 — uid=${uid} 를 콘솔에서 확인하세요`);
+    let cleaned = false;
+    if (idToken) {
+      const r = await api('DELETE', '/api/account', { token: idToken }).catch(() => null);
+      cleaned = r?.status === 200;
+    }
+    if (!cleaned) {
+      console.warn(
+        `  ⚠️ 정상 탈퇴 경로로 정리하지 못했습니다. 아래를 직접 확인하세요:\n` +
+          `     uid=${uid}\n` +
+          `     invitationId=${invitationId ?? '없음'}\n` +
+          `     slug=${slug ?? '없음'}  assetKey=${assetKey ?? '없음'}`,
+      );
+      try {
+        const token = await saToken('https://www.googleapis.com/auth/identitytoolkit');
+        await fetch(
+          `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:delete`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ localId: uid }),
+          },
+        );
+      } catch {
+        console.warn(`  ⚠️ Auth 계정 삭제도 실패했습니다 — 콘솔에서 uid=${uid} 를 지우세요`);
+      }
     }
   }
 }
