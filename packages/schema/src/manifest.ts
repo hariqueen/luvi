@@ -118,6 +118,15 @@ export interface SectionDef {
   /** false 면 사용자가 청첩장에서 뺄 수 있다 */
   required: boolean;
   /**
+   * 섹션 전체에 걸리는 주의 문구 — 필드들 **위에** 눈에 띄게 그립니다.
+   *
+   * 개별 필드의 `hint` 와 다릅니다. `hint` 는 "이 칸에 뭘 넣나" 를 설명하고,
+   * 이건 **"이 정보를 넣으면 어떤 일이 벌어지나"** 를 알립니다 — 남의 개인정보를
+   * 입력하는 자리(혼주)와 발행 즉시 공개되는 자리(계좌)에 필요합니다.
+   * 개인정보처리방침 제10조(이용자가 입력하는 제3자 정보에 대한 책임)의 실질적 근거입니다.
+   */
+  notice?: string;
+  /**
    * 이 섹션을 어떤 UI 로 편집하는지.
    * `form`(기본) — 매니페스트 필드로 폼 생성 / `canvas` — 사진 위 자유 배치 (커버)
    */
@@ -141,6 +150,9 @@ export const CORE_SECTIONS: SectionDef[] = [
     key: 'couple',
     label: '기본 정보',
     required: true,
+    // 혼주 줄에는 **본인이 아닌 사람(양가 부모)의 실명**이 들어갑니다.
+    notice:
+      '혼주 줄에는 양가 부모님 성함이 들어갑니다. 입력 전에 그분들께 동의를 받으셨는지 확인해 주세요.',
     fields: [
       { path: 'core.couple.groom.name', type: 'text', label: '신랑 이름', required: true, maxLength: 20 },
       { path: 'core.couple.groom.nameEn', type: 'text', label: '신랑 영문 이름', maxLength: 30 },
@@ -252,6 +264,9 @@ export const CORE_SECTIONS: SectionDef[] = [
     key: 'account',
     label: '마음 전하기',
     required: false,
+    // 발행된 청첩장은 주소만 알면 누구나 열 수 있습니다 — 계좌번호도 함께 보입니다.
+    notice:
+      '발행하면 청첩장 주소를 아는 누구나 이 계좌번호를 볼 수 있습니다. 넣을지는 직접 판단해 주세요.',
     fields: [
       { path: 'core.account.description', type: 'textarea', label: '안내 문구', rows: 3, maxLength: 300, previewEdit: true },
       {

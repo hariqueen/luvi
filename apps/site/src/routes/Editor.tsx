@@ -827,6 +827,17 @@ export default function Editor() {
           툴바에서 바꿔요.
         </p>
       )}
+      {/*
+        섹션 주의 문구 — 남의 개인정보를 넣는 자리(혼주)와 발행 즉시 공개되는 자리(계좌)에만
+        붙습니다. 필드 `hint` 와 달리 "이걸 넣으면 어떤 일이 벌어지나" 를 알리는 것이라
+        눈에 띄어야 하고, 그래서 필드들 **위에** 다른 색으로 그립니다.
+      */}
+      {activeForm.notice && (
+        <p className="rounded-lg border border-gold/40 bg-gold/5 px-3 py-2.5 text-[11.5px] leading-relaxed text-ink">
+          {activeForm.notice}
+        </p>
+      )}
+
       {/* 배경색은 섹션 전체에 걸리는 값이라 필드들 위에 둡니다 */}
       {formSectionKey && (
         <>
