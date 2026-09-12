@@ -20,38 +20,26 @@ export interface SocialProfile {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
-  /**
-   * 휴대전화번호. **네이버만 값이 옵니다** — 카카오는 비즈 앱 + 별도 검수 등급이라
-   * 대부분의 사용자는 null 입니다. "전화번호가 있다" 를 전제한 코드를 쓰면 안 됩니다.
-   *
-   * 🔴 이 값은 **클라이언트로 돌려주지 않습니다.** 주문 연락용으로 서버에만 보관합니다 —
-   *    브라우저에 내려보내면 노출 지점이 늘어날 뿐 화면에서 쓸 데가 없습니다.
-   */
-  phone: string | null;
 }
 
 /**
- * 전화번호 표기 정규화.
+ * 🔴 휴대전화번호는 **읽지도 저장하지도 않습니다** (2026-09-12 제거).
  *
- * 네이버는 `010-1234-5678`, 카카오는 `+82 10-1234-5678` 형태로 줍니다.
- * 그대로 저장하면 같은 번호가 두 가지 문자열로 쌓여 중복 판별·검색이 깨집니다.
- * 숫자만 남긴 뒤 국가번호를 국내 표기로 되돌립니다.
+ * 원래 네이버에서 받아 `users/{uid}.phone` 에 넣고 있었는데, 용도로 적어둔
+ * "종이 청첩장 주문 연락용" 기능이 없었습니다. 쓰지 않는 개인정보를 들고 있는 것은
+ * 개인정보 최소수집 원칙에 어긋나고, 유출 시 피해만 커집니다.
+ *
+ * **다시 넣고 싶다면 무엇을 확인해야 하는가:**
+ * 1. 중복 가입 판별(같은 사람이 카카오·네이버로 따로 가입하는 것)이 목적이라면 —
+ *    카카오는 **비즈 앱 전환 + 전화번호 동의항목 심사**를 통과해야 번호를 줍니다.
+ *    그 전까지는 네이버 번호만 쌓이고 **비교할 상대가 없어 매칭이 성립하지 않습니다.**
+ *    판별의 대부분은 이메일로 되므로 이메일 매칭을 먼저 쓰십시오.
+ * 2. 저장한다면 **평문이 아니라 HMAC 해시**로 (`lib/secrets.ts` 의 `hashIp` 와 같은 패턴).
+ *    매칭에는 원문이 필요 없고, 방침에도 "해시값·원문 미보관" 으로 적을 수 있습니다.
+ * 3. 네이버 개발자센터의 제공 항목과 개인정보처리방침 제2조 표를 **함께** 고쳐야 합니다.
+ *
+ * 주문 연락처는 그때 주문 화면에서 직접 입력받는 것이 맞습니다.
  */
-function normalizePhone(raw: string | undefined): string | null {
-  if (!raw) return null;
-  const digits = raw.replace(/[^\d+]/g, '');
-  if (!digits) return null;
-
-  // +8210xxxxxxxx → 010xxxxxxxx
-  const local = digits.startsWith('+82')
-    ? `0${digits.slice(3)}`
-    : digits.startsWith('82') && digits.length > 10
-      ? `0${digits.slice(2)}`
-      : digits;
-
-  const onlyDigits = local.replace(/\D/g, '');
-  return onlyDigits.length >= 9 ? onlyDigits : null;
-}
 
 export class SocialAuthError extends Error {
   constructor(
@@ -92,8 +80,6 @@ interface KakaoMe {
   id?: number;
   kakao_account?: {
     email?: string;
-    /** 비즈 앱 + 별도 검수 등급. 대부분의 앱에서는 오지 않습니다 */
-    phone_number?: string;
     profile?: { nickname?: string; profile_image_url?: string };
   };
 }
@@ -117,8 +103,6 @@ async function fetchKakaoProfile(accessToken: string): Promise<SocialProfile> {
     email: json.kakao_account?.email ?? null,
     displayName: profile?.nickname ?? null,
     photoURL: profile?.profile_image_url ?? null,
-    // 카카오는 '+82 10-1234-5678' 형태로 줍니다 (동의항목이 열려 있는 경우에만)
-    phone: normalizePhone(json.kakao_account?.phone_number),
   };
 }
 
@@ -133,10 +117,6 @@ interface NaverMe {
     name?: string;
     nickname?: string;
     profile_image?: string;
-    /** '010-1234-5678' */
-    mobile?: string;
-    /** '+821012345678' — 있으면 이쪽이 더 정확합니다 */
-    mobile_e164?: string;
   };
 }
 
@@ -160,7 +140,6 @@ async function fetchNaverProfile(accessToken: string): Promise<SocialProfile> {
     email: r?.email ?? null,
     displayName: r?.name ?? r?.nickname ?? null,
     photoURL: r?.profile_image ?? null,
-    phone: normalizePhone(r?.mobile_e164 ?? r?.mobile),
   };
 }
 

@@ -4,8 +4,13 @@
  * `role` 은 **여기서만** 읽습니다. 클라이언트가 보낸 값이나 토큰 클레임으로 판단하면
  * 커스텀 토큰을 발급하는 우리 코드가 곧 권한 부여 지점이 되어버립니다.
  */
-import type { UserRole } from '@luvi/schema';
-import { decodeFields, encode, fsTimestamp, type Firestore } from '../lib/firestore';
+import {
+  toConsentStatus,
+  type AccountProfile,
+  type ConsentDocType,
+  type UserRole,
+} from '@luvi/schema';
+import { decodeFields, encode, fsTimestamp, where, type Firestore } from '../lib/firestore';
 
 const COLLECTION = 'users';
 const userPath = (uid: string) => `${COLLECTION}/${uid}`;
@@ -17,14 +22,6 @@ export interface UpsertUserInput {
   photoURL: string | null;
   /** 'password' | 'google.com' | 'kakao' | 'naver' */
   provider: string;
-  /**
-   * 휴대전화번호 — **주문(종이 청첩장) 연락용으로만** 보관합니다.
-   *
-   * 네이버 로그인에서만 값이 옵니다. 카카오·구글·이메일 가입자는 null 이라
-   * **주문 화면에서 직접 입력받는 경로가 반드시 있어야 합니다.**
-   * 이 값은 클라이언트로 내려보내지 않습니다.
-   */
-  phone?: string | null;
 }
 
 /**
@@ -38,17 +35,14 @@ export async function upsertUser(db: Firestore, input: UpsertUserInput): Promise
   const existing = await db.get(userPath(input.uid));
 
   const fields = {
-    // email·displayName·photoURL 도 "값이 있을 때만" 씁니다. 소셜 로그인 직후
+    // email·displayName·photoURL 은 "값이 있을 때만" 씁니다. 소셜 로그인 직후
     // 클라이언트가 이어서 호출하는 /api/auth/session 동기화는 커스텀토큰(카카오·네이버)
     // 계정의 idToken 에 email·이름이 없어 null 을 보내는데, 그대로 덮으면 방금 소셜에서
-    // 저장한 email·이름이 지워집니다 (아래 phone 과 똑같은 이유).
+    // 저장한 email·이름이 지워집니다.
     ...(input.email ? { email: encode(input.email) } : {}),
     ...(input.displayName ? { displayName: encode(input.displayName) } : {}),
     ...(input.photoURL ? { photoURL: encode(input.photoURL) } : {}),
     lastLoginAt: fsTimestamp(now),
-    // 값이 있을 때만 씁니다. null 로 덮으면 네이버로 한 번 받아둔 번호가
-    // 다음에 카카오로 로그인하는 순간 지워집니다
-    ...(input.phone ? { phone: encode(input.phone) } : {}),
     ...(existing
       ? {}
       : {
@@ -84,6 +78,118 @@ export async function readRole(db: Firestore, uid: string): Promise<UserRole> {
   const doc = await db.get(userPath(uid));
   if (!doc) return 'user';
   return decodeFields(doc.fields).role === 'admin' ? 'admin' : 'user';
+}
+
+/** 동의 게이트 판정에 쓸 사본. 원본은 `consents` 컬렉션입니다 (`repo/consents.ts`) */
+export async function readConsentVersions(
+  db: Firestore,
+  uid: string,
+): Promise<Partial<Record<ConsentDocType, string>>> {
+  const doc = await db.get(userPath(uid));
+  return extractConsentVersions(doc ? decodeFields(doc.fields) : {});
+}
+
+function extractConsentVersions(f: Record<string, unknown>): Partial<Record<ConsentDocType, string>> {
+  const raw = f.consentVersions;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+
+  const out: Partial<Record<ConsentDocType, string>> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === 'string') out[k as ConsentDocType] = v;
+  }
+  return out;
+}
+
+const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+
+/** 계정 설정 화면에 돌려줄 내 정보 */
+export async function readAccount(db: Firestore, uid: string): Promise<AccountProfile | null> {
+  const doc = await db.get(userPath(uid));
+  if (!doc) return null;
+
+  const f = decodeFields(doc.fields);
+  return {
+    uid,
+    email: str(f.email),
+    displayName: str(f.displayName),
+    photoURL: str(f.photoURL),
+    providers: Array.isArray(f.providers)
+      ? f.providers.filter((p): p is string => typeof p === 'string')
+      : [],
+    plan: str(f.plan) ?? 'free',
+    role: f.role === 'admin' ? 'admin' : 'user',
+    createdAt: str(f.createdAt) ?? doc.createTime,
+    lastLoginAt: str(f.lastLoginAt),
+    consent: toConsentStatus(extractConsentVersions(f)),
+  };
+}
+
+/**
+ * 표시 이름 변경 · 프로필 사진 해제.
+ *
+ * 사진 해제는 `photoURL` 을 **빈 문자열로 덮지 않고 필드를 지웁니다** — 빈 문자열이 남으면
+ * `upsertUser` 의 "값이 있을 때만 쓴다" 규칙에 걸리지 않아 다음 로그인에 제공자 사진이
+ * 되살아납니다. 필드가 없어야 그 규칙이 의도대로 동작합니다.
+ *
+ * ⚠️ 다만 **다음 소셜 로그인 때 사진이 다시 저장됩니다** (제공자가 값을 주므로).
+ *    영구적으로 원치 않는다면 각 제공자 콘솔의 동의항목에서 프로필 사진을 빼야 합니다.
+ */
+export async function updateAccount(
+  db: Firestore,
+  uid: string,
+  patch: { displayName?: string; clearPhoto?: boolean },
+): Promise<void> {
+  const fields: Record<string, ReturnType<typeof encode>> = {};
+  const mask: string[] = [];
+
+  if (patch.displayName !== undefined) {
+    fields.displayName = encode(patch.displayName);
+    mask.push('displayName');
+  }
+  if (patch.clearPhoto) {
+    mask.push('photoURL'); // 값을 넣지 않으면 삭제됩니다
+  }
+  if (mask.length === 0) return;
+
+  await db.commit([
+    { update: { name: db.docName(userPath(uid)), fields }, updateMask: { fieldPaths: mask } },
+  ]);
+}
+
+/**
+ * 같은 이메일을 쓰는 **다른** 계정을 찾습니다 (중복 가입 안내용).
+ *
+ * 🔴 **찾았다고 자동으로 병합하지 마세요.** 남의 이메일로 가입해 그 계정에 올라타는
+ *    탈취 경로가 됩니다. 기존 로그인 수단을 안내만 하고, 실제 연결은 **기존 계정으로
+ *    로그인한 상태에서** 계정 설정 화면을 통해야 합니다.
+ */
+export async function findByEmail(
+  db: Firestore,
+  email: string,
+  excludeUid: string,
+): Promise<{ uid: string; providers: string[] } | null> {
+  const docs = await db.query('', {
+    from: [{ collectionId: COLLECTION }],
+    where: where('email', 'EQUAL', email),
+    limit: 5,
+  });
+
+  for (const doc of docs) {
+    if (doc.id === excludeUid) continue;
+    const f = decodeFields(doc.fields);
+    return {
+      uid: doc.id,
+      providers: Array.isArray(f.providers)
+        ? f.providers.filter((p): p is string => typeof p === 'string')
+        : [],
+    };
+  }
+  return null;
+}
+
+/** 탈퇴 — 사용자 문서를 지웁니다. 이미 없으면 조용히 넘어갑니다(재시도 가능) */
+export async function deleteUser(db: Firestore, uid: string): Promise<void> {
+  await db.commit([{ delete: db.docName(userPath(uid)) }]);
 }
 
 export interface OwnerProfile {
