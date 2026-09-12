@@ -34,8 +34,14 @@ import type {
   SocialAuthBody,
   SocialAuthResult,
   UpdateDraftBody,
+  AccountProfile,
+  ConsentRecord,
+  DeleteAccountResult,
+  ExistingAccountHint,
+  SubmitConsentsBody,
+  UpdateAccountBody,
 } from '@luvi/schema';
-import { parseThemeId } from '@luvi/schema';
+import { DOC_VERSIONS, isRequiredConsent, parseThemeId, toConsentStatus } from '@luvi/schema';
 
 import { createCustomToken } from './lib/customToken';
 import { resolveSocialProfile } from './lib/social';
@@ -59,10 +65,12 @@ import {
   invitationIdFromKey,
   isAllowedContentType,
 } from './lib/assets';
+import { deleteAuthAccount } from './lib/identityToolkit';
 import * as invitationsRepo from './repo/invitations';
 import * as guestbookRepo from './repo/guestbook';
 import * as rankingsRepo from './repo/rankings';
 import * as usersRepo from './repo/users';
+import * as consentsRepo from './repo/consents';
 import { createFormEntry } from './repo/forms';
 import { sampleContent } from './sample';
 
@@ -76,6 +84,13 @@ export interface Env {
   LUVI_LOGS?: D1Database;
   /** 업로드된 이미지·오디오 */
   LUVI_ASSETS: R2Bucket;
+  /**
+   * 재동의 게이트 on/off. `"true"` 일 때만 미동의 회원의 생성·편집·발행을 막습니다.
+   *
+   * 🔴 **동의 화면(3단계)이 배포되기 전에 켜지 마세요** — 기존 회원이 동의할 방법 없이
+   *    잠깁니다. 자세한 이유는 `requireConsent()` 주석.
+   */
+  CONSENT_ENFORCED?: string;
   /** 에셋 서빙 베이스 */
   CDN_BASE: string;
   /** 정식 도메인 */
@@ -126,6 +141,10 @@ const STATUS: Record<ApiError['code'], 400 | 401 | 403 | 404 | 409 | 429 | 500> 
   claim_expired: 400,
   claim_used: 409,
   rate_limited: 429,
+  // 인증은 됐지만 재동의 전까지 이 동작을 허용하지 않습니다 — 401 이 아니라 403 입니다.
+  // 401 로 주면 클라이언트가 "토큰 만료" 로 보고 로그아웃시켜, 동의할 화면조차 못 엽니다.
+  consent_required: 403,
+  account_exists: 409,
   internal: 500,
 };
 
@@ -272,7 +291,11 @@ async function audit(
   c: Context<{ Bindings: Env; Variables: Vars }>,
   input: {
     name: string;
-    invitationId: string;
+    /**
+     * 대상 청첩장. **계정 단위 사건(탈퇴·동의)에는 없습니다** — 그때는 생략하고,
+     * "누가" 는 `uid` 로만 남습니다.
+     */
+    invitationId?: string;
     detail?: string;
     /**
      * 그 청첩장의 소유자 uid. 주면 `by=owner` / `by=admin` 을 앞에 붙입니다 —
@@ -297,7 +320,7 @@ async function audit(
       name: input.name.slice(0, 60),
       ok: 1,
       detail: detail || null,
-      invitationId: input.invitationId.slice(0, 60),
+      invitationId: input.invitationId?.slice(0, 60) ?? null,
       slug: null,
       session: null,
       uid: c.get('uid'),
@@ -477,6 +500,7 @@ app.get('/api/invitations/:id', async (c) => {
 app.post('/api/invitations', async (c) => {
   const uid = requireUid(c);
   const db = firestore(c.env);
+  await requireConsent(c.env, db, uid);
   const body = await readJson<CreateInvitationBody>(c.req);
 
   /**
@@ -520,6 +544,7 @@ app.patch('/api/invitations/:id', async (c) => {
   const db = firestore(c.env);
   const id = c.req.param('id');
   await requireOwned(c, db, id);
+  await requireConsent(c.env, db, requireUid(c));
 
   const body = await readJson<UpdateDraftBody>(c.req);
 
@@ -558,6 +583,7 @@ app.post('/api/invitations/:id/publish', async (c) => {
   const db = firestore(c.env);
   const id = c.req.param('id');
   const invitation = await requireOwned(c, db, id);
+  await requireConsent(c.env, db, requireUid(c));
 
   const { slug: rawSlug } = await readJson<{ slug: string }>(c.req);
   const slug = (rawSlug ?? invitation.slug).trim().toLowerCase();
@@ -981,6 +1007,11 @@ app.get('/api/assets/*', async (c) => {
       'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream',
       'Cache-Control': object.httpMetadata?.cacheControl ?? IMMUTABLE_CACHE,
       ETag: object.httpEtag,
+      // 🔴 업로드된 청첩장 사진은 HTML 이 아니라 `<meta name="robots">` 를 넣을 자리가 없다.
+      //    헤더로 색인을 막는다 — 없으면 사진이 이미지 검색에 걸리는 통로가 열려 있다.
+      //    뷰어 HTML 의 noindex 는 페이지만 막지, 사진 URL 이 따로 알려지는 경로는 못 막는다.
+      //    ⚠️ robots.txt 로 이 경로를 Disallow 하면 크롤러가 이 헤더를 못 읽으니 하지 말 것.
+      'X-Robots-Tag': 'noindex, noimageindex, noarchive',
     },
   });
 });
@@ -1086,9 +1117,16 @@ app.post('/api/auth/:provider', async (c) => {
       provider: body.provider ?? 'password',
     });
 
-    // 권한을 함께 돌려줍니다 — 화면이 '운영자' 메뉴를 보여줄지 판단할 근거가 여기 말고 없습니다.
+    // 권한과 동의 상태를 함께 돌려줍니다 — 화면이 '운영자' 메뉴를 보여줄지, 재동의 모달을
+    // 띄울지 판단할 근거가 여기 말고 없습니다.
     // (토큰 클레임으로 내려보내면 커스텀 토큰을 만드는 우리 코드가 권한 부여 지점이 됩니다)
-    return c.json(ok<SessionResult>({ uid, role: await usersRepo.readRole(db, uid) }));
+    return c.json(
+      ok<SessionResult>({
+        uid,
+        role: await usersRepo.readRole(db, uid),
+        consent: toConsentStatus(await usersRepo.readConsentVersions(db, uid)),
+      }),
+    );
   }
 
   if (provider !== 'kakao' && provider !== 'naver') {
@@ -1117,6 +1155,10 @@ app.post('/api/auth/:provider', async (c) => {
       },
     });
 
+    // 🔴 커스텀 토큰을 만들기 **전에** 중복 가입을 막습니다. 토큰을 먼저 내주면
+    //    클라이언트가 이미 로그인해버린 뒤라 되돌릴 방법이 없습니다.
+    await assertNoExistingAccount(firestore(c.env), profile);
+
     const customToken = await createCustomToken({
       clientEmail: sa.clientEmail,
       privateKeyPem: sa.privateKeyPem,
@@ -1135,7 +1177,7 @@ app.post('/api/auth/:provider', async (c) => {
     };
 
     // 프로필 저장은 실패해도 로그인을 막지 않습니다 — 다음 로그인에 다시 시도됩니다.
-    // 전화번호는 여기서 Firestore 로만 들어갑니다 — 위 result 에는 넣지 않습니다
+    // 전화번호는 더 이상 받지도 저장하지도 않습니다 (2026-09-12, 사유는 lib/social.ts 주석)
     try {
       await usersRepo.upsertUser(firestore(c.env), {
         uid: profile.uid,
@@ -1143,7 +1185,6 @@ app.post('/api/auth/:provider', async (c) => {
         displayName: profile.displayName,
         photoURL: profile.photoURL,
         provider: profile.provider,
-        phone: profile.phone,
       });
     } catch (e) {
       console.error('[api] 사용자 문서 저장 실패', e);
@@ -1159,6 +1200,255 @@ app.post('/api/auth/:provider', async (c) => {
   }
 
   return c.json(ok(result));
+});
+
+/**
+ * 중복 가입 차단 — 같은 이메일의 계정이 이미 있으면 **기존 수단으로 로그인하도록 안내**합니다.
+ *
+ * 🔴 **자동으로 병합하지 않습니다.** 남의 이메일로 새 수단을 붙여 그 계정에 올라타는
+ *    탈취 경로가 되기 때문입니다. 실제 계정 연결은 *기존 계정으로 로그인한 상태에서*
+ *    계정 설정 화면을 통해서만 이루어져야 합니다.
+ *
+ * **이미 가입한 사람은 그냥 통과합니다** — `users/{uid}` 문서가 있으면 재방문이므로
+ * 검사 대상이 아닙니다. 검사는 *처음 들어온 uid* 에만 겁니다.
+ *
+ * ⚠️ **적용 범위는 카카오·네이버뿐입니다.** 구글·이메일 로그인은 클라이언트가 Firebase 로
+ *    직접 인증해 이 라우트를 지나지 않습니다. 그쪽은 Firebase 콘솔의
+ *    **"이메일 주소당 계정 하나"(One account per email address)** 설정으로 막아야 합니다.
+ *
+ * ⚠️ 알려진 한계: 공격자가 피해자의 이메일로 먼저 계정을 만들어 두면, 피해자의 소셜
+ *    로그인이 이 검사에 막힙니다(계정 탈취는 아니고 가입 방해). 복구 경로는 문의 창구이며,
+ *    안내 문구에 그 주소를 함께 노출합니다.
+ */
+async function assertNoExistingAccount(
+  db: Firestore,
+  profile: { uid: string; email: string | null },
+): Promise<void> {
+  if (!profile.email) return; // 매칭할 키가 없으면 판단하지 않습니다
+
+  // 재방문자는 검사하지 않습니다 (자기 자신과 부딪히는 것을 막는 것이 아니라, 읽기를 아낍니다)
+  if (await db.get(`users/${profile.uid}`)) return;
+
+  const existing = await usersRepo.findByEmail(db, profile.email, profile.uid);
+  if (!existing) return;
+
+  const hint: ExistingAccountHint = {
+    maskedEmail: maskEmail(profile.email),
+    providers: existing.providers,
+  };
+  throw new HttpError({
+    code: 'account_exists',
+    message:
+      `${hint.maskedEmail} 로 이미 가입된 계정이 있습니다. ` +
+      `${describeProviders(existing.providers)}(으)로 로그인해 주세요. ` +
+      '본인 계정이 아니라면 help@luv-ai.co.kr 로 문의해 주세요',
+    fields: [{ path: 'email', message: JSON.stringify(hint) }],
+  });
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  kakao: '카카오',
+  naver: '네이버',
+  'google.com': '구글',
+  password: '이메일',
+};
+
+function describeProviders(providers: string[]): string {
+  const labels = providers.map((p) => PROVIDER_LABELS[p] ?? p);
+  return labels.length > 0 ? labels.join('·') : '기존 로그인 수단';
+}
+
+/** `hariqueen@naver.com` → `har***@naver.com`. 본인 확인용이지 노출용이 아닙니다 */
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  if (at <= 0) return '***';
+  const local = email.slice(0, at);
+  const head = local.slice(0, Math.min(3, local.length));
+  return `${head}***${email.slice(at)}`;
+}
+
+// ─────────────────────────── 계정 · 동의 ───────────────────────────
+
+/**
+ * 재동의 게이트 — **편집·발행을 막고, 열람은 막지 않습니다.**
+ *
+ * 🔴 이미 발행된 청첩장의 하객 경로(`/api/public/i/:slug`)에는 **절대 걸지 마세요.**
+ *    소유자가 약관에 재동의하지 않았다는 이유로 하객이 청첩장을 못 보게 되면, 예식을
+ *    앞둔 사람에게는 서비스 장애와 같습니다. 막을 것은 *새로 쓰는 행위*뿐입니다.
+ *
+ * 비용: 문서 읽기 1회가 늘어납니다. 자동저장(PATCH)마다 발생하지만 현재 규모에서는
+ * 무시할 수준이고, 토큰 클레임에 넣어 아끼는 방식은 **권한 부여 지점이 커스텀 토큰을
+ * 만드는 우리 코드가 되어버려** `repo/users.ts` 의 `role` 과 같은 이유로 쓰지 않습니다.
+ */
+async function requireConsent(env: Env, db: Firestore, uid: string): Promise<void> {
+  /**
+   * 🔴 **동의 화면이 배포되기 전까지 이 게이트는 꺼져 있어야 합니다.**
+   *
+   * 게이트만 먼저 올리면 기존 회원 전원이 `consentVersions` 가 없어 403 을 받는데,
+   * 동의할 화면이 없으니 **빠져나올 방법이 없습니다.** 청첩장을 고칠 수도 발행할 수도
+   * 없게 되고, 예식을 앞둔 사람에게는 그대로 서비스 장애입니다.
+   *
+   * 그래서 기본값이 꺼짐입니다. **3단계(동의 화면·재동의 모달)가 배포된 뒤**
+   * `wrangler.toml` 의 `CONSENT_ENFORCED` 를 `"true"` 로 바꾸고 재배포하세요.
+   * 그 전까지 동의 기록(`POST /api/consents`)은 정상 동작하므로, 화면이 올라오면
+   * 신규 가입자부터 자연스럽게 채워집니다.
+   */
+  if (env.CONSENT_ENFORCED !== 'true') return;
+
+  const status = toConsentStatus(await usersRepo.readConsentVersions(db, uid));
+  if (status.satisfied) return;
+
+  throw new HttpError({
+    code: 'consent_required',
+    message: '개정된 약관에 동의하면 계속 이용하실 수 있습니다',
+    fields: status.missing.map((docType) => ({ path: docType, message: '동의가 필요합니다' })),
+  });
+}
+
+app.get('/api/consents', async (c) => {
+  const uid = requireUid(c);
+  return c.json(ok<ConsentRecord[]>(await consentsRepo.listConsents(firestore(c.env), uid)));
+});
+
+/**
+ * 동의 기록. 신규 가입·재동의·설정 변경이 모두 여기를 지납니다.
+ *
+ * 철회(선택 항목)도 같은 경로로 들어오고, 기존 레코드를 고치지 않고 **새 레코드**로 남습니다.
+ */
+app.post('/api/consents', async (c) => {
+  const uid = requireUid(c);
+  const body = await readJson<SubmitConsentsBody>(c.req);
+
+  const method = body.method;
+  if (method !== 'signup' && method !== 'reconsent' && method !== 'settings') {
+    throw new HttpError({ code: 'validation_failed', message: '잘못된 동의 경로입니다' });
+  }
+
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (items.length === 0) {
+    throw new HttpError({ code: 'validation_failed', message: '동의 항목이 없습니다' });
+  }
+
+  const known = new Set(Object.keys(DOC_VERSIONS));
+  for (const item of items) {
+    if (!item || !known.has(item.docType) || typeof item.agreed !== 'boolean') {
+      throw new HttpError({ code: 'validation_failed', message: '알 수 없는 동의 항목입니다' });
+    }
+    // 필수 항목을 체크 해제한 채로 보내는 건 화면 버그이거나 우회 시도입니다.
+    // 통과시키면 "동의하지 않은 회원" 이 생깁니다 (repo/consents.ts 주석 참고).
+    if (!item.agreed && isRequiredConsent(item.docType)) {
+      throw new HttpError({
+        code: 'validation_failed',
+        message: '필수 항목은 동의해야 서비스를 이용하실 수 있습니다',
+        fields: [{ path: item.docType, message: '필수 항목입니다' }],
+      });
+    }
+  }
+
+  const db = firestore(c.env);
+  const records = await consentsRepo.recordConsents(db, {
+    uid,
+    items,
+    method,
+    ipHash: await hashIp(c.env.APP_SECRET, clientIp(c)).catch(() => null),
+    userAgent: (c.req.header('User-Agent') ?? '').slice(0, 300) || null,
+  });
+
+  await audit(c, {
+    name: 'consent_record',
+    detail: `method=${method} ${records.map((r) => `${r.docType}=${r.agreed ? 'Y' : 'N'}@${r.docVersion}`).join(' ')}`,
+  });
+
+  return c.json(ok<ConsentRecord[]>(records), 201);
+});
+
+app.get('/api/account', async (c) => {
+  const uid = requireUid(c);
+  const profile = await usersRepo.readAccount(firestore(c.env), uid);
+  if (!profile) {
+    throw new HttpError({ code: 'not_found', message: '계정 정보를 찾을 수 없습니다' });
+  }
+  return c.json(ok<AccountProfile>(profile));
+});
+
+app.patch('/api/account', async (c) => {
+  const uid = requireUid(c);
+  const body = await readJson<UpdateAccountBody>(c.req);
+
+  const patch: { displayName?: string; clearPhoto?: boolean } = {};
+
+  if (body.displayName !== undefined) {
+    const name = trimmed(body.displayName, 40);
+    if (!name) {
+      throw new HttpError({
+        code: 'validation_failed',
+        message: '표시 이름을 입력해주세요',
+        fields: [{ path: 'displayName', message: '비워둘 수 없습니다' }],
+      });
+    }
+    patch.displayName = name;
+  }
+  if (body.clearPhoto === true) patch.clearPhoto = true;
+
+  const db = firestore(c.env);
+  await usersRepo.updateAccount(db, uid, patch);
+
+  const profile = await usersRepo.readAccount(db, uid);
+  if (!profile) {
+    throw new HttpError({ code: 'not_found', message: '계정 정보를 찾을 수 없습니다' });
+  }
+  return c.json(ok<AccountProfile>(profile));
+});
+
+/**
+ * 회원 탈퇴 — **되돌릴 수 없습니다.**
+ *
+ * ─── 순서가 중요한 이유 ────────────────────────────────────────
+ *
+ * Auth 계정을 **맨 마지막에** 지웁니다. 먼저 지우면 중간에 실패했을 때 남은 데이터에
+ * 접근할 주체가 사라져 고아 데이터를 치울 방법이 없어집니다. 반대로 마지막에 두면
+ * 실패해도 그 사람은 아직 로그인할 수 있으므로 **다시 호출해 이어붙일 수 있습니다.**
+ *
+ * 그래서 각 단계는 "이미 없으면 성공" 이어야 합니다(멱등). 청첩장 루프는 남은 것만
+ * 다시 가져오고, `deleteUser` 는 없는 문서를 지워도 통과하며, `deleteAuthAccount` 는
+ * `USER_NOT_FOUND` 를 성공으로 처리합니다.
+ *
+ * 청첩장 한 건의 삭제 순서(KV → R2 → Firestore)는 `DELETE /api/invitations/:id` 와
+ * 같습니다 — 하객 화면을 가장 먼저 내려 유령 청첩장이 서빙되는 구간을 없앱니다.
+ */
+app.delete('/api/account', async (c) => {
+  const uid = requireUid(c);
+  const db = firestore(c.env);
+
+  let deletedInvitations = 0;
+
+  // listByOwner 에 상한(50)이 있어 한 번으로는 다 못 가져올 수 있습니다.
+  // 지운 만큼 다음 조회에서 빠지므로, 빌 때까지 돌면 됩니다.
+  for (;;) {
+    const batch = await invitationsRepo.listByOwner(db, uid);
+    if (batch.length === 0) break;
+
+    for (const inv of batch) {
+      await removeSnapshot(c.env.LUVI_KV, inv.id, inv.slug || null, inv.pinnedHost);
+      await deleteAssets(c.env.LUVI_ASSETS, `inv/${inv.id}/`);
+      await invitationsRepo.deleteInvitation(db, inv);
+      deletedInvitations += 1;
+    }
+  }
+
+  const deletedConsents = await consentsRepo.deleteAllForUser(db, uid);
+  await usersRepo.deleteUser(db, uid);
+
+  // 감사 로그는 Auth 계정을 지우기 **전에** 남깁니다 — 뒤에 두면 계정 삭제가
+  // 성공하고 로그만 실패했을 때 탈퇴 사실이 어디에도 남지 않습니다.
+  await audit(c, {
+    name: 'account_delete',
+    detail: `invitations=${deletedInvitations} consents=${deletedConsents}`,
+  });
+
+  await deleteAuthAccount(serviceAccount(c.env), c.env.FIREBASE_PROJECT_ID, uid);
+
+  return c.json(ok<DeleteAccountResult>({ deletedInvitations }));
 });
 
 // ─────────────────────────── 예약 · 문의 ───────────────────────────

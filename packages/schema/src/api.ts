@@ -5,6 +5,7 @@
  * 엔드포인트를 추가할 때 여기부터 고치면 양쪽 타입이 자동으로 맞습니다.
  */
 import type { ContentDoc, Features, Invitation, SectionKey, ThemeId } from './content';
+import type { ConsentStatus } from './consent';
 
 /** 모든 응답의 공통 껍데기. 성공/실패를 HTTP 상태와 함께 본문에서도 구분한다. */
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError };
@@ -21,6 +22,10 @@ export interface ApiError {
     | 'claim_expired'
     | 'claim_used'
     | 'rate_limited'
+    /** 최신 약관에 재동의해야 진행할 수 있음 — 화면이 재동의 모달을 띄웁니다 */
+    | 'consent_required'
+    /** 같은 이메일의 계정이 이미 있음 — 기존 로그인 수단으로 안내합니다 */
+    | 'account_exists'
     | 'internal';
   /** 사용자에게 그대로 보여줄 수 있는 한국어 메시지 */
   message: string;
@@ -37,6 +42,51 @@ export type UserRole = 'user' | 'admin';
 export interface SessionResult {
   uid: string;
   role: UserRole;
+  /**
+   * 동의 게이트 판정. `satisfied: false` 면 화면이 재동의 모달을 띄우고,
+   * 서버도 편집·발행을 막습니다. **하객 열람(`/i/{slug}`)은 막지 않습니다.**
+   */
+  consent: ConsentStatus;
+}
+
+/** GET /api/account — 계정 설정 화면에 보여줄 내 정보 */
+export interface AccountProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  /** 연결된 로그인 수단 ('google.com' | 'kakao' | 'naver' | 'password') */
+  providers: string[];
+  plan: string;
+  role: UserRole;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  consent: ConsentStatus;
+}
+
+/** PATCH /api/account — 보낸 필드만 바뀝니다 */
+export interface UpdateAccountBody {
+  /** 표시 이름. 빈 문자열은 거부합니다 (이름 없는 계정을 만들지 않기 위해) */
+  displayName?: string;
+  /** true 면 프로필 사진을 해제합니다 */
+  clearPhoto?: boolean;
+}
+
+/** DELETE /api/account — 탈퇴 결과 */
+export interface DeleteAccountResult {
+  /** 함께 삭제된 청첩장 수 */
+  deletedInvitations: number;
+}
+
+/**
+ * 소셜 로그인 시 같은 이메일의 기존 계정이 발견된 경우.
+ * 가입을 진행하지 않고 **기존 수단으로 로그인하도록 안내**합니다 (자동 병합 금지).
+ */
+export interface ExistingAccountHint {
+  /** 마스킹된 이메일 (`ab***@naver.com`) — 본인 확인용이지 노출용이 아닙니다 */
+  maskedEmail: string;
+  /** 기존 계정에 연결된 로그인 수단 */
+  providers: string[];
 }
 
 // ─────────────────────────── 이벤트 로그 ───────────────────────────

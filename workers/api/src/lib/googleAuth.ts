@@ -11,7 +11,15 @@
 import { signJwt, type ServiceAccount } from './jwt';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const SCOPE = 'https://www.googleapis.com/auth/datastore';
+
+/** Firestore REST 용. 기본값입니다 */
+export const SCOPE_DATASTORE = 'https://www.googleapis.com/auth/datastore';
+
+/**
+ * Identity Toolkit(Firebase Authentication) REST 용 — 탈퇴 시 계정 삭제에 필요합니다.
+ * datastore 스코프로는 `accounts:delete` 가 403 이 납니다.
+ */
+export const SCOPE_IDENTITY = 'https://www.googleapis.com/auth/identitytoolkit';
 
 /** 만료 직전 토큰으로 요청을 보내면 401 이 납니다. 여유를 둡니다. */
 const REFRESH_MARGIN_MS = 60_000;
@@ -30,12 +38,12 @@ const cache = new Map<string, Promise<CachedToken>>();
 
 export class GoogleAuthError extends Error {}
 
-async function requestToken(sa: ServiceAccount): Promise<CachedToken> {
+async function requestToken(sa: ServiceAccount, scope: string): Promise<CachedToken> {
   const iat = Math.floor(Date.now() / 1000);
   const assertion = await signJwt(
     {
       iss: sa.clientEmail,
-      scope: SCOPE,
+      scope,
       aud: TOKEN_URL,
       iat,
       exp: iat + 3600,
@@ -67,9 +75,17 @@ async function requestToken(sa: ServiceAccount): Promise<CachedToken> {
   return { token: json.access_token, expiresAt: Date.now() + ttlMs };
 }
 
-/** 캐시된 액세스 토큰을 돌려주고, 만료가 가까우면 새로 받습니다. */
-export async function getAccessToken(sa: ServiceAccount): Promise<string> {
-  const key = sa.clientEmail;
+/**
+ * 캐시된 액세스 토큰을 돌려주고, 만료가 가까우면 새로 받습니다.
+ *
+ * 캐시 키에 **스코프를 포함**합니다 — 계정만으로 키를 잡으면 Firestore 용 토큰이
+ * Identity Toolkit 호출에 재사용되어 403 이 납니다.
+ */
+export async function getAccessToken(
+  sa: ServiceAccount,
+  scope: string = SCOPE_DATASTORE,
+): Promise<string> {
+  const key = `${sa.clientEmail}\n${scope}`;
   const pending = cache.get(key);
 
   if (pending) {
@@ -83,7 +99,7 @@ export async function getAccessToken(sa: ServiceAccount): Promise<string> {
 
   // 실패를 캐시에 남기면 isolate 가 사는 동안 계속 같은 오류를 반환하므로 지웁니다.
   // (타입 순환 추론을 피하려고 타입을 명시합니다)
-  const task: Promise<CachedToken> = requestToken(sa).catch((e: unknown) => {
+  const task: Promise<CachedToken> = requestToken(sa, scope).catch((e: unknown) => {
     if (cache.get(key) === task) cache.delete(key);
     throw e;
   });

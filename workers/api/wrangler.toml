@@ -9,6 +9,14 @@ CDN_BASE = "https://luvi-api.hariqueen985813.workers.dev/api/assets"
 SITE_ORIGIN = "https://luv-ai.co.kr"
 FIREBASE_PROJECT_ID = "wedding-f328e"
 
+# 재동의 게이트. "true" 일 때만 미동의 회원의 청첩장 생성·편집·발행을 막는다.
+#
+# 🔴 **동의 화면(3단계)이 배포되기 전에 켜지 마세요.**
+#    지금 켜면 기존 회원 전원이 consentVersions 가 없어 403 을 받는데, 동의할 화면이
+#    없어 빠져나올 방법이 없습니다 — 청첩장 편집·발행이 통째로 막힙니다.
+#    동의 기록(POST /api/consents)은 이 값과 무관하게 항상 동작합니다.
+CONSENT_ENFORCED = "false"
+
 # KV — 발행 스냅샷(SNAP:*) · 호스트 매핑(HOST_MAP:*) · 슬러그 매핑(SLUG_MAP:*)
 # 생성:  npx wrangler kv namespace create LUVI_KV
 # 아래 id 를 발급받은 값으로 채우세요.
@@ -50,6 +58,9 @@ enabled = true
 #   npx wrangler secret put KAKAO_CLIENT_SECRET     # 카카오 콘솔에서 "Client Secret 사용" 을 켠 경우만
 #   npx wrangler secret put NAVER_CLIENT_ID
 #   npx wrangler secret put NAVER_CLIENT_SECRET
+#
+# 메일 발송 (약관 개정 공지·재동의 안내):
+#   npx wrangler secret put RESEND_API_KEY          # 로컬 값은 workers/api/.dev.vars 에 있다
 #
 # FIREBASE_PRIVATE_KEY 는 여러 줄이라 붙여넣기가 까다롭다.
 # JSON 키 파일에서 꺼낸 "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n" 을

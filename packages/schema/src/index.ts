@@ -8,4 +8,5 @@ export * from './sectionText';
 export * from './manifest';
 export * from './derive';
 export * from './api';
+export * from './consent';
 export * from './themes';
