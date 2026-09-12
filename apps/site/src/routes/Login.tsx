@@ -228,8 +228,21 @@ export default function Login() {
         )}
       </div>
 
+      {/*
+        예전에는 "계속하면 동의한 것으로 봅니다" 라고만 적혀 있었습니다. 문서 링크도
+        동의 이력도 없이 그렇게 쓰면 동의를 받았다고 주장할 근거가 없습니다 —
+        실제 동의는 로그인 직후 동의 화면(`ConsentGate`)에서 받고 기록합니다.
+      */}
       <p className="mt-8 max-w-[320px] text-center text-[11px] leading-relaxed text-muted-faint">
-        계속하면 서비스 이용약관과 개인정보 처리방침에 동의하는 것으로 봅니다.
+        로그인 후{' '}
+        <Link to="/terms" className="underline underline-offset-2 hover:text-ink">
+          이용약관
+        </Link>
+        과{' '}
+        <Link to="/privacy" className="underline underline-offset-2 hover:text-ink">
+          개인정보 수집·이용
+        </Link>
+        에 대한 동의를 받습니다.
       </p>
     </main>
   );

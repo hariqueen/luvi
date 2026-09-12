@@ -26,6 +26,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useLocation } from 'react-router-dom';
+import type { ConsentStatus } from '@luvi/schema';
 import { api } from './api';
 import {
   authErrorMessage,
@@ -63,6 +64,15 @@ export interface AuthContextValue {
    * 실제 접근 제어는 서버가 매 요청마다 다시 판단합니다.
    */
   isAdmin: boolean;
+  /**
+   * 동의 상태. 같은 세션 응답에서 옵니다.
+   *
+   * **`null` 은 "동의 안 함" 이 아니라 "아직 모름" 입니다.** 세션 동기화가 끝나기 전에
+   * 동의 화면을 띄우면, 이미 동의한 사람에게도 로그인할 때마다 잠깐씩 뜹니다.
+   */
+  consent: ConsentStatus | null;
+  /** 동의를 마친 뒤 호출 — 서버를 다시 묻지 않고 화면을 통과시킵니다 */
+  markConsentSatisfied: () => void;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
@@ -87,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [consent, setConsent] = useState<ConsentStatus | null>(null);
 
   /** 구독을 두 번 걸지 않기 위한 표시 (StrictMode 는 effect 를 두 번 실행합니다) */
   const subscribed = useRef(false);
@@ -149,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             syncedUid.current = null;
             setUser(null);
             setIsAdmin(false);
+            setConsent(null);
             setStatus('signed-out');
             return;
           }
@@ -176,7 +188,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 provider: next.provider,
               })
               .then((res) => {
-                if (res.ok) setIsAdmin(res.data.role === 'admin');
+                if (!res.ok) return;
+                setIsAdmin(res.data.role === 'admin');
+                setConsent(res.data.consent);
               });
           }
         });
@@ -250,6 +264,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** 동의를 마친 직후. 서버를 다시 묻지 않고 통과시킵니다 (방금 우리가 저장했으므로) */
+  const markConsentSatisfied = useCallback(() => {
+    setConsent({ satisfied: true, missing: [], versions: {} });
+  }, []);
+
   const signOut = useCallback(async () => {
     setSessionHint(false);
     const auth = await loadAuth();
@@ -262,6 +281,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user,
       isAdmin,
+      consent,
+      markConsentSatisfied,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
@@ -273,6 +294,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user,
       isAdmin,
+      consent,
+      markConsentSatisfied,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,

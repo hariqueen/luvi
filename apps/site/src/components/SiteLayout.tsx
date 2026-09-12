@@ -130,7 +130,29 @@ export function SiteLayout() {
           <p className="mt-4 max-w-md text-[13px] leading-relaxed text-muted">
             내 손으로 만들고, 보낸 뒤에도 고칠 수 있는 청첩장.
           </p>
-          <p className="mt-8 text-[11.5px] text-muted-faint">
+          {/*
+            법정 게시 사항.
+            🔴 **개인정보처리방침은 다른 항목과 구분되게 굵게 표시합니다** — 법정 권고입니다.
+          */}
+          <nav className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px]">
+            <Link to="/terms" className="text-muted hover:text-ink">
+              이용약관
+            </Link>
+            <Link to="/privacy" className="font-semibold text-ink hover:text-gold">
+              개인정보처리방침
+            </Link>
+            <a href="mailto:help@luv-ai.co.kr" className="text-muted hover:text-ink">
+              문의
+            </a>
+          </nav>
+
+          <address className="mt-4 not-italic text-[11.5px] leading-relaxed text-muted-faint">
+            상호 러비(Luvi) · 대표 김하리 · 사업자등록번호 653-03-03869
+            <br />
+            경기도 시흥시 시흥대로1073번길 26, 402호 · help@luv-ai.co.kr
+          </address>
+
+          <p className="mt-4 text-[11.5px] text-muted-faint">
             © {new Date().getFullYear()} Luvi · luv-ai.co.kr
           </p>
         </div>

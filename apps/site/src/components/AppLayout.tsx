@@ -89,9 +89,24 @@ export function AppLayout() {
                 {(user?.displayName ?? user?.email ?? '?').trim().charAt(0).toUpperCase()}
               </span>
             )}
-            <span className="hidden max-w-[120px] truncate text-[12px] text-ink-soft md:block">
+            {/*
+              계정 설정으로 가는 유일한 입구입니다. 개인정보처리방침 제8조 ②가 "서비스 내
+              [계정 설정] 화면" 을 권리 행사 경로로 적고 있으므로, **찾을 수 있어야** 합니다.
+              이름을 그대로 링크로 만들어 따로 메뉴를 늘리지 않았습니다.
+            */}
+            <Link
+              to="/app/account"
+              className="hidden max-w-[120px] truncate text-[12px] text-ink-soft underline-offset-4 hover:underline md:block"
+            >
               {user?.displayName ?? user?.email?.split('@')[0] ?? '내 계정'}
-            </span>
+            </Link>
+            <Link
+              to="/app/account"
+              aria-label="계정 설정"
+              className="rounded-full border border-line-strong px-3 py-[7px] text-[12px] text-muted md:hidden"
+            >
+              계정
+            </Link>
             <button
               type="button"
               onClick={onSignOut}

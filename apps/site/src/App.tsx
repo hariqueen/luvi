@@ -20,6 +20,9 @@ import Card from '@/routes/Card';
 import Samples from '@/routes/Samples';
 import NotFound from '@/routes/NotFound';
 
+// 법률 문서는 마크다운 원문을 통째로 품고 있어 번들이 작지 않습니다.
+// 대부분의 방문자가 열지 않으므로 분할합니다 — 동의 화면에서 새 탭으로 엽니다.
+const Legal = lazyPage(() => import('@/routes/Legal'));
 const Login = lazyPage(() => import('@/routes/Login'));
 const SocialCallback = lazyPage(() => import('@/routes/SocialCallback'));
 const Dashboard = lazyPage(() => import('@/routes/Dashboard'));
@@ -27,6 +30,7 @@ const NewInvitation = lazyPage(() => import('@/routes/NewInvitation'));
 const Editor = lazyPage(() => import('@/routes/Editor'));
 const Publish = lazyPage(() => import('@/routes/Publish'));
 const Guestbook = lazyPage(() => import('@/routes/Guestbook'));
+const Account = lazyPage(() => import('@/routes/Account'));
 const Admin = lazyPage(() => import('@/routes/Admin'));
 
 export default function App() {
@@ -41,6 +45,9 @@ export default function App() {
           <Route path="card" element={<Card />} />
           <Route path="samples" element={<Samples />} />
           <Route path="samples/:themeId" element={<Samples />} />
+          {/* 법정 게시물 — 푸터·로그인·동의 화면이 모두 여기를 가리킵니다 */}
+          <Route path="terms" element={<Legal kind="terms" />} />
+          <Route path="privacy" element={<Legal kind="privacy" />} />
         </Route>
 
         {/* ── 로그인 (레이아웃 없음 — 집중형 화면) ── */}
@@ -60,6 +67,8 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="new" element={<NewInvitation />} />
           <Route path="i/:id/guestbook" element={<Guestbook />} />
+          {/* 방침 제8조 ②가 가리키는 화면 — 열람·정정·동의철회·탈퇴 */}
+          <Route path="account" element={<Account />} />
           {/* 운영자 전용. 화면은 누구나 열 수 있고, 목록은 서버가 403 으로 막습니다 */}
           <Route path="admin" element={<Admin />} />
         </Route>

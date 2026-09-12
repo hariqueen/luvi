@@ -6,10 +6,15 @@
  * 클라이언트를 만들 때 한 번 넣어두면 안 된다.
  */
 import type {
+  AccountProfile,
   AdminInvitationSummary,
   ApiError,
   ApiResult,
   ClaimBody,
+  ConsentRecord,
+  DeleteAccountResult,
+  SubmitConsentsBody,
+  UpdateAccountBody,
   ClaimPreview,
   ClaimPreviewBody,
   CreateBookingBody,
@@ -215,6 +220,24 @@ export function createClient(opts: ClientOptions) {
         photoURL: string | null;
         provider: string;
       }) => post<SessionResult>('/auth/session', body),
+    },
+
+    /**
+     * 약관·개인정보 동의.
+     *
+     * 철회(선택 항목)도 `submit` 으로 보냅니다 — 서버가 기존 레코드를 고치지 않고
+     * `agreed: false` 인 새 레코드를 남깁니다(append-only).
+     */
+    consents: {
+      list: () => get<ConsentRecord[]>('/consents'),
+      submit: (body: SubmitConsentsBody) => post<ConsentRecord[]>('/consents', body),
+    },
+
+    account: {
+      get: () => get<AccountProfile>('/account'),
+      update: (body: UpdateAccountBody) => patch<AccountProfile>('/account', body),
+      /** 🔴 회원 탈퇴. 청첩장·사진·방명록이 모두 사라지고 되돌릴 수 없습니다 */
+      remove: () => del<DeleteAccountResult>('/account'),
     },
 
     contact: {
