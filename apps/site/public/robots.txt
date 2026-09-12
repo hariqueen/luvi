@@ -1,0 +1,17 @@
+# 러비(Luvi) — luv-ai.co.kr
+#
+# 이 파일은 **존재한다는 것 자체**가 목적입니다. 없으면 Pages 의 SPA 폴백이 걸려
+# /robots.txt 요청에 사이트 HTML 이 통째로 붙어 나갑니다 (2026-09-12 확인, 3,316바이트).
+#
+# 🔴 /i/ 나 /api/assets/ 를 Disallow 하지 마세요.
+#    크롤링을 막으면 크롤러가 색인 금지 표시를 **읽지 못합니다.** 그러면 외부에 링크가
+#    걸렸을 때 내용 없이 URL 만 색인되는 것을 오히려 막을 수 없게 됩니다 — 목적이 뒤집힙니다.
+#    색인 차단은 크롤링 허용 + 아래 두 장치가 담당합니다:
+#      · /i/{slug} HTML        → <meta name="robots">  (apps/invitation/vite.config.ts)
+#      · /i/* · /api/assets/*  → X-Robots-Tag 헤더     (_worker.js · workers/api/src/index.ts)
+#
+# AI 크롤러 차단(ai-train=no · GPTBot · ClaudeBot · Google-Extended)은 Cloudflare
+# 관리형 robots.txt 가 이 파일 앞에 자동으로 덧붙입니다. 여기 중복해 적지 않습니다.
+
+User-agent: *
+Allow: /

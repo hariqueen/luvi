@@ -23,6 +23,28 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 const hasExt = (p) => /\.[a-zA-Z0-9]+$/.test(p);
 
 /**
+ * 🔴 하객 뷰어(/i/*)는 검색 색인에서 통째로 뺀다.
+ *    발행된 청첩장에는 양가 부모 실명과 계좌번호가 평문으로 들어 있다.
+ *
+ *    HTML 에는 빌드 시점에 `<meta name="robots">` 가 박히지만
+ *    (`apps/invitation/vite.config.ts`), **사진·오디오는 HTML 이 아니라 메타태그를
+ *    넣을 자리가 없다.** 그래서 헤더로 말한다. 메타태그를 파싱하지 않는 크롤러에도
+ *    이쪽은 닿으므로 HTML 응답에도 같이 건다(중복은 무해하다).
+ *
+ *    `noimageindex` 가 사진에 대한 핵심이다 — 이게 없으면 청첩장 사진이
+ *    이미지 검색에 걸리는 통로가 열려 있다.
+ *
+ *    ⚠️ 대신 robots.txt 로 /i/ 를 Disallow 하면 **안 된다.** 크롤링을 막으면 크롤러가
+ *       이 헤더 자체를 읽지 못해, 외부 링크만으로 색인되는 것을 오히려 못 막는다.
+ */
+const NOINDEX = 'noindex, nofollow, noarchive, noimageindex';
+const noindex = (r) => {
+  const h = new Headers(r.headers);
+  h.set('X-Robots-Tag', NOINDEX);
+  return new Response(r.body, { status: r.status, headers: h });
+};
+
+/**
  * 🔴 지운 고객 사진은 경로째로 거절한다 (2026-08-22).
  *
  * 첫 고객의 실제 사진·반려견 사진 20개를 저장소에서 지웠는데(커밋 5b99f1b), 배포에
@@ -69,12 +91,12 @@ export default {
       return new Response(r.body, { status: r.status, headers: h });
     };
 
-    // ── 뷰어(/i/) ──
-    if (p === '/i' || p === '/i/') return spa('/i/');
+    // ── 뷰어(/i/) ── 이 갈래로 나가는 모든 응답에 X-Robots-Tag 를 건다.
+    if (p === '/i' || p === '/i/') return noindex(await spa('/i/'));
     if (p.startsWith('/i/')) {
-      if (!hasExt(p)) return spa('/i/'); // /i/{slug}
+      if (!hasExt(p)) return noindex(await spa('/i/')); // /i/{slug}
       const r = await asset(p);
-      return p.startsWith('/i/assets/') ? immutable(r) : r;
+      return noindex(p.startsWith('/i/assets/') ? immutable(r) : r);
     }
 
     // ── 사이트(루트) ──
