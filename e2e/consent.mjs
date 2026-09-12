@@ -88,12 +88,16 @@ try {
   await page.goto(`${SITE}/login`, { waitUntil: 'networkidle' });
   check('로그인 화면에 약관 링크', (await page.getByRole('link', { name: '이용약관' }).count()) > 0);
 
-  await page.getByPlaceholder(/이메일|email/i).first().fill(email);
-  await page.getByPlaceholder(/비밀번호|password/i).first().fill(password);
-  await page.getByRole('button', { name: /로그인|계속/ }).first().click();
+  // 이메일 폼은 접혀 있습니다 — 소셜 로그인을 먼저 보여주는 화면이라 한 번 펼쳐야 합니다
+  await page.getByRole('button', { name: /이메일로 계속하기/ }).click();
+  await page.getByPlaceholder('이메일').fill(email);
+  await page.getByPlaceholder(/^비밀번호/).fill(password);
+  // '로그인' 이름의 버튼이 둘입니다 — 로그인/가입 모드 토글과 제출 버튼.
+  // 제출은 type=submit 이라 그걸로 특정합니다
+  await page.locator('button[type="submit"]').click();
 
-  await page.waitForURL(/\/app/, { timeout: 20000 });
-  await page.waitForSelector('text=동의', { timeout: 20000 });
+  await page.waitForURL(/\/app/, { timeout: 30000 });
+  await page.waitForSelector('text=동의하고 계속하기', { timeout: 30000 });
 
   check('동의 화면이 떴다', (await page.getByText('시작하기 전에 동의가 필요해요').count()) > 0);
 
