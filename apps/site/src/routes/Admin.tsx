@@ -27,14 +27,14 @@ const pad = (n: number) => String(n).padStart(2, '0');
 /** "2026-10-24T13:00:00" → "2026. 10. 24 (토)" */
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '-';
   return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
 }
 
 /** 수정 시각은 "오늘 21:04" 처럼 — 운영 중에는 '언제 만졌는지'가 날짜보다 중요합니다 */
 function formatTouched(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '-';
   const today = new Date();
   const sameDay =
     d.getFullYear() === today.getFullYear() &&
@@ -109,7 +109,7 @@ export default function Admin() {
             전체 청첩장
           </h1>
           <p className="mt-2 text-[13px] text-muted">
-            모든 계정의 청첩장입니다. 고객을 대신해 수정·발행할 때 씁니다 — 소유자를 꼭 확인하세요.
+            모든 계정의 청첩장입니다. 고객을 대신해 수정·발행할 때 씁니다 - 소유자를 꼭 확인하세요.
           </p>
         </div>
         <div className="flex items-center gap-2">

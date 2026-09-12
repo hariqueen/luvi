@@ -768,8 +768,8 @@ export default function Editor() {
         aria-label="텍스트 상자 추가"
         title={
           textBoxTarget
-            ? `텍스트 상자 추가 — ${SECTION_META[textBoxTarget].label}에 얹습니다`
-            : '텍스트 상자 추가 — 먼저 위에서 카드를 고르거나, 미리보기의 글자를 눌러주세요'
+            ? `텍스트 상자 추가: ${SECTION_META[textBoxTarget].label}에 얹습니다`
+            : '텍스트 상자 추가: 먼저 위에서 카드를 고르거나, 미리보기의 글자를 눌러주세요'
         }
         className={`flex size-10 flex-none items-center justify-center rounded-xl border ${
           textBoxTarget
@@ -823,7 +823,7 @@ export default function Editor() {
       {hasPreviewText(activeForm.fields) && (
         <p className="rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] leading-relaxed text-muted">
           이 카드의 <b className="font-semibold text-ink-soft">글자는 가운데 미리보기에서</b> 눌러
-          고칩니다 — 굵게는 ⌘/Ctrl+B, 기울임은 ⌘/Ctrl+I, 색·정렬·글씨체는 미리보기 아래
+          고칩니다. 굵게는 ⌘/Ctrl+B, 기울임은 ⌘/Ctrl+I, 색·정렬·글씨체는 미리보기 아래
           툴바에서 바꿔요.
         </p>
       )}

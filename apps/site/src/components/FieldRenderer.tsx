@@ -496,7 +496,7 @@ function PetalItemsField({
             {field.emptyHint ?? (
               <>
                 아직 고른 것이 없어서 <b className="font-semibold">아무것도 떨어지지 않아요.</b>{' '}
-                아래에서 아이콘이나 사진을 고르면 고른 것만 떨어집니다 — 섞어서 {max}개까지
+                아래에서 아이콘이나 사진을 고르면 고른 것만 떨어집니다. 섞어서 {max}개까지
                 (사진만 {max}개도 됩니다).
               </>
             )}

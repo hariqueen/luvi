@@ -27,7 +27,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 const fmt = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  iso ? new Date(iso).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
 
 export default function Account() {
   const { signOut } = useAuth();
@@ -114,7 +114,7 @@ function ProfileSection({
     if (!res.ok) return setErr(res.error.message);
     await onSaved();
     onNotice(
-      '프로필 사진을 해제했어요. 다음에 소셜 로그인하면 다시 저장될 수 있어요 — ' +
+      '프로필 사진을 해제했어요. 다음에 소셜 로그인하면 다시 저장될 수 있어요. ' +
         '완전히 원치 않으시면 해당 서비스의 동의 항목에서 프로필 사진을 빼주세요.',
     );
   }
@@ -128,7 +128,7 @@ function ProfileSection({
         <Row label="가입 경로">
           {profile.providers.length
             ? profile.providers.map((p) => PROVIDER_LABELS[p] ?? p).join(' · ')
-            : '—'}
+            : '-'}
         </Row>
         <Row label="가입일">{fmt(profile.createdAt)}</Row>
         <Row label="최종 로그인">{fmt(profile.lastLoginAt)}</Row>
@@ -233,7 +233,7 @@ function ConsentSection({
                   <span className="text-muted">[선택]</span> {CONSENT_LABELS[t]}
                 </p>
                 <p className="mt-0.5 text-[11.5px] text-muted">
-                  {agreed ? '동의함 — 언제든 철회할 수 있어요' : '동의하지 않음'}
+                  {agreed ? '동의함 (언제든 철회할 수 있어요)' : '동의하지 않음'}
                 </p>
               </div>
               <button

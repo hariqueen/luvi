@@ -60,7 +60,7 @@ export default function NewInvitation() {
 
       {error && (
         <div className="mt-6 rounded-2xl border border-line-strong bg-surface px-5 py-4 text-[13px] text-ink-soft">
-          청첩장을 만들지 못했습니다 — {error}
+          청첩장을 만들지 못했습니다: {error}
           <br />
           <span className="text-muted">잠시 뒤 다시 눌러보세요.</span>
         </div>
@@ -137,7 +137,7 @@ export default function NewInvitation() {
       */}
       <p className="mt-6 rounded-2xl border border-dashed border-line-strong bg-surface px-6 py-5 text-[12.5px] leading-relaxed text-muted">
         디자인은 만들 때 정해지고, 지금은 나중에 바꿀 수 없습니다. 두 디자인을 다 보고 싶다면
-        하나씩 만들어 비교한 뒤 쓰지 않을 초안을 지우세요 — 초안은 하객에게 보이지 않습니다.
+        하나씩 만들어 비교한 뒤 쓰지 않을 초안을 지우세요. 초안은 하객에게 보이지 않습니다.
       </p>
     </section>
   );

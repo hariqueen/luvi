@@ -385,7 +385,7 @@ export default function Guestbook() {
                 {/* 여기가 "방명록이 연동 안 됐다" 는 오해를 끊는 지점입니다 */}
                 {elsewhere.length > 0 && (
                   <p className="mt-3 text-[13px] text-muted">
-                    다른 청첩장에 글이 있어요 —{' '}
+                    다른 청첩장에 글이 있어요:{' '}
                     {elsewhere.map((e, i) => (
                       <span key={e.target.id}>
                         {i > 0 && ', '}

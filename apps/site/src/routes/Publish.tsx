@@ -316,7 +316,7 @@ export default function Publish() {
                 {!err && !checking && avail && !avail.available && (
                   <span className="text-gold-deep">
                     이미 사용 중이에요
-                    {avail.suggestions?.length ? ` — 예: ${avail.suggestions.join(', ')}` : ''}
+                    {avail.suggestions?.length ? ` (예: ${avail.suggestions.join(', ')})` : ''}
                   </span>
                 )}
               </div>
@@ -328,7 +328,7 @@ export default function Publish() {
                   </p>
                   <p className="mt-1.5 text-[12px] leading-[1.6] text-ink-soft">
                     지금 발행된 주소는 <b className="font-semibold">luv-ai.co.kr/i/{publishedSlug}</b>
-                    입니다. 주소를 바꿔 발행하면 <b className="font-semibold">옛 주소는 즉시 접속이 끊깁니다</b> —
+                    입니다. 주소를 바꿔 발행하면 <b className="font-semibold">옛 주소는 즉시 접속이 끊깁니다</b>.
                     인쇄한 청첩장이나 이미 보낸 카톡·QR 코드로 들어오는 하객은 청첩장을 볼 수 없게 됩니다.
                   </p>
                   <label className="mt-2.5 flex items-start gap-2">
