@@ -14,8 +14,9 @@
     "dev:invitation": "npm run dev --workspace @luvi/invitation",
     "dev:api": "npm run dev --workspace @luvi/api",
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "typecheck": "npm run check:inline && npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "check:inline": "node scripts/check-inline-edit.mjs"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

@@ -164,13 +164,25 @@ export const CORE_SECTIONS: SectionDef[] = [
     fields: [
       { path: 'core.couple.groom.name', type: 'text', label: '신랑 이름', required: true, maxLength: 20 },
       { path: 'core.couple.groom.nameEn', type: 'text', label: '신랑 영문 이름', maxLength: 30 },
-      { path: 'core.couple.groom.firstName', type: 'text', label: '신랑 이름만', hint: '성을 뺀 이름. 커버·푸터에 쓰입니다', maxLength: 10, previewEdit: true },
+      /**
+       * 🔴 **여기가 이 값의 유일한 자리입니다** — 미리보기에 이 값만 그리는 글자가 없습니다.
+       *
+       * 예전에는 마무리의 `신랑 ♥ 신부` 가 이 값 두 개를 그려서 거기서 고쳤습니다. 그 줄이
+       * 한 덩어리(`core.couple.line`)가 되면서 이 값은 화면에 직접 나오지 않게 됐습니다.
+       * 그래도 지울 수 없습니다: 달력 기본 문구의 `{신랑}` 치환과 대시보드 목록의 카드
+       * 제목이 이 값을 읽습니다. 발행된 청첩장은 기본 문구를 **볼 때 계산**하므로 기본
+       * 문구 자체를 바꾸면 이미 하객에게 나간 달력 글자가 바뀝니다.
+       *
+       * previewEdit 를 붙이면 폼에서도 사라져 **고칠 길이 아예 없어집니다.**
+       */
+      { path: 'core.couple.groom.firstName', type: 'text', label: '신랑 이름만', hint: '성을 뺀 이름. 달력 문구와 목록 제목에 쓰입니다', maxLength: 10 },
       // 혼주 줄은 아버지·어머니·관계로 쪼개지 않습니다 — 사이의 '·' 와 '의' 까지
       // 미리보기에서 통째로 고칩니다 (`resolveParentsLine`)
       { path: 'core.couple.groom.parentsLine', type: 'text', label: '신랑 혼주 줄', hint: '아버지 · 어머니 의 장남 이름', maxLength: 120, previewEdit: true },
       { path: 'core.couple.bride.name', type: 'text', label: '신부 이름', required: true, maxLength: 20 },
       { path: 'core.couple.bride.nameEn', type: 'text', label: '신부 영문 이름', maxLength: 30 },
-      { path: 'core.couple.bride.firstName', type: 'text', label: '신부 이름만', maxLength: 10, previewEdit: true },
+      // 신랑 쪽과 같은 이유로 폼에 남깁니다 (미리보기에 이 값만 그리는 글자가 없습니다)
+      { path: 'core.couple.bride.firstName', type: 'text', label: '신부 이름만', hint: '성을 뺀 이름. 달력 문구와 목록 제목에 쓰입니다', maxLength: 10 },
       // 혼주 줄은 아버지·어머니·관계로 쪼개지 않습니다 — 사이의 '·' 와 '의' 까지
       // 미리보기에서 통째로 고칩니다 (`resolveParentsLine`)
       { path: 'core.couple.bride.parentsLine', type: 'text', label: '신부 혼주 줄', hint: '아버지 · 어머니 의 장녀 이름', maxLength: 120, previewEdit: true },
@@ -201,11 +213,12 @@ export const CORE_SECTIONS: SectionDef[] = [
         label: '요일 머리글',
         hint: '쉼표로 일곱 칸. 일곱 개가 아니면 기본값이 쓰입니다',
         maxLength: 80,
+        previewEdit: true,
       },
-      { path: 'core.labels.countdownDays', type: 'text', label: '남은 날짜 단위 · 일', maxLength: 20 },
-      { path: 'core.labels.countdownHours', type: 'text', label: '남은 날짜 단위 · 시', maxLength: 20 },
-      { path: 'core.labels.countdownMinutes', type: 'text', label: '남은 날짜 단위 · 분', maxLength: 20 },
-      { path: 'core.labels.countdownSeconds', type: 'text', label: '남은 날짜 단위 · 초', maxLength: 20 },
+      { path: 'core.labels.countdownDays', type: 'text', label: '남은 날짜 단위 · 일', maxLength: 20, previewEdit: true },
+      { path: 'core.labels.countdownHours', type: 'text', label: '남은 날짜 단위 · 시', maxLength: 20, previewEdit: true },
+      { path: 'core.labels.countdownMinutes', type: 'text', label: '남은 날짜 단위 · 분', maxLength: 20, previewEdit: true },
+      { path: 'core.labels.countdownSeconds', type: 'text', label: '남은 날짜 단위 · 초', maxLength: 20, previewEdit: true },
     ],
   },
   /**
@@ -229,16 +242,14 @@ export const CORE_SECTIONS: SectionDef[] = [
         label: '커버 사진',
         hint: '첫 화면에 깔리는 사진. 이 사진 위에 문구가 얹힙니다',
       },
-      /**
-       * 맨 아래 스크롤 안내. 문구 레이어가 아니라 화면 아래에 고정된 글자라 캔버스에서
-       * 집을 수 없어서 여기 둡니다. **비우면 사라집니다** (`OPTIONAL_LABELS`).
-       */
+      /** 맨 아래 스크롤 안내. **비우면 사라집니다** (`OPTIONAL_LABELS`) */
       {
         path: 'core.labels.coverScroll',
         type: 'text',
         label: '스크롤 안내',
         hint: '첫 화면 맨 아래 글자. 비우면 사라집니다',
         maxLength: 40,
+        previewEdit: true,
       },
     ],
   },
@@ -277,6 +288,7 @@ export const CORE_SECTIONS: SectionDef[] = [
         label: '넘기기 안내',
         hint: '사진이 2장 이상일 때 안내 문구 뒤에 붙습니다. 비우면 사라집니다',
         maxLength: 40,
+        previewEdit: true,
       },
     ],
   },
@@ -527,6 +539,7 @@ export const CORE_SECTIONS: SectionDef[] = [
         label: '입력칸 머리글',
         hint: '입력칸 위에 적히는 한 줄. 비우면 사라집니다',
         maxLength: 40,
+        previewEdit: true,
       },
       {
         path: 'core.labels.guestbookNamePlaceholder',
@@ -549,6 +562,7 @@ export const CORE_SECTIONS: SectionDef[] = [
         hint: '방명록이 비어 있을 때만 보입니다. 비우면 사라집니다',
         rows: 2,
         maxLength: 80,
+        previewEdit: true,
       },
     ],
   },
