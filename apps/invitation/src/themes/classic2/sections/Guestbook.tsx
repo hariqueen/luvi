@@ -13,7 +13,8 @@ const fmtDate = (ts: number) =>
 
 export function Guestbook() {
   const { entries, submit } = useGuestbook();
-  const text = useInvitation().sectionText.guestbook;
+  const { sectionText, labels } = useInvitation();
+  const text = sectionText.guestbook;
   const [name, setName] = useState('');
   const [msg, setMsg] = useState('');
 
@@ -48,23 +49,35 @@ export function Guestbook() {
           ))}
         </div>
       ) : (
-        <div className="px-0 pb-6 pt-1.5 font-myeongjo text-[13px] text-c2-ink-soft">
-          아직 방명록이 없어요. 첫 한마디를 남겨주세요.
-        </div>
+        // 비어 있을 때의 안내 — 지우면 이 자리가 통째로 사라집니다 (labels.ts)
+        labels.guestbookEmpty && (
+          <div className="px-0 pb-6 pt-1.5 font-myeongjo text-[13px] text-c2-ink-soft">
+            {labels.guestbookEmpty}
+          </div>
+        )
       )}
 
       <div className="flex flex-col gap-2.5 border border-c2-line bg-c2-ivory p-4">
+        {/*
+          이 디자인에는 머리글이 없어서 기본값이 빈 문자열입니다.
+          **없는 것이지 못 넣는 것이 아닙니다** — 사용자가 적으면 여기 나옵니다.
+        */}
+        {labels.guestbookFormTitle && (
+          <div className="mb-0.5 text-center font-myeongjo text-[12.5px] tracking-[0.04em] text-c2-sage-deep">
+            {labels.guestbookFormTitle}
+          </div>
+        )}
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="이름"
+          placeholder={labels.guestbookNamePlaceholder}
           maxLength={10}
           className="border border-c2-line bg-white px-3.5 py-[11px] text-sm text-c2-ink outline-none"
         />
         <textarea
           value={msg}
           onChange={(e) => setMsg(e.target.value)}
-          placeholder="축하 메시지를 남겨주세요"
+          placeholder={labels.guestbookMessagePlaceholder}
           maxLength={120}
           rows={3}
           className="resize-none border border-c2-line bg-white px-3.5 py-[11px] text-sm text-c2-ink outline-none"
@@ -73,7 +86,7 @@ export function Guestbook() {
           onClick={onSubmit}
           className="cursor-pointer rounded-full border-none bg-c2-sage py-3 font-myeongjo text-[14px] tracking-[0.04em] text-white"
         >
-          방명록 남기기
+          {labels.guestbookSubmit}
         </button>
       </div>
 

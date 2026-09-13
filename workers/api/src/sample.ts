@@ -48,6 +48,8 @@ export function emptyContent(): ContentDoc {
       footer: { image: null },
       // 카드 문구는 비워 둡니다 — 비면 그 디자인의 기본 문구를 씁니다 (sectionText.ts)
       sectionText: {},
+      // 라벨도 비워 둡니다 - 비면 그 디자인의 기본 라벨을 씁니다 (labels.ts)
+      labels: {},
       bgm: null,
       effects: {
         // 새 청첩장은 낙하 효과가 켜져 있으니(features.petals) 떨어질 것을 하나 담아둡니다.
@@ -151,6 +153,8 @@ export function sampleContent(): ContentDoc {
       footer: { image: null },
       // 카드 문구는 비워 둡니다 — 비면 그 디자인의 기본 문구를 씁니다 (sectionText.ts)
       sectionText: {},
+      // 라벨도 비워 둡니다 - 비면 그 디자인의 기본 라벨을 씁니다 (labels.ts)
+      labels: {},
       bgm: null,
       effects: {
         // 새 청첩장은 낙하 효과가 켜져 있으니(features.petals) 떨어질 것을 하나 담아둡니다.

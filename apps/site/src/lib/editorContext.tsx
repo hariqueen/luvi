@@ -7,10 +7,12 @@
  * 실제 doc 상태와 저장(수동)은 Editor 가 소유하고, 여기에는 그 접근자만 실립니다.
  */
 import { createContext, useContext } from 'react';
-import type { AssetRef, ContentDoc } from '@luvi/schema';
+import type { AssetRef, ContentDoc, ThemeId } from '@luvi/schema';
 
 export interface EditorContextValue {
   invitationId: string;
+  /** 어떤 디자인인지. 기본 라벨이 테마마다 달라 폼이 자리표시자를 고를 때 씁니다 (labels.ts) */
+  themeId: ThemeId;
   doc: ContentDoc;
   /** 점 경로로 값을 읽습니다 (없으면 undefined). */
   get: (path: string) => unknown;

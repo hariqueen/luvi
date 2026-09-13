@@ -4,7 +4,7 @@ import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
 
 export function Gallery() {
-  const { gallery, sectionText } = useInvitation();
+  const { gallery, sectionText, labels } = useInvitation();
   const text = sectionText.gallery;
   /** 확대해서 보고 있는 사진의 순번. null 이면 닫힘 */
   const [openAt, setOpenAt] = useState<number | null>(null);
@@ -45,7 +45,8 @@ export function Gallery() {
         zone="foot"
         blocks={text.foot}
         className="mt-3.5"
-        append={gallery.length > 1 ? ' · 옆으로 넘겨 다음 사진' : null}
+        // 사진이 한 장뿐이면 넘길 것이 없고, 사용자가 지웠으면(빈 값) 붙이지 않습니다
+        append={gallery.length > 1 && labels.gallerySwipeHint ? ` ${labels.gallerySwipeHint}` : null}
       />
 
       <Lightbox

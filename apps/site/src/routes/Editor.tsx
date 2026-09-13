@@ -85,6 +85,12 @@ const PHOTO_FIELDS: { path: string; label: string }[] = [
   //    들어왔는데 첫 화면 사진이 맨 위에 있으면 엉뚱한 사진을 바꾸게 됩니다.
   { path: 'core.cover.image', label: '커버 사진 · 첫 화면' },
   { path: 'core.gallery', label: '갤러리 사진' },
+  /**
+   * 사진이 아니지만 여기 있습니다 — 갤러리 카드의 '편집' 이 이 폼으로 오기 때문입니다
+   * (`SECTION_TO_FORM.gallery === 'photos'`). 매니페스트의 갤러리 그룹은 폼으로 열리지
+   * 않으므로, 저기 두면 **저장은 되는데 고칠 화면이 없는** 필드가 됩니다.
+   */
+  { path: 'core.labels.gallerySwipeHint', label: '갤러리 넘기기 안내' },
   { path: 'core.footer.image', label: '마지막 사진 · 맨 아래' },
 ];
 
@@ -372,6 +378,7 @@ export default function Editor() {
     if (!doc) return null;
     return {
       invitationId: id,
+      themeId,
       doc,
       get: (path) => {
         let cursor: unknown = doc;
@@ -385,7 +392,7 @@ export default function Editor() {
       uploadImage: (path, file, alt) => uploadImageForPath(id, path, file, alt),
       uploadAudio: (file) => uploadAudio(id, file),
     };
-  }, [doc, id, setField]);
+  }, [doc, id, themeId, setField]);
 
   // ─────────────── 커버 ───────────────
   const layers = doc?.core.cover.layers ?? [];

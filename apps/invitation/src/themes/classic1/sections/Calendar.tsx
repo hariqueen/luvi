@@ -1,8 +1,7 @@
+import { resolveWeekdays } from '@luvi/schema';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
-
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 /** 예식일이 속한 달의 달력 셀(앞 공백 + 1~말일)을 계산 */
 function buildMonthCells(year: number, monthIndex: number): (number | null)[] {
@@ -41,12 +40,14 @@ function CountBox({ value, label, primary }: { value: number; label: string; pri
 
 export function Calendar() {
   const invitation = useInvitation();
-  const { calendar, weddingAt, sectionText } = invitation;
+  const { calendar, weddingAt, sectionText, labels, themeId } = invitation;
   const text = sectionText.calendar;
   const cd = useCountdown(weddingAt);
 
   const target = new Date(weddingAt);
   const cells = buildMonthCells(target.getFullYear(), target.getMonth());
+  // 일곱 칸이 아니면 기본값 — 개수가 어긋나면 요일과 날짜가 어긋난 채 그려집니다
+  const weekdays = resolveWeekdays(themeId, labels.calendarWeekdays);
 
   return (
     <section className="bg-cream px-7 py-[58px] text-center">
@@ -55,8 +56,9 @@ export function Calendar() {
 
       <div className="my-6 rounded-2xl border border-line bg-white px-[18px] py-[22px] shadow-sm">
         <div className="mb-2 grid grid-cols-7 text-xs font-bold text-ink-soft">
-          {WEEKDAYS.map((w, i) => (
-            <div key={w} className={i === 0 ? 'text-rose-deep' : i === 6 ? 'text-sage' : undefined}>
+          {weekdays.map((w, i) => (
+            // key 는 순번입니다 — 사용자가 같은 글자를 두 칸에 넣으면 글자로는 겹칩니다
+            <div key={i} className={i === 0 ? 'text-rose-deep' : i === 6 ? 'text-sage' : undefined}>
               {w}
             </div>
           ))}
@@ -86,10 +88,10 @@ export function Calendar() {
         override={{ note: 'font-myeongjo text-sm text-ink-soft' }}
       />
       <div className="flex justify-center gap-2">
-        <CountBox value={cd.d} label="DAYS" primary />
-        <CountBox value={cd.h} label="HOURS" />
-        <CountBox value={cd.m} label="MIN" />
-        <CountBox value={cd.s} label="SEC" />
+        <CountBox value={cd.d} label={labels.countdownDays} primary />
+        <CountBox value={cd.h} label={labels.countdownHours} />
+        <CountBox value={cd.m} label={labels.countdownMinutes} />
+        <CountBox value={cd.s} label={labels.countdownSeconds} />
       </div>
     </section>
   );

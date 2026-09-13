@@ -6,7 +6,7 @@ import { richToPlain } from '@luvi/schema';
 import { Field } from '@/components/common/Editable';
 
 export function Location() {
-  const { location, sectionText } = useInvitation();
+  const { location, sectionText, labels } = useInvitation();
   const text = sectionText.location;
   const { copy, isCopied } = useCopy();
 
@@ -59,7 +59,7 @@ export function Location() {
           rel="noopener"
           className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-[#FEE500] px-3 py-3 text-[13px] font-bold text-[#3A1D1D] no-underline transition-transform active:scale-95"
         >
-          카카오맵
+          {labels.mapKakao}
         </a>
         <a
           href={location.naverMapUrl}
@@ -67,7 +67,7 @@ export function Location() {
           rel="noopener"
           className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-[#03C75A] px-3 py-3 text-[13px] font-bold text-white no-underline transition-transform active:scale-95"
         >
-          네이버지도
+          {labels.mapNaver}
         </a>
       </div>
       <SectionText

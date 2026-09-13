@@ -8,6 +8,8 @@
  */
 
 import type { SectionBgMap } from './design';
+// 타입만 가져옵니다 — labels.ts 가 이 파일의 ThemeId 를 쓰므로 값을 주고받으면 순환합니다
+import type { LabelMap } from './labels';
 import { escapeRich } from './richText';
 import type { SectionTextMap } from './sectionText';
 
@@ -340,6 +342,17 @@ export interface CoreContent {
    *    없음·옛 모양·새 모양을 한 곳에서 처리합니다.
    */
   sectionText: SectionTextMap;
+  /**
+   * 버튼·자리표시자·단위처럼 **기능에 붙어 있어 블록으로 뺄 수 없는 글자** (`labels.ts`).
+   *
+   * 🔴 카드 문구(`sectionText`)와 성격이 다릅니다. 저쪽은 전부 지울 수 있어야 하지만,
+   *    버튼에서 글자를 빼면 누를 수 없는 버튼이 됩니다. 그래서 지울 수 있는 것
+   *    (`OPTIONAL_LABELS`)과 비우면 기본값으로 돌아가는 것을 나눠 뒀습니다.
+   *
+   * ⚠️ 이 필드가 생기기 전 문서·스냅샷에는 없습니다. 읽는 쪽은
+   *    `resolveLabels(themeId, core.labels)` 로 통과시키세요.
+   */
+  labels: LabelMap;
   /**
    * 화면 꾸미기 — 섹션마다 다르게 정할 수 있는 것.
    *

@@ -8,7 +8,8 @@ const fmtDate = (ts: number) =>
 
 export function Guestbook() {
   const { entries, submit } = useGuestbook();
-  const text = useInvitation().sectionText.guestbook;
+  const { sectionText, labels } = useInvitation();
+  const text = sectionText.guestbook;
   const [name, setName] = useState('');
   const [msg, setMsg] = useState('');
 
@@ -46,29 +47,35 @@ export function Guestbook() {
           ))}
         </div>
       ) : (
-        <div className="px-0 pb-[22px] pt-1.5 text-[13px] text-ink-soft">
-          아직 메시지가 없어요. 첫 한마디를 남겨주세요 💌
-        </div>
+        // 비어 있을 때의 안내 — 지우면 이 자리가 통째로 사라집니다 (labels.ts)
+        labels.guestbookEmpty && (
+          <div className="px-0 pb-[22px] pt-1.5 text-[13px] text-ink-soft">
+            {labels.guestbookEmpty}
+          </div>
+        )
       )}
 
       <div className="flex flex-col gap-2.5 rounded-xl bg-cream p-4">
-        <div className="mb-0.5 flex items-center justify-center gap-[7px]">
-          <span className="text-[17px]">💌</span>
-          <span className="text-[12.5px] font-bold text-rose-deep">
-            신랑 · 신부에게 한마디 남기기
-          </span>
-        </div>
+        {/* 머리글은 지울 수 있습니다. 💌 는 글자가 아니라 이 줄의 장식이라 남습니다 */}
+        {labels.guestbookFormTitle && (
+          <div className="mb-0.5 flex items-center justify-center gap-[7px]">
+            <span className="text-[17px]">💌</span>
+            <span className="text-[12.5px] font-bold text-rose-deep">
+              {labels.guestbookFormTitle}
+            </span>
+          </div>
+        )}
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="이름"
+          placeholder={labels.guestbookNamePlaceholder}
           maxLength={10}
           className="rounded-sm border border-line bg-white px-3.5 py-[11px] text-sm text-ink outline-none"
         />
         <textarea
           value={msg}
           onChange={(e) => setMsg(e.target.value)}
-          placeholder="축하 메시지를 남겨주세요"
+          placeholder={labels.guestbookMessagePlaceholder}
           maxLength={120}
           rows={3}
           className="resize-none rounded-sm border border-line bg-white px-3.5 py-[11px] text-sm text-ink outline-none"
@@ -77,7 +84,7 @@ export function Guestbook() {
           onClick={onSubmit}
           className="cursor-pointer rounded-full border-none bg-rose py-3 text-sm font-extrabold text-white shadow-[0_6px_0_#A65A6E] transition-[transform,box-shadow] duration-100 active:translate-y-[3px] active:shadow-[0_3px_0_#A65A6E]"
         >
-          💌 메시지 남기기
+          {labels.guestbookSubmit}
         </button>
       </div>
 

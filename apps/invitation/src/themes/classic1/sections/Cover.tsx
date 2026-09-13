@@ -11,7 +11,7 @@ import { useInvitation } from '@/lib/invitationContext';
 import { CoverLayers } from '@/components/common/CoverLayers';
 
 export function Cover() {
-  const { cover } = useInvitation();
+  const { cover, labels } = useInvitation();
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -58,9 +58,12 @@ export function Cover() {
       {/* 자유 배치 텍스트 레이어 (미리보기에서는 끌어 옮기고 눌러서 고칩니다) */}
       <CoverLayers layers={cover.layers} size={size} maxWidth="86%" />
 
-      <div className="absolute bottom-[22px] left-1/2 z-[2] -translate-x-1/2 animate-floatY text-[10px] tracking-[0.3em] text-white opacity-85">
-        SCROLL ↓
-      </div>
+      {/* 스크롤 안내 — 비우면 사라집니다 (labels.ts 의 OPTIONAL_LABELS) */}
+      {labels.coverScroll && (
+        <div className="absolute bottom-[22px] left-1/2 z-[2] -translate-x-1/2 animate-floatY text-[10px] tracking-[0.3em] text-white opacity-85">
+          {labels.coverScroll}
+        </div>
+      )}
     </section>
   );
 }

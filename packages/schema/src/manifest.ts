@@ -67,6 +67,14 @@ export interface FieldDef {
   label: string;
   /** 라벨 아래 도움말 */
   hint?: string;
+  /**
+   * 입력칸이 비었을 때 회색으로 보여줄 글자 (`text`·`textarea`).
+   *
+   * 🔴 **"비우면 무엇이 나오는지" 를 보여주는 자리입니다.** 화면 라벨(`core.labels.*`)은
+   *    비우면 기본 문구로 돌아가는데, 빈 칸만 보이면 사용자는 버튼 글자가 사라진 줄 압니다.
+   *    기본 문구를 여기 넣어 두면 비운 상태가 곧 미리보기와 일치합니다 (`labels.ts`).
+   */
+  placeholder?: string;
   required?: boolean;
   maxLength?: number;
   /** textarea 줄 수 */
@@ -180,6 +188,21 @@ export const CORE_SECTIONS: SectionDef[] = [
         hint: '달력·D-day·일정등록이 모두 이 값에서 계산됩니다',
         required: true,
       },
+      /**
+       * 달력·남은 날짜 세기의 **글자**. 날짜 자체는 위 `weddingAt` 에서 계산되지만
+       * 요일 머리글과 단위는 디자인에 박혀 있어 고칠 수 없었습니다 (`labels.ts`).
+       */
+      {
+        path: 'core.labels.calendarWeekdays',
+        type: 'text',
+        label: '요일 머리글',
+        hint: '쉼표로 일곱 칸. 일곱 개가 아니면 기본값이 쓰입니다',
+        maxLength: 80,
+      },
+      { path: 'core.labels.countdownDays', type: 'text', label: '남은 날짜 단위 · 일', maxLength: 20 },
+      { path: 'core.labels.countdownHours', type: 'text', label: '남은 날짜 단위 · 시', maxLength: 20 },
+      { path: 'core.labels.countdownMinutes', type: 'text', label: '남은 날짜 단위 · 분', maxLength: 20 },
+      { path: 'core.labels.countdownSeconds', type: 'text', label: '남은 날짜 단위 · 초', maxLength: 20 },
     ],
   },
   /**
@@ -202,6 +225,17 @@ export const CORE_SECTIONS: SectionDef[] = [
         type: 'image',
         label: '커버 사진',
         hint: '첫 화면에 깔리는 사진. 이 사진 위에 문구가 얹힙니다',
+      },
+      /**
+       * 맨 아래 스크롤 안내. 문구 레이어가 아니라 화면 아래에 고정된 글자라 캔버스에서
+       * 집을 수 없어서 여기 둡니다. **비우면 사라집니다** (`OPTIONAL_LABELS`).
+       */
+      {
+        path: 'core.labels.coverScroll',
+        type: 'text',
+        label: '스크롤 안내',
+        hint: '첫 화면 맨 아래 글자. 비우면 사라집니다',
+        maxLength: 40,
       },
     ],
   },
@@ -227,6 +261,19 @@ export const CORE_SECTIONS: SectionDef[] = [
         label: '사진',
         hint: '첫 번째 사진이 대표로 크게 보입니다. 끌어서 순서를 바꿀 수 있어요',
         max: 10,
+      },
+      /**
+       * 안내 문구 뒤에 붙는 한 마디. 사진이 2장 이상일 때만 나옵니다.
+       *
+       * ⚠️ 이 그룹은 폼으로 열리지 않습니다 (갤러리 카드는 '사진' 폼으로 갑니다).
+       *    그래서 이 경로를 `Editor.tsx` 의 `PHOTO_FIELDS` 가 함께 끌어갑니다.
+       */
+      {
+        path: 'core.labels.gallerySwipeHint',
+        type: 'text',
+        label: '넘기기 안내',
+        hint: '사진이 2장 이상일 때 안내 문구 뒤에 붙습니다. 비우면 사라집니다',
+        maxLength: 40,
       },
     ],
   },
@@ -257,6 +304,19 @@ export const CORE_SECTIONS: SectionDef[] = [
           { path: 'title', type: 'text', label: '수단', maxLength: 20, previewEdit: true },
           { path: 'desc', type: 'textarea', label: '안내', rows: 2, maxLength: 200, previewEdit: true },
         ],
+      },
+      /**
+       * 지도 버튼의 **글자**. 위 링크 칸과 짝입니다 (링크는 어디로 가는지, 여기는 뭐라고 적히는지).
+       * 버튼이라 비우면 기본값으로 돌아갑니다 (`labels.ts`).
+       */
+      { path: 'core.labels.mapKakao', type: 'text', label: '카카오맵 버튼 글자', maxLength: 20 },
+      { path: 'core.labels.mapNaver', type: 'text', label: '네이버지도 버튼 글자', maxLength: 20 },
+      {
+        path: 'core.labels.mapTel',
+        type: 'text',
+        label: '전화 버튼 글자',
+        hint: '세이지 가든에서만 보입니다 (로즈 클래식은 전화 아이콘)',
+        maxLength: 20,
       },
     ],
   },
@@ -373,6 +433,39 @@ export const CORE_SECTIONS: SectionDef[] = [
         hint: '{점수} 를 쓸 수 있습니다. 비우면 그 줄이 사라집니다',
         maxLength: 60,
       },
+      /**
+       * 게임이 끝난 뒤의 화면. 시작 화면·결과 문구는 위에 있었는데 **끝난 뒤의 글자만**
+       * 테마에 박혀 있었습니다 (`labels.ts` 로 옮겼습니다).
+       */
+      { path: 'core.labels.gameOver', type: 'text', label: '게임 끝 제목', maxLength: 30 },
+      {
+        path: 'core.labels.gameScoreUnit',
+        type: 'text',
+        label: '점수 단위',
+        hint: '결과와 랭킹판의 숫자 뒤에 붙습니다',
+        maxLength: 10,
+      },
+      { path: 'core.labels.gameRetry', type: 'text', label: '다시 하기 버튼', maxLength: 20 },
+      {
+        path: 'core.labels.gameRankSubmit',
+        type: 'text',
+        label: '랭킹 등록 버튼',
+        maxLength: 30,
+      },
+      {
+        path: 'core.labels.gameNicknamePlaceholder',
+        type: 'text',
+        label: '닉네임칸 안내',
+        maxLength: 30,
+      },
+      {
+        path: 'core.labels.gameRanked',
+        type: 'text',
+        label: '등록됐을 때',
+        hint: '{순위} 자리에 등수가 들어갑니다',
+        maxLength: 40,
+      },
+      { path: 'core.labels.gameRankSkip', type: 'text', label: '등록 없이 다시하기 버튼', maxLength: 30 },
       {
         path: 'theme.classic1.game.leaderboard.show',
         type: 'toggle',
@@ -413,12 +506,48 @@ export const CORE_SECTIONS: SectionDef[] = [
       },
     ],
   },
-  /** 켜고 끄는 것만 있는 섹션. 담긴 섹션 목록에서 빼면 사라진다 */
+  /**
+   * 방명록 — 하객이 **글을 남기는** 섹션이라, 커플이 쓰는 글은 머리말뿐이고 나머지는
+   * 전부 입력 UI 의 글자입니다. 그 글자들이 테마에 박혀 있어 예전에는 이 폼이 통째로
+   * 비어 있었습니다 (담기·빼기 말고는 할 수 있는 것이 없었습니다).
+   *
+   * 머리말·안내 문구는 카드 문구 블록이라 미리보기에서 고칩니다 (`sectionText.ts`).
+   */
   {
     key: 'guestbook',
     label: '방명록',
     required: false,
-    fields: [],
+    fields: [
+      {
+        path: 'core.labels.guestbookFormTitle',
+        type: 'text',
+        label: '입력칸 머리글',
+        hint: '입력칸 위에 적히는 한 줄. 비우면 사라집니다',
+        maxLength: 40,
+      },
+      {
+        path: 'core.labels.guestbookNamePlaceholder',
+        type: 'text',
+        label: '이름칸 안내',
+        hint: '입력칸이 비었을 때 회색으로 보이는 글자',
+        maxLength: 20,
+      },
+      {
+        path: 'core.labels.guestbookMessagePlaceholder',
+        type: 'text',
+        label: '메시지칸 안내',
+        maxLength: 40,
+      },
+      { path: 'core.labels.guestbookSubmit', type: 'text', label: '남기기 버튼 글자', maxLength: 20 },
+      {
+        path: 'core.labels.guestbookEmpty',
+        type: 'textarea',
+        label: '아직 아무도 안 남겼을 때',
+        hint: '방명록이 비어 있을 때만 보입니다. 비우면 사라집니다',
+        rows: 2,
+        maxLength: 80,
+      },
+    ],
   },
   /**
    * 마무리 — 청첩장 맨 아래 사진.
@@ -439,6 +568,25 @@ export const CORE_SECTIONS: SectionDef[] = [
         hint: '맨 아래 감사 인사 뒤에 깔리는 사진. 비워두면 커버 사진을 씁니다',
         inheritFrom: 'core.cover.image',
         inheritLabel: '커버 사진',
+      },
+      /**
+       * 공유 버튼의 글자. 누르는 동안 바뀌는 글자(`…Busy`·`…Copied`)까지 함께 엽니다 -
+       * 한쪽만 열어두면 버튼을 고친 사람이 누른 뒤에 낯선 문구를 보게 됩니다.
+       */
+      { path: 'core.labels.shareKakao', type: 'text', label: '카카오톡 공유 버튼', maxLength: 30 },
+      {
+        path: 'core.labels.shareKakaoBusy',
+        type: 'text',
+        label: '카카오톡 공유 · 누르는 중',
+        hint: '카카오톡이 열리는 동안 잠깐 보입니다',
+        maxLength: 30,
+      },
+      { path: 'core.labels.shareCopy', type: 'text', label: '링크 복사 버튼', maxLength: 30 },
+      {
+        path: 'core.labels.shareCopied',
+        type: 'text',
+        label: '링크 복사 · 복사된 뒤',
+        maxLength: 30,
       },
     ],
   },

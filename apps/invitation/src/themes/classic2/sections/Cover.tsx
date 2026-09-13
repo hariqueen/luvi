@@ -17,7 +17,7 @@ import { CoverLayers } from '@/components/common/CoverLayers';
 import { Rich } from '@/components/common/Rich';
 
 export function Cover() {
-  const { cover, location } = useInvitation();
+  const { cover, location, labels } = useInvitation();
   const frameRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -96,9 +96,12 @@ export function Cover() {
           </div>
         )}
 
-        <div className="mt-8 animate-floatY text-[10px] tracking-[0.3em] text-c2-ink-soft">
-          SCROLL
-        </div>
+        {/* 스크롤 안내 — 비우면 사라집니다 (labels.ts 의 OPTIONAL_LABELS) */}
+        {labels.coverScroll && (
+          <div className="mt-8 animate-floatY text-[10px] tracking-[0.3em] text-c2-ink-soft">
+            {labels.coverScroll}
+          </div>
+        )}
       </div>
     </section>
   );

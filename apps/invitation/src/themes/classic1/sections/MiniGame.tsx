@@ -5,14 +5,20 @@
  * 결과 문구, 랭킹 문구. 이 파일에 문장을 새로 적으면 편집 화면에서 바꿀 수 없는 글이
  * 생기므로, 기본 문구는 스키마(`DEFAULT_GAME_TEXTS`)에만 둡니다.
  *
+ * ⚠️ 2026-09-13 이전에는 그 원칙이 **절반만** 지켜졌습니다. 시작 화면까지는 편집 값이었는데
+ *    게임이 끝난 뒤의 화면('Game Over'·'다시 도전'·랭킹 등록)은 여기 박혀 있었습니다.
+ *    지금은 `core.labels.*` 로 나갔습니다 (`labels.ts`).
+ *
  * `{이름}`·`{횟수}`·`{점수}` 는 `fillGameText` 가 실제 값으로 바꿉니다.
+ * 랭킹 등록 안내의 `{순위}` 는 등수만 굵게 그려야 해서 `splitRankLabel` 로 잘라 씁니다.
  */
 import { useEffect, useRef, useState } from 'react';
-import { fillGameText } from '@luvi/schema';
+import { fillGameText, splitRankLabel } from '@luvi/schema';
 import { CatchGame, type GameResult } from '@/game/catchGame';
 import { useRankings } from '@/hooks/useRankings';
 import { useInvitation } from '@/lib/invitationContext';
 import { GameIntro, GameSpriteView, type BlockClassMap } from '@/components/common/GameParts';
+import { SectionText } from '../ui';
 
 type Phase = 'idle' | 'playing' | 'over';
 
@@ -33,8 +39,11 @@ const INTRO_CLASSES: BlockClassMap = {
 };
 
 export function MiniGame() {
-  const { game } = useInvitation();
+  const { game, sectionText, labels } = useInvitation();
   const { texts, leaderboard } = game;
+  const text = sectionText.minigame;
+  // 등수만 굵게 그려야 해서 `{순위}` 앞뒤로 자릅니다 (labels.ts)
+  const ranked = splitRankLabel(labels.gameRanked);
   const { rows, hasBoard, register, myRank } = useRankings(leaderboard.size);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -76,6 +85,14 @@ export function MiniGame() {
 
   return (
     <section className="bg-gradient-to-b from-cream to-ivory px-[22px] py-[56px] text-center">
+      {/*
+        🔴 다른 카드와 같은 두 자리(카드 위·콘텐츠 아래)를 여기도 그립니다.
+           예전에는 이 섹션만 없어서, 에디터에서 '텍스트 상자 추가(T)' 를 눌러 만든 문구가
+           **저장은 되는데 화면에 나오지 않았습니다** (`core.sectionText.minigame` 에 들어가는데
+           읽는 곳이 없었습니다). 소개 문단(`game.intro`)과는 별개의 자리입니다.
+      */}
+      <SectionText section="minigame" zone="head" blocks={text.head} className="mb-5" />
+
       <GameIntro blocks={game.intro} petName={game.petName} classes={INTRO_CLASSES} />
 
       {/* 게임 캔버스 + 오버레이 */}
@@ -112,7 +129,9 @@ export function MiniGame() {
 
         {phase === 'over' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[rgba(58,51,46,.82)] p-6 text-center text-white backdrop-blur-[3px]">
-            <div className="font-cormorant text-3xl tracking-[0.04em] opacity-90">Game Over</div>
+            <div className="font-cormorant text-3xl tracking-[0.04em] opacity-90">
+              {labels.gameOver}
+            </div>
             {texts.resultCaught.trim() && (
               <div className="mt-1.5 whitespace-pre-line text-[13px] opacity-85">
                 {fillGameText(texts.resultCaught, vars)}
@@ -120,7 +139,7 @@ export function MiniGame() {
             )}
             <div className="mb-0.5 mt-2 font-mono text-[46px] font-extrabold text-[#ffd9a8]">
               {result.score}
-              <span className="text-lg"> 초</span>
+              <span className="text-lg"> {labels.gameScoreUnit}</span>
             </div>
             {texts.resultHint.trim() && (
               <div className="mb-[18px] whitespace-pre-line text-xs opacity-80">
@@ -134,18 +153,20 @@ export function MiniGame() {
             */}
             {!leaderboard.show ? (
               <button onClick={startGame} className={`${pushBtn} mt-2 px-9 py-3 text-[15px]`}>
-                다시 도전
+                {labels.gameRetry}
               </button>
             ) : registered ? (
               <div className="flex flex-col items-center gap-3.5">
                 <div className="text-[15px] font-bold">
-                  🎉 랭킹 <b className="text-[#ffd9a8]">{myRank}위</b>로 등록됐어요!
+                  {ranked.before}
+                  <b className="text-[#ffd9a8]">{myRank}</b>
+                  {ranked.after}
                 </div>
                 <button
                   onClick={startGame}
                   className="cursor-pointer rounded-full border border-white/50 bg-transparent px-[30px] py-[11px] text-sm font-semibold text-white"
                 >
-                  다시 도전
+                  {labels.gameRetry}
                 </button>
               </div>
             ) : (
@@ -153,7 +174,7 @@ export function MiniGame() {
                 <input
                   value={nick}
                   onChange={(e) => setNick(e.target.value)}
-                  placeholder="닉네임을 입력하세요"
+                  placeholder={labels.gameNicknamePlaceholder}
                   maxLength={12}
                   className="w-full rounded-full border-none bg-white px-4 py-3 text-center text-sm text-ink outline-none"
                 />
@@ -161,13 +182,13 @@ export function MiniGame() {
                   onClick={onRegister}
                   className="w-full cursor-pointer rounded-full border-none bg-rose py-3.5 text-[15px] font-extrabold text-white shadow-[0_6px_0_#A65A6E] transition-[transform,box-shadow] duration-100 active:translate-y-[3px] active:shadow-[0_3px_0_#A65A6E]"
                 >
-                  🏆 랭킹에 등록하기
+                  {labels.gameRankSubmit}
                 </button>
                 <button
                   onClick={startGame}
                   className="cursor-pointer border-none bg-transparent text-[13px] text-white/75 underline"
                 >
-                  등록 없이 다시하기
+                  {labels.gameRankSkip}
                 </button>
               </div>
             )}
@@ -197,7 +218,10 @@ export function MiniGame() {
                     {b.medal}
                   </div>
                   <div className="flex-1 text-left text-sm font-semibold text-ink">{b.nick}</div>
-                  <div className="font-mono text-sm font-bold text-ink">{b.score}초</div>
+                  <div className="font-mono text-sm font-bold text-ink">
+                    {b.score}
+                    {labels.gameScoreUnit}
+                  </div>
                 </div>
               ))}
             </div>
@@ -214,6 +238,8 @@ export function MiniGame() {
           )}
         </div>
       )}
+
+      <SectionText section="minigame" zone="foot" blocks={text.foot} className="mt-6" />
     </section>
   );
 }

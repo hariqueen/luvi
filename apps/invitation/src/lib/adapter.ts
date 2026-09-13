@@ -12,6 +12,7 @@ import {
   normalizeGame,
   normalizePetalItems,
   normalizeSectionBg,
+  resolveLabels,
   resolveParentsLine,
   resolveSectionText,
 } from '@luvi/schema';
@@ -177,6 +178,12 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
       // 미리보기에서는 글자를 직접 고칩니다 — 다 지웠다고 줄을 없애면 커서를 잃습니다
       { keepEmpty: IS_PREVIEW },
     ),
+
+    /**
+     * 버튼·자리표시자·단위의 글자. 위와 같은 이유로 여기서 해결합니다 — 테마가 각자
+     * `?? '기본값'` 을 적으면 두 테마의 기본값이 조용히 어긋납니다 (`labels.ts`).
+     */
+    labels: resolveLabels(pub.themeId, c.labels),
 
     showPetals: pub.features.petals,
 

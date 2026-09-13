@@ -13,7 +13,7 @@ import { useInvitation } from '@/lib/invitationContext';
 import { Field } from '@/components/common/Editable';
 
 export function Footer() {
-  const { footer, groom, bride, share, sectionText } = useInvitation();
+  const { footer, groom, bride, share, sectionText, labels } = useInvitation();
   const text = sectionText.footer;
   const { kakaoAvailable, sharing, shareNote, linkCopied, shareToKakao, copyLink } = useShare();
 
@@ -67,14 +67,14 @@ export function Footer() {
               disabled={sharing}
               className="cursor-pointer rounded-full border border-c2-sage bg-white px-6 py-[11px] text-[12.5px] text-c2-sage-deep disabled:opacity-70"
             >
-              {sharing ? '여는 중…' : '카카오톡으로 공유'}
+              {sharing ? labels.shareKakaoBusy : labels.shareKakao}
             </button>
           )}
           <button
             onClick={copyLink}
             className="cursor-pointer rounded-full border border-c2-line bg-white px-6 py-[11px] text-[12.5px] text-c2-ink"
           >
-            {linkCopied ? '링크 복사됨' : '청첩장 링크 복사'}
+            {linkCopied ? labels.shareCopied : labels.shareCopy}
           </button>
         </div>
 

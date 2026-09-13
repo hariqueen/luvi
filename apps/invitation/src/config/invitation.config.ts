@@ -13,10 +13,12 @@ import {
   DEFAULT_GAME_TEXTS,
   defaultCoverLayers,
   defaultGameIntro,
+  resolveLabels,
   resolveSectionText,
   type GameId,
   type GameLeaderboard,
   type GameTexts,
+  type ResolvedLabels,
   type ResolvedSectionText,
   type SectionBgMap,
   type SectionKey,
@@ -208,6 +210,15 @@ export interface InvitationConfig {
    * 그대로 그리면 됩니다 (빈 문자열이면 그 디자인에 그 자리가 없다는 뜻입니다).
    */
   sectionText: ResolvedSectionText;
+
+  /**
+   * 버튼·자리표시자·단위의 글자 — **이미 해결된 값**입니다.
+   *
+   * `sectionText` 와 같은 규칙입니다: 어댑터가 "사용자가 고친 값 → 없거나 (지울 수 없는
+   * 라벨인데) 비었으면 디자인 기본값" 까지 끝내서 넣습니다. 섹션은 그대로 그립니다.
+   * 빈 문자열이면 **사용자가 일부러 지운 것**이므로 그 자리를 그리지 않습니다 (`labels.ts`).
+   */
+  labels: ResolvedLabels;
 
   /** 떨어지는 효과 노출 여부 (모양·양은 아래 petals) */
   showPetals: boolean;
@@ -405,6 +416,9 @@ export const invitation: InvitationConfig = {
   // 예시 데이터는 디자인 기본 배경·기본 문구를 그대로 씁니다
   sectionBg: {},
   sectionText: resolveSectionText('classic1', {}, { 신랑: '신랑', 신부: '신부' }),
+
+  // 이 파일은 스냅샷이 없을 때 쓰는 예시입니다 - 라벨도 그 디자인의 기본값 그대로
+  labels: resolveLabels('classic1', {}),
 
   sections: [
     'cover',

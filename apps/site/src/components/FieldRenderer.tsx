@@ -10,7 +10,13 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import type { AssetRef, FieldDef, PetalItem, TextBlock, TextBlockStyle } from '@luvi/schema';
-import { GAME_LIST, PETAL_EMOJIS, PETAL_ITEM_MAX, createTextBlock } from '@luvi/schema';
+import {
+  GAME_LIST,
+  PETAL_EMOJIS,
+  PETAL_ITEM_MAX,
+  createTextBlock,
+  defaultLabelForPath,
+} from '@luvi/schema';
 import { assetUrl } from '@/lib/env';
 import { useEditor, type EditorContextValue } from '@/lib/editorContext';
 
@@ -794,6 +800,16 @@ export function FieldRenderer({
    */
   if (field.previewEdit) return null;
 
+  /**
+   * 입력칸이 비었을 때 보여줄 글자.
+   *
+   * 화면 라벨(`core.labels.*`)은 **비우면 기본 문구로 돌아갑니다.** 그때 빈 칸만 보이면
+   * 사용자는 버튼 글자가 사라진 줄 알고 다시 적습니다. 그 테마의 기본 문구를 회색으로
+   * 보여주면, 비운 상태가 곧 미리보기와 같다는 것이 눈으로 확인됩니다 (`labels.ts`).
+   */
+  const placeholder =
+    field.placeholder ?? defaultLabelForPath(editor.themeId, field.path) ?? field.label;
+
   switch (field.type) {
     case 'textarea':
       return (
@@ -804,7 +820,7 @@ export function FieldRenderer({
             maxLength={field.maxLength}
             value={str}
             onChange={(e) => bound.set(e.target.value)}
-            placeholder={field.label}
+            placeholder={placeholder}
             className={`${inputClass} resize-none leading-relaxed`}
           />
         </div>
@@ -1002,7 +1018,7 @@ export function FieldRenderer({
             maxLength={field.maxLength}
             value={str}
             onChange={(e) => bound.set(e.target.value)}
-            placeholder={field.label}
+            placeholder={placeholder}
             className={inputClass}
           />
         </div>

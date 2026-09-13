@@ -2,13 +2,13 @@
  * 예식일 (classic2) — 흰 카드 달력 + 콜론으로 잇는 카운트다운.
  *
  * 달력 계산(앞 공백 + 말일)은 classic1 과 같은 규칙이지만 표기는 이 디자인의 것입니다
- * (요일 머리글이 국문 '일월화…' 가 아니라 영문 'SUN MON…').
+ * (요일 머리글의 기본값이 국문 '일월화…' 가 아니라 영문 'SUN MON…' 입니다 — 두 테마의
+ * 기본값은 `LABEL_DEFAULTS` 한 곳에 모여 있고, 사용자가 고치면 그 값이 이깁니다).
  */
+import { resolveWeekdays } from '@luvi/schema';
 import { useCountdown } from '@/hooks/useCountdown';
 import { SectionText } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
-
-const WEEKDAYS_EN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 /** 예식일이 속한 달의 달력 셀(앞 공백 + 1~말일)을 계산 */
 function buildMonthCells(year: number, monthIndex: number): (number | null)[] {
@@ -30,12 +30,14 @@ function CountUnit({ value, label }: { value: number; label: string }) {
 }
 
 export function Calendar() {
-  const { calendar, weddingAt, sectionText } = useInvitation();
+  const { calendar, weddingAt, sectionText, labels, themeId } = useInvitation();
   const text = sectionText.calendar;
   const cd = useCountdown(weddingAt);
 
   const target = new Date(weddingAt);
   const cells = buildMonthCells(target.getFullYear(), target.getMonth());
+  // 일곱 칸이 아니면 기본값 — 개수가 어긋나면 요일과 날짜가 어긋난 채 그려집니다
+  const weekdays = resolveWeekdays(themeId, labels.calendarWeekdays);
 
   return (
     <section className="bg-c2-ivory px-[30px] py-[60px] text-center">
@@ -47,8 +49,9 @@ export function Calendar() {
         </div>
 
         <div className="mb-2.5 grid grid-cols-7 text-[11px] font-bold tracking-[0.04em] text-c2-ink-soft">
-          {WEEKDAYS_EN.map((w) => (
-            <div key={w}>{w}</div>
+          {/* key 는 순번입니다 — 사용자가 같은 글자를 두 칸에 넣으면 글자로는 겹칩니다 */}
+          {weekdays.map((w, i) => (
+            <div key={i}>{w}</div>
           ))}
         </div>
 
@@ -68,13 +71,13 @@ export function Calendar() {
       </div>
 
       <div className="mt-8 flex items-end justify-center gap-1">
-        <CountUnit value={cd.d} label="DAYS" />
+        <CountUnit value={cd.d} label={labels.countdownDays} />
         <span className="pb-3.5 font-cormorant text-[26px] text-c2-gold">:</span>
-        <CountUnit value={cd.h} label="HOURS" />
+        <CountUnit value={cd.h} label={labels.countdownHours} />
         <span className="pb-3.5 font-cormorant text-[26px] text-c2-gold">:</span>
-        <CountUnit value={cd.m} label="MIN" />
+        <CountUnit value={cd.m} label={labels.countdownMinutes} />
         <span className="pb-3.5 font-cormorant text-[26px] text-c2-gold">:</span>
-        <CountUnit value={cd.s} label="SEC" />
+        <CountUnit value={cd.s} label={labels.countdownSeconds} />
       </div>
 
       {/* 이름은 어댑터가 이미 치환했습니다 ({신랑}·{신부}) */}
