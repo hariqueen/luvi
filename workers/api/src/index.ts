@@ -38,6 +38,10 @@ import type {
   ConsentRecord,
   DeleteAccountResult,
   ExistingAccountHint,
+  LinkAccountBody,
+  LinkAccountResult,
+  LinkedIdentity,
+  SocialProvider,
   SubmitConsentsBody,
   UpdateAccountBody,
 } from '@luvi/schema';
@@ -71,6 +75,7 @@ import * as guestbookRepo from './repo/guestbook';
 import * as rankingsRepo from './repo/rankings';
 import * as usersRepo from './repo/users';
 import * as consentsRepo from './repo/consents';
+import * as identitiesRepo from './repo/identities';
 import { createFormEntry } from './repo/forms';
 import { sampleContent } from './sample';
 
@@ -145,6 +150,8 @@ const STATUS: Record<ApiError['code'], 400 | 401 | 403 | 404 | 409 | 429 | 500> 
   // 401 로 주면 클라이언트가 "토큰 만료" 로 보고 로그아웃시켜, 동의할 화면조차 못 엽니다.
   consent_required: 403,
   account_exists: 409,
+  // 이 로그인 수단을 다른 계정이 이미 쓰고 있습니다. 붙일 자리가 없다는 뜻이라 409 입니다.
+  link_conflict: 409,
   internal: 500,
 };
 
@@ -1147,22 +1154,38 @@ app.post('/api/auth/:provider', async (c) => {
       code,
       redirectUri,
       state,
-      credentials: {
-        kakaoRestKey: c.env.KAKAO_REST_KEY,
-        kakaoClientSecret: c.env.KAKAO_CLIENT_SECRET,
-        naverClientId: c.env.NAVER_CLIENT_ID,
-        naverClientSecret: c.env.NAVER_CLIENT_SECRET,
-      },
+      credentials: socialCredentials(c.env),
     });
 
-    // 🔴 커스텀 토큰을 만들기 **전에** 중복 가입을 막습니다. 토큰을 먼저 내주면
-    //    클라이언트가 이미 로그인해버린 뒤라 되돌릴 방법이 없습니다.
-    await assertNoExistingAccount(firestore(c.env), profile);
+    // ─── 어느 계정으로 들어갈지 정합니다 ─────────────────────────────
+    //
+    // 같은 사람이 카카오·네이버·구글로 계정을 따로 만들지 않도록, **연결해 둔 수단이면
+    // 기존 계정의 uid 로** 커스텀 토큰을 서명합니다. 커스텀 토큰은 uid 를 우리가 정하므로
+    // 이것만으로 "카카오로 로그인했는데 구글 계정으로 들어오는" 동작이 됩니다.
+    //
+    // 🔴 연결은 **계정 설정에서만** 만들어집니다(`POST /api/account/link/:provider`).
+    //    이메일이 같다고 여기서 자동으로 합치면, 남의 이메일로 소셜 계정을 만들어 그 계정에
+    //    올라타는 경로가 됩니다. 자세한 이유는 repo/identities.ts 주석에 있습니다.
+    const db = firestore(c.env);
+    const linked = await identitiesRepo.findByKey(db, profile.uid);
+
+    let targetUid = linked?.uid ?? null;
+    let firstTime = false;
+
+    if (!targetUid) {
+      // 연결 기능이 생기기 전에 이 소셜로 직접 가입한 사람은 소셜 uid 자체가 계정입니다
+      firstTime = (await db.get(`users/${profile.uid}`)) === null;
+      targetUid = profile.uid;
+
+      // 🔴 커스텀 토큰을 만들기 **전에** 중복 가입을 막습니다. 토큰을 먼저 내주면
+      //    클라이언트가 이미 로그인해버린 뒤라 되돌릴 방법이 없습니다.
+      if (firstTime) await assertNoExistingAccount(db, profile);
+    }
 
     const customToken = await createCustomToken({
       clientEmail: sa.clientEmail,
       privateKeyPem: sa.privateKeyPem,
-      uid: profile.uid,
+      uid: targetUid,
       claims: { provider: profile.provider },
     });
 
@@ -1179,13 +1202,26 @@ app.post('/api/auth/:provider', async (c) => {
     // 프로필 저장은 실패해도 로그인을 막지 않습니다 — 다음 로그인에 다시 시도됩니다.
     // 전화번호는 더 이상 받지도 저장하지도 않습니다 (2026-09-12, 사유는 lib/social.ts 주석)
     try {
-      await usersRepo.upsertUser(firestore(c.env), {
-        uid: profile.uid,
+      await usersRepo.upsertUser(db, {
+        uid: targetUid,
         email: profile.email,
         displayName: profile.displayName,
         photoURL: profile.photoURL,
         provider: profile.provider,
+        // 연결된 보조 수단으로 들어온 경우입니다. 본계정 이름·사진을 덮지 않습니다 —
+        // 덮으면 로그인 수단에 따라 표시 이름이 왔다 갔다 합니다.
+        preserveProfile: targetUid !== profile.uid,
       });
+
+      // 신규 가입도 자기 자신을 가리키는 줄을 남깁니다. 그래야 앞으로는 이 표 하나만
+      // 보면 되고, `users/{소셜uid}` 존재 여부에 기대는 분기가 늘어나지 않습니다.
+      if (firstTime) {
+        await identitiesRepo.link(db, {
+          key: profile.uid,
+          provider: profile.provider,
+          uid: targetUid,
+        });
+      }
     } catch (e) {
       console.error('[api] 사용자 문서 저장 실패', e);
     }
@@ -1209,8 +1245,8 @@ app.post('/api/auth/:provider', async (c) => {
  *    탈취 경로가 되기 때문입니다. 실제 계정 연결은 *기존 계정으로 로그인한 상태에서*
  *    계정 설정 화면을 통해서만 이루어져야 합니다.
  *
- * **이미 가입한 사람은 그냥 통과합니다** — `users/{uid}` 문서가 있으면 재방문이므로
- * 검사 대상이 아닙니다. 검사는 *처음 들어온 uid* 에만 겁니다.
+ * **호출부가 신규 uid 일 때만 부릅니다.** 재방문자·연결된 수단은 이 검사를 지나지 않습니다
+ * (`POST /api/auth/:provider` 에서 identities · users 를 먼저 봅니다).
  *
  * ⚠️ **적용 범위는 카카오·네이버뿐입니다.** 구글·이메일 로그인은 클라이언트가 Firebase 로
  *    직접 인증해 이 라우트를 지나지 않습니다. 그쪽은 Firebase 콘솔의
@@ -1225,9 +1261,6 @@ async function assertNoExistingAccount(
   profile: { uid: string; email: string | null },
 ): Promise<void> {
   if (!profile.email) return; // 매칭할 키가 없으면 판단하지 않습니다
-
-  // 재방문자는 검사하지 않습니다 (자기 자신과 부딪히는 것을 막는 것이 아니라, 읽기를 아낍니다)
-  if (await db.get(`users/${profile.uid}`)) return;
 
   const existing = await usersRepo.findByEmail(db, profile.email, profile.uid);
   if (!existing) return;
@@ -1362,13 +1395,47 @@ app.post('/api/consents', async (c) => {
   return c.json(ok<ConsentRecord[]>(records), 201);
 });
 
-app.get('/api/account', async (c) => {
-  const uid = requireUid(c);
-  const profile = await usersRepo.readAccount(firestore(c.env), uid);
+/**
+ * 계정 정보 + 연결된 로그인 수단.
+ *
+ * 둘이 다른 곳(`users` · `identities`)에 있어 여기서 합칩니다. 사용자 문서 저장소가
+ * 로그인 수단 표까지 알 필요는 없어서 `readAccount` 는 일부러 모릅니다.
+ */
+async function accountProfile(db: Firestore, uid: string): Promise<AccountProfile> {
+  const [profile, links] = await Promise.all([
+    usersRepo.readAccount(db, uid),
+    identitiesRepo.listByUid(db, uid),
+  ]);
   if (!profile) {
     throw new HttpError({ code: 'not_found', message: '계정 정보를 찾을 수 없습니다' });
   }
-  return c.json(ok<AccountProfile>(profile));
+
+  const linkedProviders: LinkedIdentity[] = links
+    .filter((l) => isSocialProvider(l.provider))
+    .map((l) => ({ provider: l.provider as SocialProvider, linkedAt: l.linkedAt }))
+    .sort((a, b) => a.provider.localeCompare(b.provider));
+
+  return { ...profile, linkedProviders };
+}
+
+const isSocialProvider = (v: string): v is SocialProvider => v === 'kakao' || v === 'naver';
+
+/** 소셜 라우트 셋이 같은 자격 증명을 씁니다 */
+const socialCredentials = (env: Env) => ({
+  kakaoRestKey: env.KAKAO_REST_KEY,
+  kakaoClientSecret: env.KAKAO_CLIENT_SECRET,
+  naverClientId: env.NAVER_CLIENT_ID,
+  naverClientSecret: env.NAVER_CLIENT_SECRET,
+});
+
+function requireSocialProvider(raw: string | undefined): SocialProvider {
+  if (raw === 'kakao' || raw === 'naver') return raw;
+  throw new HttpError({ code: 'not_found', message: '지원하지 않는 로그인 방식입니다' });
+}
+
+app.get('/api/account', async (c) => {
+  const uid = requireUid(c);
+  return c.json(ok<AccountProfile>(await accountProfile(firestore(c.env), uid)));
 });
 
 app.patch('/api/account', async (c) => {
@@ -1393,11 +1460,161 @@ app.patch('/api/account', async (c) => {
   const db = firestore(c.env);
   await usersRepo.updateAccount(db, uid, patch);
 
-  const profile = await usersRepo.readAccount(db, uid);
-  if (!profile) {
-    throw new HttpError({ code: 'not_found', message: '계정 정보를 찾을 수 없습니다' });
+  return c.json(ok<AccountProfile>(await accountProfile(db, uid)));
+});
+
+// ─────────────────────── 로그인 수단 연결 · 해제 ───────────────────────
+
+/**
+ * 이 계정에 소셜 로그인 수단을 붙입니다.
+ *
+ * 🔴 **로그인한 상태에서만 가능합니다. 그게 이 설계의 전부입니다.**
+ *    "이메일이 같으면 합쳐주기" 는 남의 이메일로 소셜 계정을 만들어 그 계정에 올라타는
+ *    경로가 됩니다. 본인 계정에 이미 들어와 있는 사람만 붙일 수 있게 하면 그 구멍이 없습니다.
+ *
+ * 예전에 같은 소셜로 **따로 가입한 계정**이 있으면 비어 있을 때만 흡수합니다. 청첩장이
+ * 하나라도 있으면 거절합니다 — 합치는 과정에서 남의 청첩장을 조용히 지울 수는 없습니다.
+ */
+app.post('/api/account/link/:provider', async (c) => {
+  const uid = requireUid(c);
+  const provider = requireSocialProvider(c.req.param('provider'));
+  const { code, redirectUri, state } = await readJson<LinkAccountBody>(c.req);
+  if (!code || !redirectUri) {
+    throw new HttpError({ code: 'validation_failed', message: '인가 정보가 없습니다' });
   }
-  return c.json(ok<AccountProfile>(profile));
+
+  const db = firestore(c.env);
+
+  let profile;
+  try {
+    profile = await resolveSocialProfile({
+      provider,
+      code,
+      redirectUri,
+      state,
+      credentials: socialCredentials(c.env),
+    });
+  } catch (e) {
+    console.error('[api] 연결용 소셜 인증 실패', provider, e);
+    throw new HttpError({ code: 'unauthorized', message: '연결에 실패했습니다. 다시 시도해주세요' });
+  }
+
+  const key = profile.uid; // 'kakao:12345'
+  const label = PROVIDER_LABELS[provider] ?? provider;
+
+  const existing = await identitiesRepo.findByKey(db, key);
+  if (existing) {
+    // 이미 내 계정에 붙어 있으면 성공으로 봅니다 (같은 요청을 두 번 보내도 안전해야 합니다)
+    if (existing.uid === uid) {
+      return c.json(ok<LinkAccountResult>({
+        linkedProviders: (await accountProfile(db, uid)).linkedProviders,
+        absorbedUid: null,
+      }));
+    }
+    throw new HttpError({
+      code: 'link_conflict',
+      message:
+        `이 ${label} 계정은 이미 다른 러비 계정에 연결되어 있습니다. ` +
+        '본인 계정이 아니라면 help@luv-ai.co.kr 로 문의해 주세요',
+    });
+  }
+
+  // 예전에 이 소셜로 따로 가입한 계정이 있는지 (연결 기능 이전 가입자)
+  let absorbedUid: string | null = null;
+  if (key !== uid && (await db.get(`users/${key}`))) {
+    const owned = await invitationsRepo.listByOwner(db, key);
+    if (owned.length > 0) {
+      throw new HttpError({
+        code: 'link_conflict',
+        message:
+          `이 ${label} 계정으로 만든 청첩장이 ${owned.length}개 있습니다. ` +
+          `${label}(으)로 로그인해 청첩장을 정리한 뒤 다시 연결해 주세요`,
+      });
+    }
+    absorbedUid = key;
+  }
+
+  // 🔴 순서: 연결을 **먼저** 씁니다. 예전 계정을 먼저 지우면 연결 쓰기가 실패했을 때
+  //    그 소셜로는 어디로도 들어갈 수 없게 됩니다. 반대로 두면 최악의 경우 빈 계정이
+  //    남을 뿐이고 로그인은 이미 본계정으로 이어집니다.
+  try {
+    await identitiesRepo.link(db, { key, provider, uid });
+  } catch (e) {
+    // exists:false 전제 위반 = 그 사이 누군가 같은 수단을 연결했습니다
+    if (isPreconditionFailure(e)) {
+      throw new HttpError({
+        code: 'link_conflict',
+        message: `이 ${label} 계정은 방금 다른 계정에 연결되었습니다`,
+      });
+    }
+    throw e;
+  }
+
+  if (absorbedUid) {
+    await consentsRepo.deleteAllForUser(db, absorbedUid);
+    await usersRepo.deleteUser(db, absorbedUid);
+    await deleteAuthAccount(serviceAccount(c.env), c.env.FIREBASE_PROJECT_ID, absorbedUid);
+  }
+
+  await usersRepo.upsertUser(db, {
+    uid,
+    email: null,
+    displayName: null,
+    photoURL: null,
+    provider,
+    // 연결했다고 본계정 이름·사진을 소셜 것으로 바꾸지 않습니다
+    preserveProfile: true,
+  });
+
+  await audit(c, {
+    name: 'account_link',
+    detail: `provider=${provider}${absorbedUid ? ` absorbed=${absorbedUid}` : ''}`,
+  });
+
+  return c.json(ok<LinkAccountResult>({
+    linkedProviders: (await accountProfile(db, uid)).linkedProviders,
+    absorbedUid,
+  }));
+});
+
+/**
+ * 연결을 끊습니다.
+ *
+ * 🔴 **마지막 로그인 수단은 끊지 못합니다.** 끊는 순간 아무 방법으로도 들어올 수 없는
+ *    계정이 되고, 그 안의 청첩장까지 같이 잠깁니다. 구글·이메일은 Firebase 가 직접
+ *    인증하므로 그 수단이 있으면 소셜을 전부 끊어도 안전합니다.
+ */
+app.delete('/api/account/link/:provider', async (c) => {
+  const uid = requireUid(c);
+  const provider = requireSocialProvider(c.req.param('provider'));
+  const db = firestore(c.env);
+
+  const links = await identitiesRepo.listByUid(db, uid);
+  const targets = links.filter((l) => l.provider === provider);
+  if (targets.length === 0) {
+    throw new HttpError({ code: 'not_found', message: '연결되지 않은 로그인 수단입니다' });
+  }
+
+  const profile = await usersRepo.readAccount(db, uid);
+  const hasNative = (profile?.providers ?? []).some((p) => p === 'google.com' || p === 'password');
+  if (!hasNative && links.length - targets.length === 0) {
+    throw new HttpError({
+      code: 'validation_failed',
+      message:
+        '마지막 남은 로그인 수단이라 해제할 수 없습니다. ' +
+        '다른 수단을 먼저 연결한 뒤에 해제해 주세요',
+    });
+  }
+
+  for (const t of targets) await identitiesRepo.unlink(db, t.key);
+  await usersRepo.removeProvider(db, uid, provider);
+
+  await audit(c, { name: 'account_unlink', detail: `provider=${provider}` });
+
+  return c.json(ok<LinkAccountResult>({
+    linkedProviders: (await accountProfile(db, uid)).linkedProviders,
+    absorbedUid: null,
+  }));
 });
 
 /**
@@ -1437,13 +1654,16 @@ app.delete('/api/account', async (c) => {
   }
 
   const deletedConsents = await consentsRepo.deleteAllForUser(db, uid);
+  // 연결해 둔 로그인 수단도 지웁니다. 남겨두면 그 소셜로 로그인했을 때 사라진 계정을
+  // 가리키는 줄을 따라가 빈 화면이 뜹니다.
+  const deletedIdentities = await identitiesRepo.deleteAllForUser(db, uid);
   await usersRepo.deleteUser(db, uid);
 
   // 감사 로그는 Auth 계정을 지우기 **전에** 남깁니다 — 뒤에 두면 계정 삭제가
   // 성공하고 로그만 실패했을 때 탈퇴 사실이 어디에도 남지 않습니다.
   await audit(c, {
     name: 'account_delete',
-    detail: `invitations=${deletedInvitations} consents=${deletedConsents}`,
+    detail: `invitations=${deletedInvitations} consents=${deletedConsents} identities=${deletedIdentities}`,
   });
 
   await deleteAuthAccount(serviceAccount(c.env), c.env.FIREBASE_PROJECT_ID, uid);

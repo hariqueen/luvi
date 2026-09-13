@@ -7,16 +7,18 @@
  * 열람(제8조 ①1) · 정정(①2) · 삭제(①3) · 동의 철회가 여기서 전부 가능해야 합니다.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   CONSENT_LABELS,
   OPTIONAL_CONSENTS,
   isRequiredConsent,
   type AccountProfile,
   type ConsentRecord,
+  type SocialProvider,
 } from '@luvi/schema';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { PROVIDER_LABEL, startSocialLogin } from '@/lib/social';
 
 const PROVIDER_LABELS: Record<string, string> = {
   kakao: '카카오',
@@ -37,6 +39,7 @@ export default function Account() {
   const [history, setHistory] = useState<ConsentRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const location = useLocation();
 
   const load = useCallback(async () => {
     const [p, h] = await Promise.all([api.account.get(), api.consents.list()]);
@@ -48,6 +51,25 @@ export default function Account() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * 연결을 마치고 `/login/callback/:provider` 에서 돌아온 직후입니다.
+   *
+   * 결과를 화면 state 로 받습니다 — 쿼리스트링에 남기면 새로고침할 때마다 안내가 다시 뜨고,
+   * 주소를 공유했을 때 남의 화면에도 뜹니다. 한 번 읽고 바로 지웁니다.
+   */
+  useEffect(() => {
+    const st = location.state as { linked?: string; absorbed?: string | null } | null;
+    if (!st?.linked) return;
+
+    const label = PROVIDER_LABELS[st.linked] ?? st.linked;
+    setNotice(
+      `${label} 로그인을 연결했어요. 이제 ${label}(으)로 로그인해도 이 계정으로 들어옵니다.` +
+        (st.absorbed ? ' 따로 만들어져 있던 빈 계정은 함께 정리했어요.' : ''),
+    );
+    navigate(location.pathname, { replace: true });
+    void load();
+  }, [location.state, location.pathname, navigate, load]);
 
   if (error) {
     return <p className="px-1 py-10 text-[13px] text-red-700">{error}</p>;
@@ -70,6 +92,7 @@ export default function Account() {
       )}
 
       <ProfileSection profile={profile} onSaved={load} onNotice={setNotice} />
+      <LoginMethodsSection profile={profile} onChanged={load} onNotice={setNotice} />
       <ConsentSection profile={profile} history={history} onChanged={load} onNotice={setNotice} />
       <DangerSection
         onDone={async () => {
@@ -175,6 +198,122 @@ function ProfileSection({
       >
         {saving ? '저장 중…' : '저장'}
       </button>
+    </section>
+  );
+}
+
+// ─────────────────────────── 로그인 수단 ───────────────────────────
+
+const SOCIALS: SocialProvider[] = ['kakao', 'naver'];
+
+/** Firebase 가 직접 인증하는 수단. 우리 쪽에서 붙이거나 뗄 수 있는 것이 아닙니다 */
+const NATIVE_PROVIDERS = ['google.com', 'password'];
+
+/**
+ * 로그인 수단 연결 · 해제.
+ *
+ * 🔴 **연결은 로그인한 상태에서만 시작합니다.** 이메일이 같다고 서버가 자동으로 합쳐주지
+ *    않습니다 — 남의 이메일로 소셜 계정을 만들어 그 계정에 올라타는 경로가 되기 때문입니다.
+ *    그래서 여기서 나가는 인가 요청이 유일한 연결 경로입니다.
+ */
+function LoginMethodsSection({
+  profile,
+  onChanged,
+  onNotice,
+}: {
+  profile: AccountProfile;
+  onChanged: () => Promise<void>;
+  onNotice: (m: string) => void;
+}) {
+  const [busy, setBusy] = useState<SocialProvider | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const linked = new Map(profile.linkedProviders.map((l) => [l.provider, l.linkedAt]));
+  const natives = profile.providers.filter((x) => NATIVE_PROVIDERS.includes(x));
+
+  /** 이 계정에 남는 로그인 수단이 하나도 없게 되는 해제인지 */
+  const isLastMethod = (provider: SocialProvider) =>
+    natives.length === 0 && profile.linkedProviders.filter((l) => l.provider !== provider).length === 0;
+
+  function connect(provider: SocialProvider) {
+    setErr(null);
+    try {
+      // 돌아올 곳을 계정 설정으로 지정합니다. 기본값(/app)으로 두면 대시보드로 튕깁니다
+      startSocialLogin(provider, '/app/account', 'link');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '연결을 시작하지 못했어요');
+    }
+  }
+
+  async function disconnect(provider: SocialProvider) {
+    if (busy) return;
+    setBusy(provider);
+    setErr(null);
+    const res = await api.account.unlink(provider);
+    setBusy(null);
+    if (!res.ok) return setErr(res.error.message);
+    await onChanged();
+    onNotice(`${PROVIDER_LABEL[provider]} 로그인 연결을 해제했어요.`);
+  }
+
+  return (
+    <section className="mb-10">
+      <h2 className="mb-1 text-[14px] font-semibold text-ink">로그인 수단</h2>
+      <p className="mb-3 text-[12.5px] leading-relaxed text-muted">
+        연결해두면 어느 것으로 로그인해도 <strong className="font-semibold text-ink">이 계정</strong>
+        으로 들어와요. 청첩장이 계정마다 흩어지지 않습니다.
+      </p>
+
+      <ul className="divide-y divide-line rounded-xl border border-line">
+        {natives.map((n) => (
+          <li key={n} className="flex items-center gap-3 px-4 py-3">
+            <span className="w-[64px] shrink-0 text-[13px] font-medium text-ink">
+              {PROVIDER_LABELS[n] ?? n}
+            </span>
+            <span className="flex-1 text-[12.5px] text-muted">이 계정의 기본 로그인</span>
+          </li>
+        ))}
+
+        {SOCIALS.map((provider) => {
+          const at = linked.get(provider);
+          const isLinked = linked.has(provider);
+          return (
+            <li key={provider} className="flex items-center gap-3 px-4 py-3">
+              <span className="w-[64px] shrink-0 text-[13px] font-medium text-ink">
+                {PROVIDER_LABEL[provider]}
+              </span>
+              <span className="flex-1 text-[12.5px] text-muted">
+                {isLinked ? `연결됨 ${at ? `· ${fmt(at)}` : ''}` : '연결 안 됨'}
+              </span>
+              {isLinked ? (
+                <button
+                  type="button"
+                  onClick={() => void disconnect(provider)}
+                  disabled={busy === provider || isLastMethod(provider)}
+                  title={
+                    isLastMethod(provider)
+                      ? '마지막 남은 로그인 수단이라 해제할 수 없어요'
+                      : undefined
+                  }
+                  className="shrink-0 text-[12px] text-muted underline underline-offset-2 hover:text-ink disabled:no-underline disabled:opacity-40"
+                >
+                  {busy === provider ? '해제 중…' : '해제'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => connect(provider)}
+                  className="h-8 shrink-0 rounded-lg border border-line-strong px-3 text-[12px] font-semibold text-ink"
+                >
+                  연결하기
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {err && <p className="mt-2 text-[12.5px] text-red-700">{err}</p>}
     </section>
   );
 }

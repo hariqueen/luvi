@@ -17,6 +17,18 @@ export type SocialProvider = 'kakao' | 'naver';
 
 const STATE_KEY = 'luvi:oauth-state';
 const RETURN_KEY = 'luvi:oauth-return';
+const MODE_KEY = 'luvi:oauth-mode';
+
+/**
+ * 같은 콜백 주소(`/login/callback/:provider`)로 두 가지 흐름이 돌아옵니다.
+ *
+ * - `login` — 로그인. 인가 코드를 커스텀 토큰으로 바꿔 Firebase 세션을 만듭니다
+ * - `link`  — **이미 로그인한 계정에** 이 소셜을 연결합니다
+ *
+ * 콜백 URL 만 봐서는 구분할 수 없어(제공자가 우리 파라미터를 되돌려주지 않습니다)
+ * 나갈 때 기억해 둡니다. 제공자 콘솔에 등록한 Redirect URI 를 늘리지 않으려는 이유도 있습니다.
+ */
+export type OAuthMode = 'login' | 'link';
 
 const AUTHORIZE_URL: Record<SocialProvider, string> = {
   kakao: 'https://kauth.kakao.com/oauth/authorize',
@@ -38,8 +50,15 @@ function randomState(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** 인가 화면으로 이동합니다. 돌아온 뒤 갈 곳(`returnTo`)을 함께 기억합니다. */
-export function startSocialLogin(provider: SocialProvider, returnTo = '/app'): void {
+/**
+ * 인가 화면으로 이동합니다. 돌아온 뒤 갈 곳(`returnTo`)과 무엇을 하려던 것인지(`mode`)를
+ * 함께 기억합니다.
+ */
+export function startSocialLogin(
+  provider: SocialProvider,
+  returnTo = '/app',
+  mode: OAuthMode = 'login',
+): void {
   const clientId = provider === 'kakao' ? env.kakaoRestKey : env.naverClientId;
   if (!clientId) {
     throw new Error(`${PROVIDER_LABEL[provider]} 로그인이 설정되지 않았습니다`);
@@ -48,6 +67,7 @@ export function startSocialLogin(provider: SocialProvider, returnTo = '/app'): v
   const state = randomState();
   sessionStorage.setItem(STATE_KEY, `${provider}:${state}`);
   sessionStorage.setItem(RETURN_KEY, returnTo);
+  sessionStorage.setItem(MODE_KEY, mode);
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -63,6 +83,7 @@ export interface CallbackResult {
   code: string;
   state: string;
   returnTo: string;
+  mode: OAuthMode;
 }
 
 /**
@@ -86,14 +107,18 @@ export function consumeCallback(provider: SocialProvider, search: string): Callb
   const state = params.get('state');
   const saved = sessionStorage.getItem(STATE_KEY);
   const returnTo = sessionStorage.getItem(RETURN_KEY) ?? '/app';
+  // 모드를 잃었으면 로그인으로 봅니다. 연결을 로그인으로 오해하면 "이미 가입된 계정" 안내가
+  // 뜰 뿐이지만, 반대로 오해하면 로그인하려던 사람이 연결 API 를 호출해 401 을 받습니다.
+  const mode: OAuthMode = sessionStorage.getItem(MODE_KEY) === 'link' ? 'link' : 'login';
 
   sessionStorage.removeItem(STATE_KEY);
   sessionStorage.removeItem(RETURN_KEY);
+  sessionStorage.removeItem(MODE_KEY);
 
   if (!code || !state) throw new Error('인가 정보가 없습니다');
   if (saved !== `${provider}:${state}`) {
     throw new Error('로그인 요청이 확인되지 않았습니다. 다시 시도해주세요');
   }
 
-  return { code, state, returnTo };
+  return { code, state, returnTo, mode };
 }

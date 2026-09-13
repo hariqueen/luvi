@@ -26,6 +26,8 @@ export interface ApiError {
     | 'consent_required'
     /** 같은 이메일의 계정이 이미 있음 — 기존 로그인 수단으로 안내합니다 */
     | 'account_exists'
+    /** 이 로그인 수단을 다른 계정이 이미 쓰고 있음 — 연결할 수 없습니다 */
+    | 'link_conflict'
     | 'internal';
   /** 사용자에게 그대로 보여줄 수 있는 한국어 메시지 */
   message: string;
@@ -55,13 +57,43 @@ export interface AccountProfile {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
-  /** 연결된 로그인 수단 ('google.com' | 'kakao' | 'naver' | 'password') */
+  /** 지금까지 이 계정으로 로그인한 적 있는 수단 ('google.com' | 'kakao' | 'naver' | 'password') */
   providers: string[];
+  /**
+   * 계정 설정에서 **연결한** 소셜 로그인 수단. `providers` 와 달리 해제할 수 있습니다.
+   *
+   * 구글·이메일은 Firebase 가 직접 인증해 여기 들어오지 않습니다 — 그쪽은 계정 자체의
+   * 로그인 수단이라 해제 대상이 아닙니다.
+   */
+  linkedProviders: LinkedIdentity[];
   plan: string;
   role: UserRole;
   createdAt: string | null;
   lastLoginAt: string | null;
   consent: ConsentStatus;
+}
+
+/**
+ * 계정에 연결된 소셜 로그인 수단 한 줄.
+ *
+ * 연결은 **이미 본인 계정으로 로그인한 상태에서만** 가능합니다. 이메일이 같다고 자동으로
+ * 합치지 않습니다 — 남의 이메일로 소셜 계정을 만들어 그 계정에 올라타는 경로가 되기 때문입니다.
+ */
+export interface LinkedIdentity {
+  provider: SocialProvider;
+  linkedAt: string | null;
+}
+
+/** POST /api/account/link/:provider — 인가 코드로 이 계정에 로그인 수단을 붙입니다 */
+export type LinkAccountBody = SocialAuthBody;
+
+export interface LinkAccountResult {
+  linkedProviders: LinkedIdentity[];
+  /**
+   * 흡수한 빈 계정의 uid. 그 소셜로 예전에 따로 가입했던 계정이 **비어 있어서**
+   * 함께 정리한 경우에만 채워집니다. 데이터가 있으면 흡수하지 않고 거절합니다.
+   */
+  absorbedUid: string | null;
 }
 
 /** PATCH /api/account — 보낸 필드만 바뀝니다 */

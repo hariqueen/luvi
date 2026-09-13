@@ -35,6 +35,8 @@ import type {
   SignUploadResult,
   SlugAvailability,
   SocialAuthBody,
+  LinkAccountBody,
+  LinkAccountResult,
   SocialAuthResult,
   SocialProvider,
   UpdateDraftBody,
@@ -238,6 +240,17 @@ export function createClient(opts: ClientOptions) {
       update: (body: UpdateAccountBody) => patch<AccountProfile>('/account', body),
       /** 🔴 회원 탈퇴. 청첩장·사진·방명록이 모두 사라지고 되돌릴 수 없습니다 */
       remove: () => del<DeleteAccountResult>('/account'),
+
+      /**
+       * 소셜 로그인 수단을 이 계정에 붙인다. **로그인한 상태에서만** 호출된다 —
+       * 이메일이 같다고 서버가 알아서 합쳐주지 않는다(계정 탈취 방지).
+       */
+      link: (provider: SocialProvider, body: LinkAccountBody) =>
+        post<LinkAccountResult>(`/account/link/${provider}`, body),
+
+      /** 연결 해제. 마지막 남은 로그인 수단이면 서버가 거절한다 */
+      unlink: (provider: SocialProvider) =>
+        del<LinkAccountResult>(`/account/link/${provider}`),
     },
 
     contact: {

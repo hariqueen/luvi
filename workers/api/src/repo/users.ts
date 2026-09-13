@@ -22,6 +22,14 @@ export interface UpsertUserInput {
   photoURL: string | null;
   /** 'password' | 'google.com' | 'kakao' | 'naver' */
   provider: string;
+  /**
+   * true 면 email·displayName·photoURL 을 **건드리지 않습니다** (lastLoginAt 과 providers 만 갱신).
+   *
+   * 연결된 보조 수단으로 로그인했을 때 씁니다. 구글 계정에 카카오를 연결해 두고 카카오로
+   * 로그인할 때마다 카카오 닉네임이 본계정 이름을 덮으면, 로그인 수단에 따라 이름이
+   * 왔다 갔다 합니다. 본계정 프로필은 그 계정 자신의 것이어야 합니다.
+   */
+  preserveProfile?: boolean;
 }
 
 /**
@@ -34,14 +42,15 @@ export async function upsertUser(db: Firestore, input: UpsertUserInput): Promise
   const now = new Date().toISOString();
   const existing = await db.get(userPath(input.uid));
 
+  const writeProfile = !input.preserveProfile;
   const fields = {
     // email·displayName·photoURL 은 "값이 있을 때만" 씁니다. 소셜 로그인 직후
     // 클라이언트가 이어서 호출하는 /api/auth/session 동기화는 커스텀토큰(카카오·네이버)
     // 계정의 idToken 에 email·이름이 없어 null 을 보내는데, 그대로 덮으면 방금 소셜에서
     // 저장한 email·이름이 지워집니다.
-    ...(input.email ? { email: encode(input.email) } : {}),
-    ...(input.displayName ? { displayName: encode(input.displayName) } : {}),
-    ...(input.photoURL ? { photoURL: encode(input.photoURL) } : {}),
+    ...(writeProfile && input.email ? { email: encode(input.email) } : {}),
+    ...(writeProfile && input.displayName ? { displayName: encode(input.displayName) } : {}),
+    ...(writeProfile && input.photoURL ? { photoURL: encode(input.photoURL) } : {}),
     lastLoginAt: fsTimestamp(now),
     ...(existing
       ? {}
@@ -103,7 +112,10 @@ function extractConsentVersions(f: Record<string, unknown>): Partial<Record<Cons
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 
 /** 계정 설정 화면에 돌려줄 내 정보 */
-export async function readAccount(db: Firestore, uid: string): Promise<AccountProfile | null> {
+export async function readAccount(
+  db: Firestore,
+  uid: string,
+): Promise<Omit<AccountProfile, 'linkedProviders'> | null> {
   const doc = await db.get(userPath(uid));
   if (!doc) return null;
 
@@ -227,4 +239,23 @@ export async function readOwnerProfiles(
     }),
   );
   return new Map(entries);
+}
+
+/**
+ * 로그인 수단 목록에서 하나를 뺍니다 (연결 해제).
+ *
+ * `providers` 는 "이 계정으로 로그인한 적 있는 수단" 이라 이력에 가깝지만, 해제한 뒤에도
+ * 남겨두면 계정 설정의 "가입 경로" 에 이제 쓸 수 없는 수단이 계속 보입니다. 화면이 사실과
+ * 어긋나므로 함께 지웁니다.
+ */
+export async function removeProvider(db: Firestore, uid: string, provider: string): Promise<void> {
+  await db.commit([
+    {
+      update: { name: db.docName(userPath(uid)), fields: {} },
+      updateMask: { fieldPaths: [] },
+      updateTransforms: [
+        { fieldPath: 'providers', removeAllFromArray: { values: [encode(provider)] } },
+      ],
+    },
+  ]);
 }
