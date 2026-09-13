@@ -95,6 +95,72 @@ export async function countRecent(
   }
 }
 
+/** 운영자 화면이 읽어가는 한 줄. 저장 컬럼 중 화면에 쓰는 것만 담습니다 */
+export interface EventView {
+  at: string;
+  kind: string;
+  name: string;
+  ok: number | null;
+  detail: string | null;
+  invitationId: string | null;
+  path: string | null;
+}
+
+/**
+ * 한 회원의 최근 활동.
+ *
+ * `0001_events.sql` 이 이 테이블을 만든 이유가 바로 이 조회입니다 —
+ * "문의가 들어왔을 때 누가 언제 무엇을 눌러 무엇이 실패했나" 를 바로 훑는 것.
+ * 지금까지는 볼 화면이 없어 D1 콘솔에서 SQL 로만 봤습니다.
+ *
+ * 🔴 `ip_hash` · `ua` 는 **고르지 않습니다.** 운영자가 회원의 접속 흔적을 추적할 이유가
+ *    없습니다. 그 컬럼들은 속도 제한과 침해 대응에 쓰는 것이고, 화면에 필요 없는 값은
+ *    응답에 담지 않는 것이 이 콘솔의 원칙입니다.
+ *
+ * 실패하면 빈 배열입니다 — 로그가 죽었다고 회원 상세가 안 열리면 안 됩니다.
+ */
+export async function listForUid(
+  db: D1Database | undefined,
+  uid: string,
+  opts: { onlyErrors?: boolean; limit?: number } = {},
+): Promise<EventView[]> {
+  if (!db || !uid) return [];
+  const limit = Math.min(Math.max(opts.limit ?? 200, 1), 500);
+
+  // 실패만 보기: ok = 0 이거나 kind = 'error'. 둘 다 봐야 합니다 —
+  // 화면이 보내는 오류는 kind='error' 이고, 서버가 남기는 실패는 ok=0 입니다.
+  const filter = opts.onlyErrors ? ' AND (ok = 0 OR kind = ?)' : '';
+  const sql = `SELECT at, kind, name, ok, detail, invitation_id, path
+    FROM events WHERE uid = ?${filter} ORDER BY at DESC LIMIT ${limit}`;
+
+  try {
+    const stmt = db.prepare(sql);
+    const bound = opts.onlyErrors ? stmt.bind(uid, 'error') : stmt.bind(uid);
+    const res = await bound.all<{
+      at: string;
+      kind: string;
+      name: string;
+      ok: number | null;
+      detail: string | null;
+      invitation_id: string | null;
+      path: string | null;
+    }>();
+
+    return (res.results ?? []).map((r) => ({
+      at: r.at,
+      kind: r.kind,
+      name: r.name,
+      ok: r.ok,
+      detail: r.detail,
+      invitationId: r.invitation_id,
+      path: r.path,
+    }));
+  } catch (e) {
+    console.error('[api] 회원 활동 로그 조회 실패', e);
+    return [];
+  }
+}
+
 /** 보관 기간이 지난 로그를 지웁니다. Cron 이 매일 부릅니다 */
 export async function purgeOld(db: D1Database | undefined, days = RETENTION_DAYS): Promise<number> {
   if (!db) return 0;

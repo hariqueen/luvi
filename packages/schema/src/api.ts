@@ -5,7 +5,8 @@
  * 엔드포인트를 추가할 때 여기부터 고치면 양쪽 타입이 자동으로 맞습니다.
  */
 import type { ContentDoc, Features, Invitation, SectionKey, ThemeId } from './content';
-import type { ConsentStatus } from './consent';
+import type { ConsentRecord, ConsentStatus } from './consent';
+import type { InquiryStatus } from './inquiry';
 
 /** 모든 응답의 공통 껍데기. 성공/실패를 HTTP 상태와 함께 본문에서도 구분한다. */
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError };
@@ -182,6 +183,88 @@ export interface AdminInvitationSummary extends InvitationSummary {
   /** 'google.com' | 'kakao' | 'naver' | 'password' … 가입 경로 */
   ownerProviders: string[];
   createdAt: string;
+}
+
+/**
+ * GET /api/admin/users — 운영자 회원 목록.
+ *
+ * 🔴 **이메일은 마스킹해서 내려보냅니다.** "화면에서 가린다" 가 아니라
+ *    "원문을 보내지 않는다" 입니다. 목록을 여는 것만으로 회원 전원의 연락처를
+ *    본 것이 되면 안 되고, 브라우저 개발자 도구에 원문이 남아서도 안 됩니다.
+ *    원문이 필요하면 `POST /api/admin/users/:uid/reveal` 로 한 명씩, 기록을 남기고 받습니다.
+ */
+export interface AdminUserSummary {
+  uid: string;
+  displayName: string | null;
+  /** `har***@naver.com`. 계정에 이메일이 없으면 null (카카오·네이버는 선택 동의) */
+  emailMasked: string | null;
+  providers: string[];
+  role: UserRole;
+  plan: string;
+  /** 이 회원이 가진 청첩장 수 */
+  invitationCount: number;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  consent: ConsentStatus;
+}
+
+export interface AdminUserList {
+  items: AdminUserSummary[];
+  /**
+   * 서버 상한(500)에 걸렸는지. 걸렸으면 화면이 **검색 결과가 전부가 아닐 수 있다**고
+   * 알려야 합니다 — 검색은 받아온 범위 안에서만 거르기 때문입니다.
+   */
+  truncated: boolean;
+}
+
+/** 회원 상세에 함께 내려보내는 문의 한 줄 (본문은 없습니다 — 스레드 화면에서 봅니다) */
+export interface AdminUserInquiry {
+  id: string;
+  number: string;
+  status: InquiryStatus;
+  subject: string;
+  createdAt: string;
+  lastMessageAt: string;
+  unreadForAdmin: boolean;
+}
+
+/** GET /api/admin/users/:uid */
+export interface AdminUserDetail extends AdminUserSummary {
+  invitations: InvitationSummary[];
+  inquiries: AdminUserInquiry[];
+  /** 동의 이력 원본 (`consents` 컬렉션). 철회도 레코드로 남으므로 순서대로 보여줍니다 */
+  consentHistory: ConsentRecord[];
+}
+
+/**
+ * POST /api/admin/users/:uid/reveal — 가려둔 연락처의 원문.
+ *
+ * 🔴 **이 라우트가 존재하는 이유는 기록입니다.** 목록 응답에 원문을 실어 보내면
+ *    누가 언제 누구의 연락처를 봤는지 남길 자리가 없습니다. 따로 부르게 해서
+ *    그 순간 `audit()` 로 남깁니다. GET 이 아니라 POST 인 것도 같은 이유입니다 —
+ *    브라우저가 미리 가져오거나 캐시하면 기록이 사실과 어긋납니다.
+ */
+export interface AdminUserReveal {
+  uid: string;
+  email: string | null;
+}
+
+/**
+ * GET /api/admin/users/:uid/events — D1 이벤트 로그 (14일 보관).
+ *
+ * 이 회원이 무엇을 눌러 무엇이 실패했는지. 고객이 "사진이 안 올라가요" 라고만 써도
+ * 옆에 `upload_fail ×3 (413)` 이 뜨게 하는 것이 목적입니다.
+ */
+export interface AdminEventRow {
+  at: string;
+  /** 'click' | 'error' | 'view' | 'admin' */
+  kind: string;
+  name: string;
+  /** 1 = 성공, 0 = 실패, null = 성패 개념이 없는 사건 */
+  ok: number | null;
+  detail: string | null;
+  invitationId: string | null;
+  path: string | null;
 }
 
 /** POST /api/invitations */

@@ -258,15 +258,33 @@ export async function listForAdmin(
   db: Firestore,
   options: AdminListOptions = {},
 ): Promise<AdminInquirySummary[]> {
+  /**
+   * 🔴 **상태로 거를 때는 정렬을 Firestore 에 맡기지 않습니다.** `listForUser` 와 같은
+   *    이유입니다 — `where + orderBy` 는 복합 색인을 요구하고, 이 프로젝트는 복합 색인을
+   *    만들지 않습니다. 필터 없이 부를 때의 `orderBy` 는 단일 필드라 색인 없이 됩니다.
+   *
+   *    ⚠️ 거를 때는 `limit` 이 **정렬 전에** 걸립니다. 문의가 `limit` 을 넘어가면
+   *    "최근 N건" 이 아니라 "아무 N건 중 최근 순" 이 됩니다. 지금 건수에서는 차이가
+   *    없지만, 문의가 백 단위로 늘면 그때 페이징을 넣어야 합니다.
+   */
+  const filtered = Boolean(options.status);
   const docs = await db.query('', {
     from: [{ collectionId: COLLECTION }],
     ...(options.status ? { where: where('status', 'EQUAL', options.status) } : {}),
-    orderBy: [{ field: { fieldPath: 'lastMessageAt' }, direction: 'DESCENDING' }],
+    ...(filtered
+      ? {}
+      : { orderBy: [{ field: { fieldPath: 'lastMessageAt' }, direction: 'DESCENDING' as const }] }),
     limit: options.limit ?? 100,
   });
 
-  return docs.map((d) => {
-    const s = toStored(d);
+  const rows = docs.map(toStored);
+  if (filtered) {
+    rows.sort((a, b) =>
+      a.lastMessageAt < b.lastMessageAt ? 1 : a.lastMessageAt > b.lastMessageAt ? -1 : 0,
+    );
+  }
+
+  return rows.map((s) => {
     return {
       id: s.id,
       number: s.number,
@@ -289,12 +307,29 @@ export async function listForAdmin(
 }
 
 /** 내 문의 (회원) */
+/**
+ * 🔴 **정렬을 Firestore 에 맡기지 않습니다.**
+ *
+ * `where(uid) + orderBy(lastMessageAt)` 는 **복합 색인을 요구합니다.** 색인이 없으면
+ * 질의가 400(FAILED_PRECONDITION)으로 떨어지고, 이 라우트는 500 이 됩니다.
+ * 실제로 그렇게 죽어 있었습니다 — 이 함수를 쓰는 `/api/inquiries/mine` 과
+ * 운영자 회원 상세가 둘 다 500 이었고, 2026-09-13 에 발견했습니다.
+ * (`apps/invitation/firestore.indexes.json` 은 비어 있습니다. 이 프로젝트는 복합 색인을
+ * 만들지 않는 쪽을 택했습니다 — 색인은 배포 절차가 하나 더 늘고, 빠뜨리면 지금처럼
+ * 코드가 멀쩡한데 질의만 죽습니다.)
+ *
+ * 한 사람의 문의는 많아야 수십 건이라 받아서 정렬하는 편이 안전합니다.
+ * `listConsents` · `listByOwner` 도 같은 이유로 JS 에서 정렬합니다.
+ */
 export async function listForUser(db: Firestore, uid: string): Promise<StoredInquiry[]> {
   const docs = await db.query('', {
     from: [{ collectionId: COLLECTION }],
     where: where('uid', 'EQUAL', uid),
-    orderBy: [{ field: { fieldPath: 'lastMessageAt' }, direction: 'DESCENDING' }],
     limit: 50,
   });
-  return docs.map(toStored);
+  return docs
+    .map(toStored)
+    .sort((a, b) =>
+      a.lastMessageAt < b.lastMessageAt ? 1 : a.lastMessageAt > b.lastMessageAt ? -1 : 0,
+    );
 }

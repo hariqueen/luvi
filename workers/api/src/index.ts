@@ -15,7 +15,13 @@
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import type {
+  AdminEventRow,
   AdminInvitationSummary,
+  AdminUserDetail,
+  AdminUserInquiry,
+  AdminUserList,
+  AdminUserReveal,
+  AdminUserSummary,
   ApiError,
   EventLogBody,
   EventLogItem,
@@ -546,6 +552,145 @@ app.get('/api/admin/invitations', async (c) => {
   );
 });
 
+/**
+ * ─────────────────────────── 운영자 · 회원 ───────────────────────────
+ *
+ * 🔴 **이 네 라우트는 남의 개인정보를 다룹니다.** 고치기 전에
+ *    `docs/09-admin-console-brief.md` 3장을 읽으세요. 요지는 둘입니다:
+ *    ① 원문은 기본으로 내려보내지 않는다 (마스킹해서 보낸다)
+ *    ② 원문을 보낸 순간은 반드시 기록한다
+ */
+
+/** 운영자 확인. 네 라우트가 같은 문장을 반복하지 않도록 묶습니다 */
+async function requireAdmin(
+  c: Context<{ Bindings: Env; Variables: Vars }>,
+  db: Firestore,
+): Promise<string> {
+  const uid = requireUid(c);
+  if (!(await usersRepo.isAdmin(db, uid))) {
+    throw new HttpError({ code: 'forbidden', message: '운영자만 볼 수 있습니다' });
+  }
+  return uid;
+}
+
+function toUserSummary(
+  user: usersRepo.StoredUser,
+  invitationCount: number,
+): AdminUserSummary {
+  return {
+    uid: user.uid,
+    displayName: user.displayName,
+    // 🔴 원문이 아니라 마스킹본입니다. reveal 라우트 주석을 보세요
+    emailMasked: user.email ? maskEmail(user.email) : null,
+    providers: user.providers,
+    role: user.role,
+    plan: user.plan,
+    invitationCount,
+    createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt,
+    consent: toConsentStatus(user.consentVersions),
+  };
+}
+
+app.get('/api/admin/users', async (c) => {
+  const db = firestore(c.env);
+  await requireAdmin(c, db);
+
+  /**
+   * 청첩장 수를 회원별로 세려고 **회원 수만큼 질의하지 않습니다.**
+   * 전체를 한 번 읽어 uid 로 모읍니다 — 회원 200명이면 질의 200번과 1번의 차이입니다.
+   */
+  const [{ users, truncated }, invitations] = await Promise.all([
+    usersRepo.listAllUsers(db),
+    invitationsRepo.listAll(db, 500),
+  ]);
+
+  const counts = new Map<string, number>();
+  for (const inv of invitations) {
+    if (inv.ownerUid) counts.set(inv.ownerUid, (counts.get(inv.ownerUid) ?? 0) + 1);
+  }
+
+  return c.json(
+    ok<AdminUserList>({
+      items: users.map((u) => toUserSummary(u, counts.get(u.uid) ?? 0)),
+      truncated,
+    }),
+  );
+});
+
+app.get('/api/admin/users/:uid', async (c) => {
+  const db = firestore(c.env);
+  await requireAdmin(c, db);
+  const target = c.req.param('uid');
+
+  const user = await usersRepo.readUser(db, target);
+  if (!user) throw new HttpError({ code: 'not_found', message: '회원을 찾을 수 없습니다' });
+
+  const [invitations, inquiries, consentHistory] = await Promise.all([
+    invitationsRepo.listByOwner(db, target),
+    inquiriesRepo.listForUser(db, target),
+    consentsRepo.listConsents(db, target),
+  ]);
+
+  /**
+   * 상세를 연 것 자체를 남깁니다. 원문을 본 것(`admin_user_reveal`)과는 다른 사건이라
+   * 이름을 나눕니다 — 로그를 읽을 때 "목록을 훑었다" 와 "연락처를 봤다" 가 구분돼야 합니다.
+   */
+  await audit(c, { name: 'admin_user_view', detail: `uid=${target}` });
+
+  return c.json(
+    ok<AdminUserDetail>({
+      ...toUserSummary(user, invitations.length),
+      invitations: invitations.map<InvitationSummary>((inv) => invitationsRepo.toSummary(inv)),
+      inquiries: inquiries.map<AdminUserInquiry>((q) => ({
+        id: q.id,
+        number: q.number,
+        status: q.status,
+        subject: q.subject,
+        createdAt: q.createdAt,
+        lastMessageAt: q.lastMessageAt,
+        unreadForAdmin: q.unreadForAdmin,
+      })),
+      consentHistory,
+    }),
+  );
+});
+
+/**
+ * 가려둔 연락처의 원문.
+ *
+ * 🔴 **이 라우트가 존재하는 이유는 기능이 아니라 기록입니다.** 목록 응답에 원문을
+ *    실어 보내면 누가 언제 누구의 연락처를 봤는지 남길 자리가 없습니다.
+ *    GET 이 아니라 POST 인 것도 같은 이유입니다 — 브라우저가 미리 가져오거나
+ *    캐시하면 기록이 사실과 어긋납니다.
+ *
+ * 🔴 **기록을 먼저 남기고 값을 돌려줍니다.** 순서를 바꾸면 D1 이 잠깐 죽은 사이에
+ *    기록 없는 열람이 생깁니다. 로그가 서비스보다 덜 중요하다는 원칙의 예외입니다 —
+ *    여기서는 기록이 곧 목적입니다.
+ */
+app.post('/api/admin/users/:uid/reveal', async (c) => {
+  const db = firestore(c.env);
+  await requireAdmin(c, db);
+  const target = c.req.param('uid');
+
+  const user = await usersRepo.readUser(db, target);
+  if (!user) throw new HttpError({ code: 'not_found', message: '회원을 찾을 수 없습니다' });
+
+  await audit(c, { name: 'admin_user_reveal', detail: `uid=${target}` });
+
+  return c.json(ok<AdminUserReveal>({ uid: target, email: user.email }));
+});
+
+app.get('/api/admin/users/:uid/events', async (c) => {
+  const db = firestore(c.env);
+  await requireAdmin(c, db);
+
+  const rows = await eventsRepo.listForUid(c.env.LUVI_LOGS, c.req.param('uid'), {
+    onlyErrors: c.req.query('onlyErrors') === '1',
+  });
+  return c.json(ok<AdminEventRow[]>(rows));
+});
+
 app.get('/api/invitations/:id', async (c) => {
   const db = firestore(c.env);
   const invitation = await requireOwned(c, db, c.req.param('id'));
@@ -1054,21 +1199,41 @@ app.get('/api/assets/*', async (c) => {
     throw new HttpError({ code: 'not_found', message: '없는 파일입니다' });
   }
 
-  const object = await c.env.LUVI_ASSETS.get(key);
+  // 🔴 Range 를 R2 에 그대로 넘긴다 — 안 넘기면 아이폰에서 배경음악이 재생되지 않는다.
+  //    Safari 는 미디어를 틀기 전에 일부러 `Range: bytes=0-1` 로 2바이트만 요청해서
+  //    서버가 206 으로 답하는지 시험한다. 200 에 전체 파일을 주면 재생을 포기한다.
+  //    청첩장은 대부분 카톡으로 열리고 iOS 카톡 인앱은 WKWebView(Safari 엔진)라 직격이다.
+  const rangeHeader = c.req.header('Range');
+  const object = await c.env.LUVI_ASSETS.get(
+    key,
+    rangeHeader ? { range: c.req.raw.headers } : undefined,
+  );
   if (!object) throw new HttpError({ code: 'not_found', message: '없는 파일입니다' });
 
-  return new Response(object.body, {
-    headers: {
-      'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream',
-      'Cache-Control': object.httpMetadata?.cacheControl ?? IMMUTABLE_CACHE,
-      ETag: object.httpEtag,
-      // 🔴 업로드된 청첩장 사진은 HTML 이 아니라 `<meta name="robots">` 를 넣을 자리가 없다.
-      //    헤더로 색인을 막는다 — 없으면 사진이 이미지 검색에 걸리는 통로가 열려 있다.
-      //    뷰어 HTML 의 noindex 는 페이지만 막지, 사진 URL 이 따로 알려지는 경로는 못 막는다.
-      //    ⚠️ robots.txt 로 이 경로를 Disallow 하면 크롤러가 이 헤더를 못 읽으니 하지 말 것.
-      'X-Robots-Tag': 'noindex, noimageindex, noarchive',
-    },
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream',
+    'Cache-Control': object.httpMetadata?.cacheControl ?? IMMUTABLE_CACHE,
+    ETag: object.httpEtag,
+    // 구간 요청을 받는다고 알린다. 이게 없으면 브라우저가 아예 시도하지 않는다.
+    'Accept-Ranges': 'bytes',
+    // 🔴 업로드된 청첩장 사진은 HTML 이 아니라 `<meta name="robots">` 를 넣을 자리가 없다.
+    //    헤더로 색인을 막는다 — 없으면 사진이 이미지 검색에 걸리는 통로가 열려 있다.
+    //    뷰어 HTML 의 noindex 는 페이지만 막지, 사진 URL 이 따로 알려지는 경로는 못 막는다.
+    //    ⚠️ robots.txt 로 이 경로를 Disallow 하면 크롤러가 이 헤더를 못 읽으니 하지 말 것.
+    'X-Robots-Tag': 'noindex, noimageindex, noarchive',
+  };
+
+  // 구간을 실제로 잘라 줬을 때만 206. 사진처럼 Range 없이 온 요청은 기존대로 200 이다.
+  // R2Range 는 {offset,length} · {length} · {suffix} 세 모양이라 모두 풀어서 계산한다.
+  if (rangeHeader && object.range) {
+    const r = object.range as { offset?: number; length?: number; suffix?: number };
+    const offset = r.suffix != null ? object.size - r.suffix : (r.offset ?? 0);
+    const length = r.suffix != null ? r.suffix : (r.length ?? object.size - offset);
+    headers['Content-Range'] = `bytes ${offset}-${offset + length - 1}/${object.size}`;
+    return new Response(object.body, { status: 206, headers });
+  }
+
+  return new Response(object.body, { status: 200, headers });
 });
 
 // ─────────────────────────── 인계 (클레임) ───────────────────────────

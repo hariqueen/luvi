@@ -17,6 +17,7 @@ import { lazyPage } from '@/lib/lazyPage';
 
 const Inquiries = lazyPage(() => import('@/routes/Inquiries'));
 const Users = lazyPage(() => import('@/routes/Users'));
+const UserDetail = lazyPage(() => import('@/routes/UserDetail'));
 const Invitations = lazyPage(() => import('@/routes/Invitations'));
 const NotFound = lazyPage(() => import('@/routes/NotFound'));
 
@@ -38,6 +39,7 @@ export default function App() {
           <Route index element={<Navigate to="/invitations" replace />} />
           <Route path="inquiries" element={<Inquiries />} />
           <Route path="users" element={<Users />} />
+          <Route path="users/:uid" element={<UserDetail />} />
           <Route path="invitations" element={<Invitations />} />
           <Route path="*" element={<NotFound />} />
         </Route>

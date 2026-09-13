@@ -199,6 +199,72 @@ export async function findByEmail(
   return null;
 }
 
+export interface StoredUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  providers: string[];
+  role: UserRole;
+  plan: string;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  consentVersions: Partial<Record<ConsentDocType, string>>;
+}
+
+function toStoredUser(uid: string, f: Record<string, unknown>): StoredUser {
+  return {
+    uid,
+    email: str(f.email),
+    displayName: str(f.displayName),
+    photoURL: str(f.photoURL),
+    providers: Array.isArray(f.providers)
+      ? f.providers.filter((p): p is string => typeof p === 'string')
+      : [],
+    role: f.role === 'admin' ? 'admin' : 'user',
+    plan: str(f.plan) ?? 'free',
+    createdAt: str(f.createdAt),
+    lastLoginAt: str(f.lastLoginAt),
+    consentVersions: extractConsentVersions(f),
+  };
+}
+
+/** 한 명. 운영자 상세 화면용 */
+export async function readUser(db: Firestore, uid: string): Promise<StoredUser | null> {
+  const doc = await db.get(userPath(uid));
+  return doc ? toStoredUser(uid, decodeFields(doc.fields)) : null;
+}
+
+/**
+ * 전체 회원 (운영자 전용).
+ *
+ * 🔴 **검색을 서버에서 하지 않습니다.** Firestore 에는 부분일치 질의가 없습니다.
+ *    회원이 수백 단위인 동안은 상한까지 내려주고 화면에서 거르는 편이 맞습니다 —
+ *    검색 색인 서비스를 붙이면 비용과 운영 대상이 하나 늘어납니다.
+ *    상한에 걸렸는지는 호출부가 알아야 하므로 `limit + 1` 을 읽어 판단합니다.
+ *
+ * `listAll(청첩장)` 과 같은 성격의 경로입니다 — 운영자 화면에서만 부릅니다.
+ * 회원 수만큼 읽기가 발생하므로 자주 열리는 화면에서 쓰면 무료 한도를 태웁니다.
+ */
+export async function listAllUsers(
+  db: Firestore,
+  limit = 500,
+): Promise<{ users: StoredUser[]; truncated: boolean }> {
+  const docs = await db.query('', {
+    from: [{ collectionId: COLLECTION }],
+    limit: limit + 1,
+  });
+
+  const truncated = docs.length > limit;
+  const users = docs
+    .slice(0, limit)
+    .map((doc) => toStoredUser(doc.id, decodeFields(doc.fields)))
+    // 최근 로그인 순. 값이 없는 계정(한 번도 동기화 안 된)이 뒤로 갑니다
+    .sort((a, b) => (a.lastLoginAt ?? '') < (b.lastLoginAt ?? '') ? 1 : (a.lastLoginAt ?? '') > (b.lastLoginAt ?? '') ? -1 : 0);
+
+  return { users, truncated };
+}
+
 /** 탈퇴 — 사용자 문서를 지웁니다. 이미 없으면 조용히 넘어갑니다(재시도 가능) */
 export async function deleteUser(db: Firestore, uid: string): Promise<void> {
   await db.commit([{ delete: db.docName(userPath(uid)) }]);

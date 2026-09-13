@@ -7,7 +7,11 @@
  */
 import type {
   AccountProfile,
+  AdminEventRow,
   AdminInvitationSummary,
+  AdminUserDetail,
+  AdminUserList,
+  AdminUserReveal,
   ApiError,
   ApiResult,
   ClaimBody,
@@ -124,6 +128,23 @@ export function createClient(opts: ClientOptions) {
     admin: {
       /** 모든 계정의 청첩장. 운영자가 아니면 서버가 403(forbidden) 을 돌려준다 */
       invitations: () => get<AdminInvitationSummary[]>('/admin/invitations'),
+
+      /** 회원 목록. **이메일은 마스킹된 채로 온다** — 원문은 `reveal` 로만 */
+      users: () => get<AdminUserList>('/admin/users'),
+      user: (uid: string) => get<AdminUserDetail>(`/admin/users/${uid}`),
+
+      /**
+       * 가려둔 연락처의 원문.
+       *
+       * 🔴 **부르는 순간 서버가 감사 로그를 남긴다.** 화면을 그리려고 미리 부르지 마라 —
+       *    운영자가 "보기" 를 누른 순간에만 불러야 기록이 사실과 맞는다.
+       *    GET 이 아니라 POST 인 것도 브라우저가 멋대로 미리 가져오지 못하게 하기 위해서다.
+       */
+      revealUser: (uid: string) => post<AdminUserReveal>(`/admin/users/${uid}/reveal`),
+
+      /** D1 이벤트 로그 14일치. `onlyErrors` 면 실패한 것만 */
+      userEvents: (uid: string, onlyErrors = false) =>
+        get<AdminEventRow[]>(`/admin/users/${uid}/events${onlyErrors ? '?onlyErrors=1' : ''}`),
     },
 
     guestbook: {
