@@ -1,0 +1,10 @@
+# Luvi 운영자 콘솔 — admin.luv-ai.co.kr
+#
+# 이 파일은 **존재한다는 것 자체**가 목적입니다. 없으면 Pages 의 SPA 폴백이 걸려
+# /robots.txt 요청에 앱 HTML 이 통째로 붙어 나갑니다 (apps/site 에서 2026-09-12 확인).
+#
+# 여기는 소비자 화면과 달리 크롤링을 막아도 손해가 없습니다 — 외부에서 링크가 걸릴
+# 화면이 아니고, index.html 의 <meta name="robots"> 가 색인 금지를 따로 말합니다.
+
+User-agent: *
+Disallow: /
