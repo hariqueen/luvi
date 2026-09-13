@@ -166,7 +166,15 @@ export interface InquiryThread {
   messages: InquiryMessage[];
 }
 
-/** 운영자 목록의 한 줄. 스레드를 읽지 않고 그릴 수 있어야 합니다 */
+/**
+ * 운영자 목록의 한 줄. 스레드를 읽지 않고 그릴 수 있어야 합니다.
+ *
+ * 🔴 **연락처는 가려서 내려보냅니다** (`emailMasked` · `phoneMasked`).
+ *    2026-09-13 이전에는 `email` · `phone` 을 원문으로 보냈습니다 — 목록을 한 번 여는 것만으로
+ *    문의한 사람 전원의 연락처가 브라우저에 내려갔다는 뜻입니다. 그건 열람 기록으로 남길
+ *    수도 없고 남길 의미도 없습니다. 원문이 필요하면
+ *    `POST /api/admin/inquiries/:id/reveal` 로 한 건씩, 기록을 남기고 받습니다.
+ */
 export interface AdminInquirySummary {
   id: string;
   number: string;
@@ -174,8 +182,9 @@ export interface AdminInquirySummary {
   category: InquiryCategory;
   subject: string;
   name: string;
-  email: string;
-  phone: string;
+  /** `ab***@naver.com`. 값이 없으면 빈 문자열 */
+  emailMasked: string;
+  phoneMasked: string;
   /** 회원이면 uid, 비회원이면 null */
   uid: string | null;
   invitationId: string | null;
@@ -192,6 +201,65 @@ export interface AdminInquiryList {
   /** 상태별 건수 — 헤더 배지에 씁니다 */
   counts: Record<InquiryStatus, number>;
 }
+
+/**
+ * 운영자 스레드 상세.
+ *
+ * 고객용 `InquiryThread` 와 다른 점은 셋입니다: **내부 메모**가 있고, 접수 맥락(경로·세션·
+ * 청첩장)이 붙고, 회원이면 `uid` 로 회원 상세와 이어집니다. 연락처는 여전히 가려져 있고,
+ * `ipHash` · `accessTokenHash` 는 여기에도 **필드 자체를 만들지 않습니다.**
+ */
+export interface AdminInquiryDetail {
+  id: string;
+  number: string;
+  status: InquiryStatus;
+  category: InquiryCategory;
+  subject: string;
+  name: string;
+  emailMasked: string;
+  phoneMasked: string;
+  /** 회원이면 uid — 화면이 회원 상세로 잇습니다 */
+  uid: string | null;
+  /** 접수 맥락. "어디서 막혔나" 를 되묻지 않기 위한 값들입니다 */
+  entry: string;
+  path: string;
+  invitationId: string | null;
+  slug: string | null;
+  sessionId: string | null;
+  /** 유형이 'consult' 일 때만 채워집니다 */
+  weddingDate: string;
+  services: string;
+  attachments: InquiryAttachment[];
+  /** 🔴 고객에게 보이지 않는 운영 메모 */
+  adminNote: string;
+  createdAt: string;
+  lastMessageAt: string;
+  messages: InquiryMessage[];
+}
+
+/** POST /api/admin/inquiries/:id/reveal — 가려둔 연락처의 원문. 부르면 기록이 남습니다 */
+export interface AdminInquiryReveal {
+  id: string;
+  email: string;
+  phone: string;
+}
+
+/** POST /api/admin/inquiries/:id/messages — 운영자 답변 */
+export interface AdminReplyBody {
+  body: string;
+}
+
+/** PATCH /api/admin/inquiries/:id — 상태·내부 메모. 둘 다 선택입니다 */
+export interface UpdateInquiryBody {
+  status?: InquiryStatus;
+  adminNote?: string;
+}
+
+/** 운영자 답변 길이 상한. 고객 입력(2000)보다 넉넉합니다 — 안내가 길어질 수 있습니다 */
+export const ADMIN_REPLY_MAX = 4000;
+
+/** 내부 메모 길이 상한 */
+export const ADMIN_NOTE_MAX = 2000;
 
 /**
  * `hariqueen@naver.com` → `har***@naver.com`. **본인 확인용이지 노출용이 아닙니다.**

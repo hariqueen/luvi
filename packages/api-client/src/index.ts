@@ -27,7 +27,12 @@ import type {
   CreateInquiryResult,
   InquiryThread,
   InquiryStatus,
+  AdminInquiryDetail,
   AdminInquiryList,
+  AdminInquiryReveal,
+  AdminReplyBody,
+  UpdateInquiryBody,
+  InquiryMessage,
   CreateInvitationBody,
   CreateRankBody,
   DraftDiff,
@@ -330,6 +335,20 @@ export function createClient(opts: ClientOptions) {
       /** 운영자 목록. 운영자가 아니면 서버가 403 을 돌려줍니다 */
       admin: (status?: InquiryStatus) =>
         get<AdminInquiryList>(`/admin/inquiries${status ? `?status=${status}` : ''}`),
+
+      /** 운영자 스레드 상세. 부르면 서버가 '안 읽음' 을 내립니다 */
+      adminThread: (id: string) => get<AdminInquiryDetail>(`/admin/inquiries/${id}`),
+
+      /** 🔴 부르는 순간 감사 로그가 남는다. "보기" 를 눌렀을 때만 불러라 */
+      adminReveal: (id: string) => post<AdminInquiryReveal>(`/admin/inquiries/${id}/reveal`),
+
+      /** 운영자 답변. 서버가 상태를 'answered' 로 올리고 알림 메일을 띄운다 */
+      adminReply: (id: string, body: string) =>
+        post<InquiryMessage>(`/admin/inquiries/${id}/messages`, { body } satisfies AdminReplyBody),
+
+      /** 상태 · 내부 메모. 준 것만 바뀐다 */
+      adminUpdate: (id: string, changes: UpdateInquiryBody) =>
+        patch<{ id: string } & UpdateInquiryBody>(`/admin/inquiries/${id}`, changes),
     },
 
     public: {

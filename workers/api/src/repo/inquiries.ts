@@ -19,6 +19,7 @@ import {
   type Firestore,
   type FsDocument,
 } from '../lib/firestore';
+import { maskEmail, maskPhone } from '@luvi/schema';
 import type {
   AdminInquirySummary,
   InquiryAttachment,
@@ -243,6 +244,112 @@ export async function setAttachments(
   );
 }
 
+/**
+ * 스레드에 글을 덧붙입니다 (지금은 운영자 답변만 부릅니다).
+ *
+ * 🔴 **비정규화한 값을 같이 갱신해야 합니다.** 목록은 서브컬렉션을 읽지 않고
+ *    상위 문서의 `lastMessage*` 만 보므로, 여기서 빠뜨리면 **답변을 했는데 목록에는
+ *    그대로 "미확인 · 고객 글" 로 남습니다.** 저장은 됐는데 화면이 거짓말을 하는 상태가
+ *    가장 나쁩니다 — 운영자가 같은 문의에 두 번 답하게 됩니다.
+ *
+ * `messageCount` 는 읽고 더합니다. 트랜잭션이 아니라서 운영자 둘이 같은 순간에 답하면
+ * 1 이 적게 셀 수 있는데, 그건 화면의 숫자가 하나 틀리는 정도라 감수합니다 —
+ * 실제 글은 서브컬렉션에 둘 다 남습니다.
+ */
+export async function appendMessage(
+  db: Firestore,
+  id: string,
+  input: { author: 'user' | 'admin'; body: string },
+): Promise<InquiryMessage> {
+  const now = new Date().toISOString();
+
+  const doc = await db.create(`${COLLECTION}/${id}`, 'messages', {
+    author: encode(input.author),
+    body: encode(input.body),
+    attachments: encode([] as InquiryAttachment[]),
+    createdAt: fsTimestamp(now),
+  });
+
+  const current = await findInquiry(db, id);
+  const fromAdmin = input.author === 'admin';
+
+  await db.patch(
+    `${COLLECTION}/${id}`,
+    {
+      messageCount: encode((current?.messageCount ?? 1) + 1),
+      lastMessageAt: fsTimestamp(now),
+      lastMessageFrom: encode(input.author),
+      lastMessagePreview: encode(input.body.slice(0, 80)),
+      // 답한 쪽은 읽은 것이고, 상대는 아직 못 읽은 것입니다
+      unreadForAdmin: encode(!fromAdmin),
+      unreadForUser: encode(fromAdmin),
+      // 운영자가 답하면 '답변함'. 고객이 덧붙이면 다시 '처리 중' 으로 내려옵니다 —
+      // 종결(closed)은 사람이 직접 누를 때만 되어야 합니다
+      ...(fromAdmin
+        ? { status: encode('answered' satisfies InquiryStatus) }
+        : current?.status === 'closed'
+          ? {}
+          : { status: encode('open' satisfies InquiryStatus) }),
+      updatedAt: fsTimestamp(now),
+    },
+    [
+      'messageCount',
+      'lastMessageAt',
+      'lastMessageFrom',
+      'lastMessagePreview',
+      'unreadForAdmin',
+      'unreadForUser',
+      'status',
+      'updatedAt',
+    ],
+  );
+
+  return { id: doc.id, author: input.author, body: input.body, attachments: [], createdAt: now };
+}
+
+/** 상태·내부 메모. 준 것만 씁니다 */
+export async function updateInquiry(
+  db: Firestore,
+  id: string,
+  patch: { status?: InquiryStatus; adminNote?: string },
+): Promise<void> {
+  const fields: Record<string, ReturnType<typeof encode>> = {};
+  const mask: string[] = [];
+
+  if (patch.status !== undefined) {
+    fields.status = encode(patch.status);
+    mask.push('status');
+  }
+  if (patch.adminNote !== undefined) {
+    fields.adminNote = encode(patch.adminNote);
+    mask.push('adminNote');
+  }
+  if (mask.length === 0) return;
+
+  fields.updatedAt = fsTimestamp(new Date().toISOString());
+  mask.push('updatedAt');
+
+  await db.patch(`${COLLECTION}/${id}`, fields, mask);
+}
+
+/** 운영자가 스레드를 열면 '안 읽음' 을 내립니다 */
+export async function markReadByAdmin(db: Firestore, id: string): Promise<void> {
+  await db.patch(`${COLLECTION}/${id}`, { unreadForAdmin: encode(false) }, ['unreadForAdmin']);
+}
+
+/**
+ * 내부 메모.
+ *
+ * `toStored` 에 넣지 않은 이유: `StoredInquiry` 는 고객 경로(`toThread`)도 지나갑니다.
+ * 거기서 실수로 흘리지 않으려면 **애초에 같은 객체에 담지 않는 편**이 안전합니다.
+ */
+export async function readAdminNote(db: Firestore, id: string): Promise<string> {
+  const doc = await db.get(`${COLLECTION}/${id}`);
+  if (!doc) return '';
+  const note = decodeFields(doc.fields).adminNote;
+  return typeof note === 'string' ? note : '';
+}
+
 export interface AdminListOptions {
   status?: InquiryStatus;
   limit?: number;
@@ -292,8 +399,9 @@ export async function listForAdmin(
       category: s.category,
       subject: s.subject,
       name: s.name,
-      email: s.email,
-      phone: s.phone,
+      // 🔴 원문이 아니라 가린 값입니다. 원문은 reveal 라우트로만 (스키마 주석 참고)
+      emailMasked: s.email ? maskEmail(s.email) : '',
+      phoneMasked: s.phone ? maskPhone(s.phone) : '',
       uid: s.uid,
       invitationId: s.invitationId,
       entry: s.entry,

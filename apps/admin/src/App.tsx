@@ -16,6 +16,7 @@ import { ScreenFallback } from '@/components/ScreenFallback';
 import { lazyPage } from '@/lib/lazyPage';
 
 const Inquiries = lazyPage(() => import('@/routes/Inquiries'));
+const InquiryDetail = lazyPage(() => import('@/routes/InquiryDetail'));
 const Users = lazyPage(() => import('@/routes/Users'));
 const UserDetail = lazyPage(() => import('@/routes/UserDetail'));
 const Invitations = lazyPage(() => import('@/routes/Invitations'));
@@ -32,12 +33,10 @@ export default function App() {
             </RequireAdmin>
           }
         >
-          {/*
-            문의함이 완성되면 여기를 `/inquiries` 로 바꾸세요 — 운영자가 아침에 여는
-            첫 화면은 "누가 무엇을 물었나" 입니다. 지금은 실제로 도는 화면으로 보냅니다.
-          */}
-          <Route index element={<Navigate to="/invitations" replace />} />
+          {/* 운영자가 아침에 여는 첫 화면은 "누가 무엇을 물었나" 입니다 */}
+          <Route index element={<Navigate to="/inquiries" replace />} />
           <Route path="inquiries" element={<Inquiries />} />
+          <Route path="inquiries/:id" element={<InquiryDetail />} />
           <Route path="users" element={<Users />} />
           <Route path="users/:uid" element={<UserDetail />} />
           <Route path="invitations" element={<Invitations />} />

@@ -59,8 +59,14 @@ function Row({ item }: { item: AdminInquirySummary }) {
       </p>
 
       {/*
-        "누가" 를 제목만큼 크게 보여줍니다 — 답장할 주소를 여기서 바로 복사해야 하고,
-        M1 에서는 답변을 메일로 하기 때문입니다.
+        🔴 **연락처 원문을 더 이상 받지 않습니다** (2026-09-13). 서버가 가려서 보냅니다.
+           예전에는 여기에 원문 이메일과 mailto 링크가 있었습니다 — 목록을 한 번 여는 것만으로
+           문의한 사람 전원의 연락처가 브라우저에 내려갔다는 뜻이고, 누가 언제 봤는지 남길
+           자리도 없었습니다.
+
+           답변은 이제 운영자 콘솔(admin.luv-ai.co.kr)의 스레드에서 씁니다. 거기서는
+           "보기" 를 눌러야 원문이 펼쳐지고 그 순간이 기록에 남습니다.
+           이 화면은 콘솔이 자리 잡으면 없앨 예정입니다.
       */}
       <p className="mt-1.5 text-[12.5px] text-ink">
         {item.name}
@@ -69,18 +75,8 @@ function Row({ item }: { item: AdminInquirySummary }) {
         ) : (
           <span className="ml-1 text-[11.5px] text-muted">(비회원)</span>
         )}
-        {item.email && (
-          <>
-            {' · '}
-            <a
-              href={`mailto:${item.email}?subject=${encodeURIComponent(`[러비] 문의 ${item.number} 답변`)}`}
-              className="text-gold underline underline-offset-2"
-            >
-              {item.email}
-            </a>
-          </>
-        )}
-        {item.phone && <> · {item.phone}</>}
+        {item.emailMasked && <span className="text-muted"> · {item.emailMasked}</span>}
+        {item.phoneMasked && <span className="text-muted"> · {item.phoneMasked}</span>}
       </p>
 
       <p className="mt-1 text-[11.5px] text-muted-faint">
@@ -133,7 +129,7 @@ export default function AdminInquiries() {
     const needle = q.trim().toLowerCase();
     if (!needle) return load.data.items;
     return load.data.items.filter((i) =>
-      [i.number, i.name, i.email, i.phone, i.subject]
+      [i.number, i.name, i.emailMasked, i.phoneMasked, i.subject]
         .join(' ')
         .toLowerCase()
         .includes(needle),

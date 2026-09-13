@@ -16,7 +16,12 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import type {
   AdminEventRow,
+  AdminInquiryDetail,
+  AdminInquiryReveal,
   AdminInvitationSummary,
+  AdminReplyBody,
+  UpdateInquiryBody,
+  InquiryMessage,
   AdminUserDetail,
   AdminUserInquiry,
   AdminUserList,
@@ -59,6 +64,8 @@ import type {
   InquiryThread,
 } from '@luvi/schema';
 import {
+  ADMIN_NOTE_MAX,
+  ADMIN_REPLY_MAX,
   DOC_VERSIONS,
   INQUIRY_ATTACHMENT_TYPES,
   INQUIRY_CATEGORIES,
@@ -97,7 +104,7 @@ import {
   SecretError,
 } from './lib/secrets';
 import { verifyTurnstile } from './lib/turnstile';
-import { adminAlertMail, receiptMail, send as sendMail } from './lib/mail';
+import { adminAlertMail, receiptMail, replyMail, send as sendMail } from './lib/mail';
 import {
   AssetError,
   IMMUTABLE_CACHE,
@@ -2227,6 +2234,172 @@ app.get('/api/admin/inquiries', async (c) => {
   }
 
   return c.json(ok<AdminInquiryList>({ items, counts }));
+});
+
+/**
+ * ─────────────────────────── 운영자 · 문의 응대 ───────────────────────────
+ *
+ * 여기가 콘솔에서 값어치가 가장 큰 부분입니다. 지금까지 답변을 메일로 해서 기록이
+ * Gmail 에 흩어져 있었습니다. 스레드 하나에 고객 글·운영자 답변·상태·내부 메모가 모입니다.
+ *
+ * 🔴 라우트 순서: 고정 경로 `/api/admin/inquiries` 는 위에 이미 선언돼 있고, 아래는
+ *    세그먼트가 하나 더 붙으므로 겹치지 않습니다. 새 고정 경로를 넣을 때는
+ *    반드시 `:id` 보다 **먼저** 두세요 (`index.ts` 의 다른 주석에 같은 사고가 적혀 있습니다).
+ */
+
+/** 스레드를 열면 '안 읽음' 이 내려갑니다 — 읽었다는 사실이 목록에 바로 반영돼야 합니다 */
+app.get('/api/admin/inquiries/:id', async (c) => {
+  const db = firestore(c.env);
+  await requireAdmin(c, db);
+  const id = c.req.param('id');
+
+  const inquiry = await inquiriesRepo.findInquiry(db, id);
+  if (!inquiry) throw new HttpError({ code: 'not_found', message: '문의를 찾을 수 없습니다' });
+
+  const [messages, adminNote] = await Promise.all([
+    inquiriesRepo.listMessages(db, id),
+    inquiriesRepo.readAdminNote(db, id),
+  ]);
+
+  // 읽음 처리는 실패해도 화면을 막지 않습니다 — 배지가 한 번 더 뜨는 정도입니다
+  if (inquiry.unreadForAdmin) {
+    c.executionCtx.waitUntil(
+      inquiriesRepo.markReadByAdmin(db, id).catch((e) => {
+        console.error('[api] 문의 읽음 처리 실패', e);
+      }),
+    );
+  }
+
+  return c.json(
+    ok<AdminInquiryDetail>({
+      id: inquiry.id,
+      number: inquiry.number,
+      status: inquiry.status,
+      category: inquiry.category,
+      subject: inquiry.subject,
+      name: inquiry.name,
+      // 🔴 상세에서도 가립니다. 원문은 아래 reveal 로만
+      emailMasked: inquiry.email ? maskEmail(inquiry.email) : '',
+      phoneMasked: inquiry.phone ? maskPhone(inquiry.phone) : '',
+      uid: inquiry.uid,
+      entry: inquiry.entry,
+      path: inquiry.path,
+      invitationId: inquiry.invitationId,
+      slug: inquiry.slug,
+      sessionId: inquiry.sessionId,
+      weddingDate: inquiry.weddingDate,
+      services: inquiry.services,
+      attachments: inquiry.attachments,
+      adminNote,
+      createdAt: inquiry.createdAt,
+      lastMessageAt: inquiry.lastMessageAt,
+      messages,
+    }),
+  );
+});
+
+/** 회원 쪽 reveal 과 같은 설계입니다 — 부르는 순간이 곧 기록입니다 */
+app.post('/api/admin/inquiries/:id/reveal', async (c) => {
+  const db = firestore(c.env);
+  await requireAdmin(c, db);
+  const id = c.req.param('id');
+
+  const inquiry = await inquiriesRepo.findInquiry(db, id);
+  if (!inquiry) throw new HttpError({ code: 'not_found', message: '문의를 찾을 수 없습니다' });
+
+  await audit(c, { name: 'admin_inquiry_reveal', detail: `inquiry=${inquiry.number}` });
+
+  return c.json(
+    ok<AdminInquiryReveal>({ id, email: inquiry.email, phone: inquiry.phone }),
+  );
+});
+
+/**
+ * 운영자 답변.
+ *
+ * 🔴 **메일 실패가 답변 저장 실패가 되면 안 됩니다.** 답변은 이미 Firestore 에 있고
+ *    메일은 알림일 뿐입니다. Resend 가 죽었다고 운영자가 같은 답을 두 번 쓰게 만들지
+ *    않습니다 — 접수(`POST /api/inquiries`)가 같은 이유로 `waitUntil` 을 씁니다.
+ *
+ * 🔴 **본문을 평문으로 저장합니다.** 마크다운·HTML 로 해석하지 않습니다. 운영자 계정이
+ *    털렸을 때 고객 화면에서 스크립트가 도는 경로를 만들지 않기 위해서입니다
+ *    (화면도 평문으로 렌더합니다).
+ */
+app.post('/api/admin/inquiries/:id/messages', async (c) => {
+  const db = firestore(c.env);
+  await requireAdmin(c, db);
+  const id = c.req.param('id');
+
+  const body = await readJson<AdminReplyBody>(c.req);
+  const text = trimmed(body.body, ADMIN_REPLY_MAX);
+  if (!text) {
+    throw new HttpError({ code: 'validation_failed', message: '답변 내용을 입력해주세요' });
+  }
+
+  const inquiry = await inquiriesRepo.findInquiry(db, id);
+  if (!inquiry) throw new HttpError({ code: 'not_found', message: '문의를 찾을 수 없습니다' });
+
+  const message = await inquiriesRepo.appendMessage(db, id, { author: 'admin', body: text });
+  await audit(c, { name: 'admin_inquiry_reply', detail: `inquiry=${inquiry.number}` });
+
+  if (inquiry.email) {
+    c.executionCtx.waitUntil(
+      sendMail(c.env, replyMail(c.env, {
+        number: inquiry.number,
+        name: inquiry.name,
+        to: inquiry.email,
+        body: text,
+      })).then((sent) => {
+        if (!sent) console.error('[api] 답변 알림 메일 실패', inquiry.number);
+      }),
+    );
+  } else {
+    // 카카오·네이버는 이메일이 선택 동의라 회원이어도 주소가 없을 수 있습니다.
+    // 그런 사람에게는 조회 링크가 유일한 경로이므로, 답변했다는 사실만 남겨둡니다.
+    console.warn('[api] 답변 알림을 보낼 주소가 없습니다', inquiry.number);
+  }
+
+  return c.json(ok<InquiryMessage>(message));
+});
+
+/** 상태 · 내부 메모. 둘 다 선택이고, 준 것만 바뀝니다 */
+app.patch('/api/admin/inquiries/:id', async (c) => {
+  const db = firestore(c.env);
+  await requireAdmin(c, db);
+  const id = c.req.param('id');
+
+  const body = await readJson<UpdateInquiryBody>(c.req);
+  const patch: { status?: InquiryStatus; adminNote?: string } = {};
+
+  if (body.status !== undefined) {
+    if (!(['new', 'open', 'answered', 'closed'] as const).includes(body.status)) {
+      throw new HttpError({ code: 'validation_failed', message: '알 수 없는 상태입니다' });
+    }
+    patch.status = body.status;
+  }
+  // 🔴 빈 문자열도 유효한 값입니다 (메모 지우기). `trimmed()` 의 falsy 검사로 걸러내면
+  //    한 번 쓴 메모를 영영 못 지웁니다.
+  if (typeof body.adminNote === 'string') {
+    patch.adminNote = body.adminNote.trim().slice(0, ADMIN_NOTE_MAX);
+  }
+
+  if (patch.status === undefined && patch.adminNote === undefined) {
+    throw new HttpError({ code: 'validation_failed', message: '바꿀 내용이 없습니다' });
+  }
+
+  const inquiry = await inquiriesRepo.findInquiry(db, id);
+  if (!inquiry) throw new HttpError({ code: 'not_found', message: '문의를 찾을 수 없습니다' });
+
+  await inquiriesRepo.updateInquiry(db, id, patch);
+
+  // 상태 변경만 기록합니다. 내부 메모는 내용이 곧 개인정보일 수 있어 로그에 남기지 않고,
+  // 바꿨다는 사실만 남깁니다.
+  await audit(c, {
+    name: patch.status ? 'admin_inquiry_status' : 'admin_inquiry_note',
+    detail: `inquiry=${inquiry.number}${patch.status ? ` status=${patch.status}` : ''}`,
+  });
+
+  return c.json(ok({ id, ...patch }));
 });
 
 app.post('/api/bookings', async (c) => {

@@ -15,7 +15,11 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { AdminEventRow, AdminUserDetail } from '@luvi/schema';
+import {
+  INQUIRY_STATUS_LABELS,
+  type AdminEventRow,
+  type AdminUserDetail,
+} from '@luvi/schema';
 import { api } from '@/lib/api';
 import { siteUrl } from '@/lib/env';
 import { formatDate, formatDay, formatLogTime, formatTouched, providerLabels } from '@/lib/format';
@@ -27,12 +31,8 @@ type Load =
   | { state: 'error'; message: string; forbidden: boolean; notFound: boolean }
   | { state: 'ready'; user: AdminUserDetail };
 
-const STATUS_LABEL: Record<string, string> = {
-  open: '미확인',
-  in_progress: '처리 중',
-  answered: '답변함',
-  closed: '종결',
-};
+// 라벨은 @luvi/schema 의 INQUIRY_STATUS_LABELS 하나만 씁니다 — 화면마다 따로 적으면
+// 상태가 하나 늘 때 한쪽만 고쳐 서로 다른 말이 보입니다.
 
 function Panel({ title, aside, children }: { title: string; aside?: string; children: React.ReactNode }) {
   return (
@@ -299,26 +299,27 @@ export default function UserDetail() {
           ) : (
             <ul className="flex flex-col">
               {u.inquiries.map((q) => (
-                <li
-                  key={q.id}
-                  className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line-soft py-2 last:border-0 text-[12.5px]"
-                >
-                  <span className="w-[110px] flex-none text-muted-faint">{q.number}</span>
-                  <span className="min-w-0 flex-1 truncate text-ink-soft">{q.subject}</span>
-                  <span className="text-muted">{STATUS_LABEL[q.status] ?? q.status}</span>
-                  {q.unreadForAdmin && (
-                    <span className="rounded-full bg-cream px-2 py-px text-[11px] text-gold-deep">
-                      안 읽음
+                <li key={q.id} className="border-b border-line-soft last:border-0">
+                  <Link
+                    to={`/inquiries/${q.id}`}
+                    className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2 text-[12.5px] transition-colors hover:bg-surface-sunken"
+                  >
+                    <span className="w-[110px] flex-none text-muted-faint">{q.number}</span>
+                    <span className="min-w-0 flex-1 truncate text-ink-soft">{q.subject}</span>
+                    <span className="text-muted">{INQUIRY_STATUS_LABELS[q.status]}</span>
+                    {q.unreadForAdmin && (
+                      <span className="rounded-full bg-cream px-2 py-px text-[11px] text-gold-deep">
+                        안 읽음
+                      </span>
+                    )}
+                    <span className="w-[86px] flex-none text-right text-muted-faint">
+                      {formatTouched(q.lastMessageAt)}
                     </span>
-                  )}
-                  <span className="w-[86px] flex-none text-right text-muted-faint">
-                    {formatTouched(q.lastMessageAt)}
-                  </span>
+                  </Link>
                 </li>
               ))}
             </ul>
           )}
-          {/* 문의 상세(B2)가 생기면 위 각 줄을 /inquiries/:id 로 잇습니다 */}
         </Panel>
       </div>
     </section>
