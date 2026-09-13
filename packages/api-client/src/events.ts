@@ -15,8 +15,13 @@ const FLUSH_MS = 1500;
 const MAX_QUEUE = 20;
 const SESSION_KEY = 'luvi.session';
 
-/** 탭(세션) 단위 난수. 사람을 식별하지 않고 한 번의 방문을 잇는 용도입니다 */
-function sessionId(): string {
+/**
+ * 탭(세션) 단위 난수. 사람을 식별하지 않고 한 번의 방문을 잇는 용도입니다.
+ *
+ * 문의 접수에도 함께 보냅니다 — 운영자가 "이 사람이 방금 무엇을 하다 실패했는지" 를
+ * D1 이벤트 로그에서 찾는 **유일한 열쇠**입니다. 그래서 밖으로 엽니다.
+ */
+export function sessionId(): string {
   try {
     const found = sessionStorage.getItem(SESSION_KEY);
     if (found) return found;

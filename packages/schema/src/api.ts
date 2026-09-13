@@ -346,12 +346,8 @@ export interface SocialAuthResult {
 
 // ─────────────────────────── 예약 · 문의 ───────────────────────────
 
-export interface CreateInquiryBody {
-  name: string;
-  phone?: string;
-  email?: string;
-  message: string;
-}
+// 문의 타입은 `inquiry.ts` 로 옮겼습니다 — 유형·길이 제한·마스킹까지 한 곳에 모읍니다.
+// 예약(`bookings`)은 M3 에서 문의의 '제작 상담' 유형으로 흡수할 예정이라 여기 남겨둡니다.
 
 export interface CreateBookingBody {
   name: string;

@@ -20,6 +20,10 @@ import type {
   CreateBookingBody,
   CreateGuestbookBody,
   CreateInquiryBody,
+  CreateInquiryResult,
+  InquiryThread,
+  InquiryStatus,
+  AdminInquiryList,
   CreateInvitationBody,
   CreateRankBody,
   DraftDiff,
@@ -254,8 +258,57 @@ export function createClient(opts: ClientOptions) {
     },
 
     contact: {
-      inquiry: (body: CreateInquiryBody) => post<{ id: string }>('/inquiries', body),
       booking: (body: CreateBookingBody) => post<{ id: string }>('/bookings', body),
+    },
+
+    inquiries: {
+      /**
+       * 문의 접수. 비로그인도 부릅니다.
+       *
+       * 응답의 `token` 은 **여기서 한 번만** 옵니다 (서버는 해시만 보관). 화면은 이 값을
+       * 조회 링크로 즉시 보여줘야 합니다 — 메일이 늦거나 오타로 안 갈 수 있습니다.
+       */
+      create: (body: CreateInquiryBody) => post<CreateInquiryResult>('/inquiries', body),
+
+      /**
+       * 첨부 한 장 올리기. **접수가 끝난 뒤에** 부릅니다.
+       *
+       * 실패해도 문의 본문은 이미 저장돼 있습니다 — 그래서 호출부는 이 실패로
+       * "문의가 접수되지 않았다" 고 말하면 안 됩니다.
+       */
+      uploadAttachment: async (
+        id: string,
+        uploadToken: string,
+        index: number,
+        file: Blob,
+      ): Promise<ApiResult<{ index: number }>> => {
+        try {
+          const res = await fetch(
+            `${opts.baseUrl}/inquiries/${id}/attachments?index=${index}&token=${encodeURIComponent(uploadToken)}`,
+            { method: 'PUT', headers: { 'Content-Type': file.type }, body: file },
+          );
+          if (!res.ok) {
+            const err = (await res.json().catch(() => null)) as { error?: ApiError } | null;
+            return {
+              ok: false,
+              error: err?.error ?? { code: 'internal', message: '첨부 업로드에 실패했습니다' },
+            };
+          }
+          return { ok: true, data: { index } };
+        } catch {
+          return { ok: false, error: { code: 'internal', message: '업로드 중 연결이 끊겼습니다' } };
+        }
+      },
+
+      /** 조회 링크로 스레드 보기 (비회원) */
+      byToken: (token: string) => get<InquiryThread>(`/inquiries/t/${encodeURIComponent(token)}`),
+
+      /** 내 문의 (회원) */
+      mine: () => get<Omit<InquiryThread, 'messages'>[]>('/inquiries/mine'),
+
+      /** 운영자 목록. 운영자가 아니면 서버가 403 을 돌려줍니다 */
+      admin: (status?: InquiryStatus) =>
+        get<AdminInquiryList>(`/admin/inquiries${status ? `?status=${status}` : ''}`),
     },
 
     public: {
@@ -267,4 +320,9 @@ export function createClient(opts: ClientOptions) {
 
 export type LuviClient = ReturnType<typeof createClient>;
 
-export { createEventLogger, type EventLogger, type EventLoggerOptions } from './events';
+export {
+  createEventLogger,
+  sessionId,
+  type EventLogger,
+  type EventLoggerOptions,
+} from './events';

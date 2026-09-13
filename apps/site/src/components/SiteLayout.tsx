@@ -144,9 +144,13 @@ export function SiteLayout() {
             <Link to="/notice" className="text-muted hover:text-ink">
               공지사항
             </Link>
-            <a href="mailto:help@luv-ai.co.kr" className="text-muted hover:text-ink">
+            {/*
+              🔴 `mailto:` 로 되돌리지 마세요. 메일로 받으면 문의가 Gmail 에 흩어져
+                 기록·상태·보유기간 관리가 통째로 불가능해집니다 (방침상 1년 보관 대상입니다).
+            */}
+            <Link to="/support" className="text-muted hover:text-ink">
               문의
-            </a>
+            </Link>
           </nav>
 
           <address className="mt-4 not-italic text-[11.5px] leading-relaxed text-muted-faint">

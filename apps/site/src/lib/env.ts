@@ -12,6 +12,12 @@ export const env = {
   naverClientId: import.meta.env.VITE_NAVER_CLIENT_ID ?? '',
 
   /**
+   * Turnstile 사이트 키 (공개 값). 비밀키는 Worker 시크릿에만 둔다.
+   * 비어 있으면 위젯을 그리지 않는다 — 키가 없다고 문의 창구가 닫히면 안 된다.
+   */
+  turnstileSiteKey: import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '',
+
+  /**
    * Firebase 웹 앱 설정.
    *
    * 전부 브라우저에 노출되는 **공개 값**이다 — `apiKey` 는 비밀키가 아니라 프로젝트 식별자다.
