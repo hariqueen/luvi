@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ensureFonts } from '@luvi/schema';
 import { useInvitation } from '@/lib/invitationContext';
 import { CoverLayers } from '@/components/common/CoverLayers';
+import { Field } from '@/components/common/Editable';
+import { IS_PREVIEW } from '@/components/common/PreviewSlot';
 
 export function Cover() {
   const { cover, labels } = useInvitation();
@@ -58,10 +60,18 @@ export function Cover() {
       {/* 자유 배치 텍스트 레이어 (미리보기에서는 끌어 옮기고 눌러서 고칩니다) */}
       <CoverLayers layers={cover.layers} size={size} maxWidth="86%" />
 
-      {/* 스크롤 안내 — 비우면 사라집니다 (labels.ts 의 OPTIONAL_LABELS) */}
-      {labels.coverScroll && (
+      {/*
+        스크롤 안내 — 비우면 사라집니다 (labels.ts 의 OPTIONAL_LABELS).
+        미리보기에서는 비어도 자리를 남깁니다: 사라지면 다시 넣을 곳이 없고,
+        지우는 도중에 요소가 없어지면 커서까지 함께 사라집니다.
+      */}
+      {(IS_PREVIEW || labels.coverScroll) && (
         <div className="absolute bottom-[22px] left-1/2 z-[2] -translate-x-1/2 animate-floatY text-[10px] tracking-[0.3em] text-white opacity-85">
-          {labels.coverScroll}
+          <Field
+            path="core.labels.coverScroll"
+            value={labels.coverScroll}
+            placeholder="스크롤 안내"
+          />
         </div>
       )}
     </section>

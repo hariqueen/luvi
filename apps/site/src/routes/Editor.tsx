@@ -870,23 +870,24 @@ export default function Editor() {
           )}
           {layers.map((layer, i) => (
             <div key={layer.id} className="flex flex-col gap-2 rounded-xl border border-line bg-white p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-muted">문구 {i + 1}</span>
+              <div className="flex items-center justify-between gap-2">
+                {/*
+                  🔴 **글자는 여기서 받지 않습니다.** 미리보기의 그 글자를 눌러 바로 고칩니다
+                     (PPT 와 같습니다). 예전에는 여기에도 textarea 가 있어서 같은 문구를 받는
+                     자리가 두 곳이 됐습니다 — 어느 쪽이 원본인지 헷갈립니다. 여기 글자는
+                     **어느 문구의 설정인지 알아보라고** 보여주는 것뿐입니다.
+                */}
+                <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink-soft">
+                  {richToPlain(layer.text).trim() || `문구 ${i + 1}`}
+                </span>
                 <button
                   type="button"
                   onClick={() => removeLayer(layer.id)}
-                  className="text-[11.5px] text-gold-deep"
+                  className="flex-none text-[11.5px] text-gold-deep"
                 >
                   삭제
                 </button>
               </div>
-              <textarea
-                value={layer.text}
-                onChange={(e) => patchLayer(layer.id, { text: e.target.value })}
-                rows={2}
-                placeholder="문구를 입력하세요"
-                className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] outline-none focus:border-gold"
-              />
               <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={layer.font}
