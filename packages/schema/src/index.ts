@@ -1,6 +1,7 @@
 export * from './content';
 export * from './richText';
 export * from './fonts';
+export * from './bgm';
 export * from './games';
 export * from './layers';
 export * from './design';
