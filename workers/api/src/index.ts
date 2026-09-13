@@ -1856,7 +1856,16 @@ app.post('/api/inquiries', async (c) => {
     message,
     name,
     email,
-    phone: trimmed(body.phone, INQUIRY_LIMITS.phone),
+    /**
+     * 🔴 문의에서는 전화번호를 받지 않습니다. 보내와도 버립니다.
+     *
+     * 비회원은 이메일로, 회원은 서비스 안에서 답변을 받으므로 두 경로 모두 전화번호가
+     * 필요 없습니다. **쓰지 않을 개인정보를 "선택" 이라는 이름으로 받아두지 않습니다.**
+     * 화면에서 칸을 지우는 것만으로는 부족합니다 — 요청을 직접 보내는 경로가 남습니다.
+     *
+     * (`POST /api/bookings` 는 그대로 받습니다. 그쪽은 상담 예약이라 통화가 목적입니다)
+     */
+    phone: '',
     uid,
     weddingDate: trimmed(body.weddingDate, 30),
     services: trimmed(body.services, 200),
@@ -1888,7 +1897,8 @@ app.post('/api/inquiries', async (c) => {
           ...mailInput,
           id,
           email,
-          phone: trimmed(body.phone, INQUIRY_LIMITS.phone),
+          // 문의에서는 전화번호를 받지 않습니다 (위 `phone: ''` 주석 참고)
+          phone: '',
           entry: context.entry,
           invitationId: context.invitationId || null,
           sessionId: context.sessionId || null,

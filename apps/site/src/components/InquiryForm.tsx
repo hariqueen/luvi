@@ -64,7 +64,6 @@ export function InquiryForm({
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [weddingDate, setWeddingDate] = useState('');
   const [services, setServices] = useState('');
   const [agreed, setAgreed] = useState(false);
@@ -137,7 +136,6 @@ export function InquiryForm({
       category,
       message,
       ...(signedIn ? {} : { name, email, privacyAgreed: agreed, turnstileToken }),
-      ...(phone ? { phone } : {}),
       ...(category === 'consult' ? { weddingDate, services } : {}),
       ...(context ? { context } : {}),
       ...(company ? { company } : {}),
@@ -265,21 +263,18 @@ export function InquiryForm({
         </div>
       )}
 
-      <div>
-        <label className={labelClass} htmlFor="inq-phone">
-          연락처 <span className="font-normal text-muted-faint">(선택)</span>
-        </label>
-        <input
-          id="inq-phone"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          maxLength={INQUIRY_LIMITS.phone}
-          className={inputClass}
-          placeholder="010-0000-0000"
-          inputMode="tel"
-          autoComplete="tel"
-        />
-      </div>
+      {/*
+        🔴 전화번호는 받지 않습니다.
+
+        비회원은 이메일로, 회원은 서비스 안에서 답변을 받습니다. 두 경로 모두 전화번호가
+        필요 없고, 전화번호는 이메일보다 민감한 개인정보입니다. **쓰지 않을 개인정보를
+        "선택" 이라는 이름으로 받아두지 않습니다.**
+
+        전화 연락을 원하는 분은 문의 내용에 직접 적으면 됩니다 — 그건 본인이 목적을 알고
+        제공하는 것이라 성격이 다릅니다.
+
+        (`bookings` 폼은 여전히 전화번호를 받습니다. 그쪽은 상담 예약이라 통화가 목적입니다)
+      */}
 
       {category === 'consult' && (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -411,9 +406,14 @@ export function InquiryForm({
                 <strong className="font-semibold">개인정보 수집·이용에 동의합니다 (필수)</strong>
                 <br />
                 <span className="text-muted">
-                  {/* 실제로 받는 것과 한 글자도 어긋나면 안 됩니다 */}
-                  수집 항목: 이름, 이메일 주소, 문의 내용 (필수) / 휴대전화번호
-                  {INQUIRY_EXTRAS_ENABLED ? ', 첨부 이미지' : ''} (선택)
+                  {/*
+                    🔴 실제로 받는 것과 한 글자도 어긋나면 안 됩니다.
+                       방침에는 휴대전화번호가 '선택' 으로 적혀 있지만 **폼에서 받지 않으므로**
+                       여기에도 적지 않습니다. 적게 받는 것은 고지 없이 바로 할 수 있습니다
+                       (사전 고지가 필요한 것은 항목이 **늘** 때입니다).
+                  */}
+                  수집 항목: 이름, 이메일 주소, 문의 내용 (필수)
+                  {INQUIRY_EXTRAS_ENABLED ? ' / 첨부 이미지 (선택)' : ''}
                   <br />
                   이용 목적: 문의 접수 및 답변 · 보유 기간: 처리 완료 후 1년
                   <br />
