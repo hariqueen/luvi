@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useGuestbook } from '@/hooks/useGuestbook';
 import { SectionText } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
+import { Field, showOptional } from '@/components/common/Editable';
 
 const fmtDate = (ts: number) =>
   new Date(ts).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
@@ -50,9 +51,13 @@ export function Guestbook() {
         </div>
       ) : (
         // 비어 있을 때의 안내 — 지우면 이 자리가 통째로 사라집니다 (labels.ts)
-        labels.guestbookEmpty && (
+        showOptional(labels.guestbookEmpty) && (
           <div className="px-0 pb-6 pt-1.5 font-myeongjo text-[13px] text-c2-ink-soft">
-            {labels.guestbookEmpty}
+            <Field
+              path="core.labels.guestbookEmpty"
+              value={labels.guestbookEmpty}
+              placeholder="비었을 때 안내"
+            />
           </div>
         )
       )}
@@ -62,9 +67,13 @@ export function Guestbook() {
           이 디자인에는 머리글이 없어서 기본값이 빈 문자열입니다.
           **없는 것이지 못 넣는 것이 아닙니다** — 사용자가 적으면 여기 나옵니다.
         */}
-        {labels.guestbookFormTitle && (
+        {showOptional(labels.guestbookFormTitle) && (
           <div className="mb-0.5 text-center font-myeongjo text-[12.5px] tracking-[0.04em] text-c2-sage-deep">
-            {labels.guestbookFormTitle}
+            <Field
+              path="core.labels.guestbookFormTitle"
+              value={labels.guestbookFormTitle}
+              placeholder="머리글"
+            />
           </div>
         )}
         <input

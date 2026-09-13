@@ -15,8 +15,7 @@ import { ensureFonts } from '@luvi/schema';
 import { useInvitation } from '@/lib/invitationContext';
 import { CoverLayers } from '@/components/common/CoverLayers';
 import { Rich } from '@/components/common/Rich';
-import { Field } from '@/components/common/Editable';
-import { IS_PREVIEW } from '@/components/common/PreviewSlot';
+import { Field, showOptional } from '@/components/common/Editable';
 
 export function Cover() {
   const { cover, location, labels } = useInvitation();
@@ -103,7 +102,7 @@ export function Cover() {
           미리보기에서는 비어도 자리를 남깁니다: 사라지면 다시 넣을 곳이 없고,
           지우는 도중에 요소가 없어지면 커서까지 함께 사라집니다.
         */}
-        {(IS_PREVIEW || labels.coverScroll) && (
+        {showOptional(labels.coverScroll) && (
           <div className="mt-8 animate-floatY text-[10px] tracking-[0.3em] text-c2-ink-soft">
             <Field
               path="core.labels.coverScroll"

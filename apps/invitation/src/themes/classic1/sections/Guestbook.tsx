@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGuestbook } from '@/hooks/useGuestbook';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
+import { Field, showOptional } from '@/components/common/Editable';
 
 const fmtDate = (ts: number) =>
   new Date(ts).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
@@ -48,20 +49,28 @@ export function Guestbook() {
         </div>
       ) : (
         // 비어 있을 때의 안내 — 지우면 이 자리가 통째로 사라집니다 (labels.ts)
-        labels.guestbookEmpty && (
+        showOptional(labels.guestbookEmpty) && (
           <div className="px-0 pb-[22px] pt-1.5 text-[13px] text-ink-soft">
-            {labels.guestbookEmpty}
+            <Field
+              path="core.labels.guestbookEmpty"
+              value={labels.guestbookEmpty}
+              placeholder="비었을 때 안내"
+            />
           </div>
         )
       )}
 
       <div className="flex flex-col gap-2.5 rounded-xl bg-cream p-4">
         {/* 머리글은 지울 수 있습니다. 💌 는 글자가 아니라 이 줄의 장식이라 남습니다 */}
-        {labels.guestbookFormTitle && (
+        {showOptional(labels.guestbookFormTitle) && (
           <div className="mb-0.5 flex items-center justify-center gap-[7px]">
             <span className="text-[17px]">💌</span>
             <span className="text-[12.5px] font-bold text-rose-deep">
-              {labels.guestbookFormTitle}
+              <Field
+                path="core.labels.guestbookFormTitle"
+                value={labels.guestbookFormTitle}
+                placeholder="머리글"
+              />
             </span>
           </div>
         )}

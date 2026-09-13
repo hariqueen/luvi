@@ -278,6 +278,20 @@ export function EditableText({
   );
 }
 
+/**
+ * **지울 수 있는 라벨을 미리보기에서 계속 잡히게 합니다.**
+ *
+ * 'SCROLL ↓' 처럼 비우면 사라지는 글자들이 있습니다. 하객 화면에서는 그게 맞지만,
+ * 편집 중에 그대로 두면 다 지우는 순간 요소가 없어져 **커서까지 사라지고 다시 넣을 자리도
+ * 없습니다.** 미리보기에서는 비어도 자리를 남기고(`:empty` 자리표시자가 뜹니다),
+ * 하객 화면에서는 지금처럼 사라집니다.
+ *
+ *     {showOptional(labels.coverScroll) && <div …><Field … /></div>}
+ */
+export function showOptional(value: string | undefined | null): boolean {
+  return IS_PREVIEW || Boolean(value);
+}
+
 interface FieldProps {
   /** 초안의 점 경로 (예: `core.greeting.message`). 폼의 입력칸과 같은 경로입니다 */
   path: string;

@@ -651,6 +651,7 @@ export default function Editor() {
           final?: boolean;
         };
         __luviFieldEdit?: { path: string; value: string };
+        __luviOpenForm?: string;
         __luviBlockPlace?: {
           section: SectionKey;
           zone: string;
@@ -703,12 +704,24 @@ export default function Editor() {
         return;
       }
 
+      /**
+       * 계산해서 나오는 글자(날짜 표기·달)를 눌렀다 — 그 값을 만드는 폼을 연다.
+       *
+       * 🔴 **받은 키가 실제 폼인지 확인한 뒤에만 엽니다.** 미리보기는 같은 출처지만,
+       *    아무 문자열이나 패널 상태로 들어가면 존재하지 않는 폼이 열려 화면이 빈 채로 남습니다.
+       */
+      const openKey = data?.__luviOpenForm;
+      if (openKey) {
+        if (formSections.some((f) => f.key === openKey)) openForm(openKey);
+        return;
+      }
+
       const key = data?.__luviSectionClick;
       if (key) openSectionForm(key);
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [openSectionForm, applyBlockEdit, applyBlockPlace, applyFieldEdit]);
+  }, [openSectionForm, openForm, formSections, applyBlockEdit, applyBlockPlace, applyFieldEdit]);
 
   const sheetTitle = panel.kind === 'sections' ? '청첩장 구성' : (activeForm?.label ?? '편집');
   const title = (doc?.core.share.title ?? '') as string;

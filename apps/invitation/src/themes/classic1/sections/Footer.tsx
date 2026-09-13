@@ -8,6 +8,7 @@ import { useShare } from '@/hooks/useShare';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
 import { Field } from '@/components/common/Editable';
+import { Derived } from '@/components/common/PreviewSlot';
 
 export function Footer() {
   const { footer, groom, bride, share, sectionText, labels } = useInvitation();
@@ -49,7 +50,11 @@ export function Footer() {
           <Field path="core.couple.groom.firstName" value={groom.firstName} /> ♥{' '}
           <Field path="core.couple.bride.firstName" value={bride.firstName} />
         </div>
-        <div className="text-[13px] tracking-[0.08em] opacity-90">{share.date}</div>
+        <div className="text-[13px] tracking-[0.08em] opacity-90">
+          <Derived form="ceremony" hint="예식 일시에서 계산됩니다 — 눌러서 일시를 고치세요">
+            {share.date}
+          </Derived>
+        </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           {kakaoAvailable && (

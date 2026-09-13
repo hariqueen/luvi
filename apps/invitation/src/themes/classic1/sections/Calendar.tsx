@@ -2,6 +2,9 @@ import { resolveWeekdays } from '@luvi/schema';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
+import { Field } from '@/components/common/Editable';
+import { WeekdayCell } from '@/components/common/CalendarParts';
+import { Derived } from '@/components/common/PreviewSlot';
 
 /** 예식일이 속한 달의 달력 셀(앞 공백 + 1~말일)을 계산 */
 function buildMonthCells(year: number, monthIndex: number): (number | null)[] {
@@ -13,7 +16,19 @@ function buildMonthCells(year: number, monthIndex: number): (number | null)[] {
   ];
 }
 
-function CountBox({ value, label, primary }: { value: number; label: string; primary?: boolean }) {
+/** 숫자는 예식 일시에서 계산됩니다 — 고칠 수 있는 것은 아래 단위 글자뿐입니다 */
+function CountBox({
+  value,
+  label,
+  path,
+  primary,
+}: {
+  value: number;
+  label: string;
+  /** 단위 글자의 초안 경로 (`core.labels.countdownDays` …) */
+  path: string;
+  primary?: boolean;
+}) {
   return (
     <div
       className={
@@ -32,7 +47,7 @@ function CountBox({ value, label, primary }: { value: number; label: string; pri
           primary ? 'text-white/90' : 'text-ink-soft'
         }`}
       >
-        {label}
+        <Field path={path} value={label} placeholder="단위" />
       </div>
     </div>
   );
@@ -52,14 +67,18 @@ export function Calendar() {
   return (
     <section className="bg-cream px-7 py-[58px] text-center">
       <SectionText section="calendar" zone="head" blocks={text.head} className="mb-2" />
-      <div className="font-cormorant text-[34px] font-medium text-ink">{calendar.monthLabel}</div>
+      <div className="font-cormorant text-[34px] font-medium text-ink">
+        <Derived form="ceremony" hint="예식 일시에서 계산됩니다 — 눌러서 일시를 고치세요">
+          {calendar.monthLabel}
+        </Derived>
+      </div>
 
       <div className="my-6 rounded-2xl border border-line bg-white px-[18px] py-[22px] shadow-sm">
         <div className="mb-2 grid grid-cols-7 text-xs font-bold text-ink-soft">
-          {weekdays.map((w, i) => (
+          {weekdays.map((_, i) => (
             // key 는 순번입니다 — 사용자가 같은 글자를 두 칸에 넣으면 글자로는 겹칩니다
             <div key={i} className={i === 0 ? 'text-rose-deep' : i === 6 ? 'text-sage' : undefined}>
-              {w}
+              <WeekdayCell weekdays={weekdays} index={i} />
             </div>
           ))}
         </div>
@@ -88,10 +107,10 @@ export function Calendar() {
         override={{ note: 'font-myeongjo text-sm text-ink-soft' }}
       />
       <div className="flex justify-center gap-2">
-        <CountBox value={cd.d} label={labels.countdownDays} primary />
-        <CountBox value={cd.h} label={labels.countdownHours} />
-        <CountBox value={cd.m} label={labels.countdownMinutes} />
-        <CountBox value={cd.s} label={labels.countdownSeconds} />
+        <CountBox value={cd.d} label={labels.countdownDays} path="core.labels.countdownDays" primary />
+        <CountBox value={cd.h} label={labels.countdownHours} path="core.labels.countdownHours" />
+        <CountBox value={cd.m} label={labels.countdownMinutes} path="core.labels.countdownMinutes" />
+        <CountBox value={cd.s} label={labels.countdownSeconds} path="core.labels.countdownSeconds" />
       </div>
     </section>
   );

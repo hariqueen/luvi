@@ -54,6 +54,45 @@ export function notifySectionClick(e: MouseEvent) {
 }
 
 /**
+ * **계산해서 나오는 글자** — 눌러도 타이핑은 안 되고, 그 값을 만드는 설정을 엽니다.
+ *
+ * 예식 일시 하나에서 날짜 표기·달·요일·남은 시간·일정등록이 전부 계산됩니다. 그래서
+ * '2026. 10. 20 TUE · PM 1:00' 을 글자로 고치게 두면 안 됩니다 — 되돌려 읽을 방법이 없어
+ * 화면의 날짜와 달력·D-day 가 서로 다른 날을 가리키게 됩니다.
+ *
+ * 그렇다고 눌러도 아무 일이 없으면 **어디를 고쳐야 이 글자가 바뀌는지 알 수 없습니다**
+ * (인라인 편집을 만든 이유가 그것입니다). 그래서 여기서는 그 설정으로 보냅니다.
+ */
+export function Derived({
+  form,
+  hint,
+  children,
+}: {
+  /** 열 폼의 키 (`ceremony` — manifest.ts 의 `SectionDef.key`) */
+  form: string;
+  /** 왜 못 고치는지. 누르기 전에 보이는 유일한 설명이라 생략하지 않습니다 */
+  hint: string;
+  children: ReactNode;
+}) {
+  if (!IS_PREVIEW) return <>{children}</>;
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      title={hint}
+      onClick={(e) => {
+        // 섹션 클릭까지 함께 처리되면 엉뚱한 폼이 덮어씁니다
+        e.stopPropagation();
+        window.parent?.postMessage({ __luviOpenForm: form }, window.location.origin);
+      }}
+      className="cursor-pointer rounded-[3px] underline decoration-dotted decoration-current/50 underline-offset-4 outline-offset-[3px] hover:outline hover:outline-1 hover:outline-gold/60"
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
  * 미리보기에서 **그 자리에서 고친 글자**를 부모(에디터)에게 보냅니다.
  *
  * 에디터가 이 값을 초안에 반영하면 초안이 다시 미리보기로 내려옵니다 — 그래서 편집 중인

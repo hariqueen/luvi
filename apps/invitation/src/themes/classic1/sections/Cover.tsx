@@ -9,8 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ensureFonts } from '@luvi/schema';
 import { useInvitation } from '@/lib/invitationContext';
 import { CoverLayers } from '@/components/common/CoverLayers';
-import { Field } from '@/components/common/Editable';
-import { IS_PREVIEW } from '@/components/common/PreviewSlot';
+import { Field, showOptional } from '@/components/common/Editable';
 
 export function Cover() {
   const { cover, labels } = useInvitation();
@@ -65,7 +64,7 @@ export function Cover() {
         미리보기에서는 비어도 자리를 남깁니다: 사라지면 다시 넣을 곳이 없고,
         지우는 도중에 요소가 없어지면 커서까지 함께 사라집니다.
       */}
-      {(IS_PREVIEW || labels.coverScroll) && (
+      {showOptional(labels.coverScroll) && (
         <div className="absolute bottom-[22px] left-1/2 z-[2] -translate-x-1/2 animate-floatY text-[10px] tracking-[0.3em] text-white opacity-85">
           <Field
             path="core.labels.coverScroll"

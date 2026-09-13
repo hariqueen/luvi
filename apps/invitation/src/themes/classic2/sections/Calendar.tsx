@@ -9,6 +9,9 @@ import { resolveWeekdays } from '@luvi/schema';
 import { useCountdown } from '@/hooks/useCountdown';
 import { SectionText } from '../ui';
 import { useInvitation } from '@/lib/invitationContext';
+import { Field } from '@/components/common/Editable';
+import { WeekdayCell } from '@/components/common/CalendarParts';
+import { Derived } from '@/components/common/PreviewSlot';
 
 /** 예식일이 속한 달의 달력 셀(앞 공백 + 1~말일)을 계산 */
 function buildMonthCells(year: number, monthIndex: number): (number | null)[] {
@@ -20,11 +23,14 @@ function buildMonthCells(year: number, monthIndex: number): (number | null)[] {
   ];
 }
 
-function CountUnit({ value, label }: { value: number; label: string }) {
+/** 숫자는 예식 일시에서 계산됩니다 — 고칠 수 있는 것은 아래 단위 글자뿐입니다 */
+function CountUnit({ value, label, path }: { value: number; label: string; path: string }) {
   return (
     <div className="min-w-[52px]">
       <div className="font-cormorant text-[34px] font-medium leading-none text-c2-ink">{value}</div>
-      <div className="mt-1 text-[10px] tracking-[0.18em] text-c2-ink-soft">{label}</div>
+      <div className="mt-1 text-[10px] tracking-[0.18em] text-c2-ink-soft">
+        <Field path={path} value={label} placeholder="단위" />
+      </div>
     </div>
   );
 }
@@ -45,13 +51,17 @@ export function Calendar() {
 
       <div className="mt-[26px] rounded-[18px] border border-c2-line bg-white px-5 py-6 shadow-[0_6px_20px_rgba(62,58,51,.05)]">
         <div className="mb-4 font-cormorant text-2xl font-medium tracking-[0.04em] text-c2-ink">
-          {calendar.monthLabel}
+          <Derived form="ceremony" hint="예식 일시에서 계산됩니다 — 눌러서 일시를 고치세요">
+            {calendar.monthLabel}
+          </Derived>
         </div>
 
         <div className="mb-2.5 grid grid-cols-7 text-[11px] font-bold tracking-[0.04em] text-c2-ink-soft">
           {/* key 는 순번입니다 — 사용자가 같은 글자를 두 칸에 넣으면 글자로는 겹칩니다 */}
-          {weekdays.map((w, i) => (
-            <div key={i}>{w}</div>
+          {weekdays.map((_, i) => (
+            <div key={i}>
+              <WeekdayCell weekdays={weekdays} index={i} />
+            </div>
           ))}
         </div>
 
@@ -71,13 +81,13 @@ export function Calendar() {
       </div>
 
       <div className="mt-8 flex items-end justify-center gap-1">
-        <CountUnit value={cd.d} label={labels.countdownDays} />
+        <CountUnit value={cd.d} label={labels.countdownDays} path="core.labels.countdownDays" />
         <span className="pb-3.5 font-cormorant text-[26px] text-c2-gold">:</span>
-        <CountUnit value={cd.h} label={labels.countdownHours} />
+        <CountUnit value={cd.h} label={labels.countdownHours} path="core.labels.countdownHours" />
         <span className="pb-3.5 font-cormorant text-[26px] text-c2-gold">:</span>
-        <CountUnit value={cd.m} label={labels.countdownMinutes} />
+        <CountUnit value={cd.m} label={labels.countdownMinutes} path="core.labels.countdownMinutes" />
         <span className="pb-3.5 font-cormorant text-[26px] text-c2-gold">:</span>
-        <CountUnit value={cd.s} label={labels.countdownSeconds} />
+        <CountUnit value={cd.s} label={labels.countdownSeconds} path="core.labels.countdownSeconds" />
       </div>
 
       {/* 이름은 어댑터가 이미 치환했습니다 ({신랑}·{신부}) */}

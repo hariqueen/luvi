@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Lightbox } from '@/components/common/Lightbox';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
+import { Field, showOptional } from '@/components/common/Editable';
 
 export function Gallery() {
   const { gallery, sectionText, labels } = useInvitation();
@@ -45,8 +46,22 @@ export function Gallery() {
         zone="foot"
         blocks={text.foot}
         className="mt-3.5"
-        // 사진이 한 장뿐이면 넘길 것이 없고, 사용자가 지웠으면(빈 값) 붙이지 않습니다
-        append={gallery.length > 1 && labels.gallerySwipeHint ? ` ${labels.gallerySwipeHint}` : null}
+        /*
+          넘김 안내도 눌러서 고칩니다 — 문구 뒤에 붙지만 값은 따로입니다
+          (`core.labels.gallerySwipeHint`). 사진이 한 장뿐이면 넘길 것이 없어 붙이지 않습니다.
+        */
+        append={
+          gallery.length > 1 && showOptional(labels.gallerySwipeHint) ? (
+            <>
+              {' '}
+              <Field
+                path="core.labels.gallerySwipeHint"
+                value={labels.gallerySwipeHint}
+                placeholder="넘김 안내"
+              />
+            </>
+          ) : null
+        }
       />
 
       <Lightbox
