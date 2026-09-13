@@ -9,13 +9,23 @@
  *  · **제어(하위)** — repeat 항목 안의 칸처럼 doc 경로가 없는 경우, 부모가 `value`/`onChange`를 줍니다.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { AssetRef, FieldDef, PetalItem, TextBlock, TextBlockStyle } from '@luvi/schema';
+import type {
+  AssetRef,
+  BgmMood,
+  FieldDef,
+  PetalItem,
+  TextBlock,
+  TextBlockStyle,
+} from '@luvi/schema';
 import {
+  BGM_MOOD_LABELS,
   GAME_LIST,
   PETAL_EMOJIS,
   PETAL_ITEM_MAX,
+  activeBgmTracks,
   createTextBlock,
   defaultLabelForPath,
+  findBgmTrackByKey,
 } from '@luvi/schema';
 import { assetUrl } from '@/lib/env';
 import { useEditor, type EditorContextValue } from '@/lib/editorContext';
@@ -293,6 +303,20 @@ function ImagesField({
 
 // ───────────────────────── 오디오 ─────────────────────────
 
+/** 초 → `1:23` */
+function mmss(sec: number): string {
+  return `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+}
+
+/**
+ * 배경음악 고르기 — **기본 음악(프리셋)** 과 **직접 올리기** 두 갈래입니다.
+ *
+ * 프리셋과 업로드가 같은 `AssetRef` 로 저장됩니다. 프리셋은 `shared/bgm/` 키를 그대로 넣을 뿐이라
+ * 렌더러·발행 스냅샷은 둘을 구분하지 않습니다(`w`/`h` 는 오디오라 0). 덕분에 스키마 변경이 없습니다.
+ *
+ * 기본 음악은 전 청첩장이 R2 의 같은 파일 하나를 공유하므로 저장 용량이 늘지 않습니다.
+ * 저작권은 `docs/legal/bgm-licenses.md` 를 보세요 — 전 곡 상업적 이용이 허용된 음원입니다.
+ */
 function AudioField({
   field,
   bound,
@@ -303,9 +327,37 @@ function AudioField({
   editor: EditorContextValue;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLAudioElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mood, setMood] = useState<BgmMood | 'all'>('all');
+  const [previewing, setPreviewing] = useState<string | null>(null);
+
   const asset = (bound.value as AssetRef | null) ?? null;
+  const preset = findBgmTrackByKey(asset?.key);
+  const isUpload = !!asset && !preset;
+  const tracks = activeBgmTracks().filter((t) => mood === 'all' || t.mood === mood);
+
+  // 화면을 벗어날 때 미리듣기를 끊습니다 — 안 끊으면 다른 섹션으로 넘어가도 계속 들립니다.
+  useEffect(() => {
+    return () => {
+      previewRef.current?.pause();
+      previewRef.current = null;
+    };
+  }, []);
+
+  const togglePreview = (id: string, key: string) => {
+    previewRef.current?.pause();
+    if (previewing === id) {
+      setPreviewing(null);
+      return;
+    }
+    const el = new Audio(assetUrl(key));
+    el.volume = 0.55;
+    el.onended = () => setPreviewing(null);
+    previewRef.current = el;
+    void el.play().then(() => setPreviewing(id)).catch(() => setPreviewing(null));
+  };
 
   const onPick = async (file: File | undefined) => {
     if (!file) return;
@@ -321,9 +373,98 @@ function AudioField({
     }
   };
 
+  const clear = () => {
+    previewRef.current?.pause();
+    setPreviewing(null);
+    bound.set(null);
+  };
+
+  const moods: (BgmMood | 'all')[] = ['all', 'warm', 'bright', 'calm'];
+
   return (
     <div>
       <Label field={field} />
+
+      {/* 지금 고른 것 */}
+      <div className="mb-2.5 flex items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-3">
+        <span className="min-w-0 flex-1 truncate text-[12.5px]">
+          {busy ? (
+            <span className="text-muted">올리는 중…</span>
+          ) : preset ? (
+            <>
+              <span className="text-gold-deep">기본 음악</span>
+              <span className="text-ink"> · {preset.label}</span>
+            </>
+          ) : isUpload ? (
+            <span className="text-ink">직접 올린 음원</span>
+          ) : (
+            <span className="text-muted">선택된 음원 없음</span>
+          )}
+        </span>
+        {asset && (
+          <button type="button" onClick={clear} className="flex-none text-[12px] text-muted">
+            삭제
+          </button>
+        )}
+      </div>
+
+      {/* 기본 음악 */}
+      <div className="rounded-xl border border-line bg-white p-3">
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {moods.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMood(m)}
+              className={`rounded-full px-2.5 py-1 text-[11.5px] transition-colors ${
+                mood === m
+                  ? 'bg-gold-deep text-white'
+                  : 'border border-line text-muted hover:border-gold'
+              }`}
+            >
+              {m === 'all' ? '전체' : BGM_MOOD_LABELS[m]}
+            </button>
+          ))}
+        </div>
+
+        <ul className="max-h-64 overflow-y-auto">
+          {tracks.map((t) => {
+            const on = asset?.key === t.key;
+            return (
+              <li key={t.id}>
+                <div
+                  className={`flex items-center gap-2 rounded-lg px-2 py-2 ${on ? 'bg-ivory' : ''}`}
+                >
+                  <button
+                    type="button"
+                    aria-label={`${t.label} 미리듣기`}
+                    onClick={() => togglePreview(t.id, t.key)}
+                    className="flex-none text-[12px] text-gold-deep"
+                  >
+                    {previewing === t.id ? '❚❚' : '▶'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => bound.set({ key: t.key, w: 0, h: 0 })}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <span className="block truncate text-[12.5px] text-ink">{t.label}</span>
+                    <span className="block text-[11px] text-muted">
+                      {BGM_MOOD_LABELS[t.mood]} · {mmss(t.durationSec)}
+                    </span>
+                  </button>
+                  {on && <span className="flex-none text-[11.5px] text-gold-deep">선택됨</span>}
+                </div>
+              </li>
+            );
+          })}
+          {tracks.length === 0 && (
+            <li className="px-2 py-3 text-[12px] text-muted">이 분위기의 곡이 아직 없습니다</li>
+          )}
+        </ul>
+      </div>
+
+      {/* 직접 올리기 */}
       <input
         ref={ref}
         type="file"
@@ -331,32 +472,22 @@ function AudioField({
         className="hidden"
         onChange={(e) => void onPick(e.target.files?.[0])}
       />
-      <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-3">
-        {asset ? (
-          <audio controls src={assetUrl(asset.key)} className="h-9 min-w-0 flex-1" />
-        ) : (
-          <span className="flex-1 truncate text-[12.5px] text-muted">
-            {busy ? '올리는 중…' : '선택된 음원 없음'}
-          </span>
-        )}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => ref.current?.click()}
-          className="flex-none text-[12px] text-gold-deep disabled:opacity-50"
-        >
-          {asset ? '바꾸기' : '고르기'}
-        </button>
-        {asset && (
-          <button
-            type="button"
-            onClick={() => bound.set(null)}
-            className="flex-none text-[12px] text-muted"
-          >
-            삭제
-          </button>
-        )}
-      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => ref.current?.click()}
+        className="mt-2 w-full rounded-xl border border-dashed border-line-strong py-2.5 text-[12px] text-gold-deep disabled:opacity-50"
+      >
+        {isUpload ? '다른 음원 올리기' : '내 음악 직접 올리기 (MP3)'}
+      </button>
+      {isUpload && asset && (
+        <audio controls src={assetUrl(asset.key)} className="mt-2 h-9 w-full" />
+      )}
+
+      <p className="mt-1.5 text-[11.5px] text-muted">
+        직접 올리실 때는 저작권이 있는 음원인지 확인해 주세요. 기본 음악은 상업적 이용이 허용된
+        음원이라 그대로 쓰셔도 됩니다.
+      </p>
       {error && <p className="mt-1.5 text-[11.5px] text-gold-deep">{error}</p>}
     </div>
   );

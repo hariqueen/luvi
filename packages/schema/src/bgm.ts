@@ -159,6 +159,17 @@ export const activeBgmTracks = (): BgmTrack[] => BGM_TRACKS.filter((t) => !t.dep
 export const findBgmTrack = (id: string): BgmTrack | undefined =>
   BGM_TRACKS.find((t) => t.id === id);
 
+/**
+ * R2 키로 프리셋을 찾습니다. `core.bgm` 은 프리셋이든 직접 업로드든 같은 `AssetRef` 라서,
+ * 에디터가 "지금 고른 것이 프리셋인가" 를 판단할 때 이걸로 되짚습니다.
+ * `deprecated` 곡도 찾습니다 — 이미 그 곡을 고른 청첩장의 편집 화면이 빈칸이 되면 안 됩니다.
+ */
+export const findBgmTrackByKey = (key: string | undefined | null): BgmTrack | undefined =>
+  key ? BGM_TRACKS.find((t) => t.key === key) : undefined;
+
+/** 프리셋 음원의 R2 키 접두사. 직접 업로드는 `inv/{id}/audio/` 로 들어갑니다 */
+export const BGM_PRESET_PREFIX = 'shared/bgm/';
+
 /** 영상(v2)에 얹어도 Content ID 클레임 위험이 없는 곡 */
 export const videoSafeBgmTracks = (): BgmTrack[] =>
   activeBgmTracks().filter((t) => !t.contentIdRegistered);
