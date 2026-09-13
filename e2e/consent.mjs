@@ -49,7 +49,7 @@ try {
   await page.goto(`${SITE}/privacy`, { waitUntil: 'networkidle' });
   const privacyH1 = await page.locator('h1').first().innerText();
   check('개인정보처리방침 제목', privacyH1.includes('개인정보처리방침'), privacyH1);
-  check('시행일 표시', (await page.getByText('시행일 2026년 10월 2일').count()) > 0);
+  check('시행일 표시', (await page.getByText('시행일 2026년 9월 13일').count()) > 0);
   // 마크다운 표가 <table> 로 변환됐는지 — 문단으로 새면 `|` 가 본문에 보입니다
   const tables = await page.locator('table').count();
   check('표가 table 로 렌더링됨', tables >= 10, `${tables}개`);
