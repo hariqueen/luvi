@@ -119,11 +119,20 @@ export function EditableText({
 }: EditableTextProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const timer = useRef<number | null>(null);
+  /**
+   * IME 가 글자를 **조합하는 중**인지.
+   *
+   * 🔴 조합 중에는 이 요소의 DOM 도 값도 건드리면 안 됩니다. 브라우저는 조합 중인 글자를
+   *    특정 텍스트 노드에 얹어두는데, 그 노드가 갈리면 조합이 통째로 취소되고 **치던 글자가
+   *    그대로 사라집니다.** 영문은 한 번의 input 으로 확정되어 이 창이 없지만, 한글은
+   *    자음·모음마다 조합 이벤트가 지나가므로 그 사이가 전부 위험 구간입니다.
+   */
+  const composing = useRef(false);
 
   // 포커스가 없을 때만 DOM 을 맞춥니다 (편집 중에 덮어쓰면 커서가 튑니다)
   useEffect(() => {
     const el = ref.current;
-    if (!el || document.activeElement === el) return;
+    if (!el || composing.current || document.activeElement === el) return;
     const html = richToHtml(text);
     if (el.innerHTML !== html) el.innerHTML = html;
   }, [text]);
@@ -143,15 +152,32 @@ export function EditableText({
   // 타이핑이 멈추면 올립니다. 매 글자마다 올리면 저장 요청과 미리보기 갱신이 과합니다
   const schedule = useCallback(() => {
     if (timer.current !== null) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => flush(false), 250);
+    timer.current = window.setTimeout(() => {
+      // 조합이 시작됐으면 미룹니다 — 반쯤 만들어진 글자('ㄱ')를 올려봐야 되돌아온 값이
+      // 조합을 덮어쓸 위험만 생깁니다. 조합이 끝나면 onCompositionEnd 가 다시 겁니다
+      if (composing.current) return;
+      flush(false);
+    }, 250);
   }, [flush]);
 
-  const onInput = useCallback(() => {
+  /**
+   * 다 지우면 브라우저가 `<br>` 을 남깁니다 — 그대로 두면 `:empty` 안내가 뜨지 않습니다.
+   *
+   * 🔴 **조합 중에는 절대 부르지 않습니다.** 글자를 전부 선택한 채로 한글을 치면 크롬이
+   *    '선택 지우기'(deleteByComposition) 를 먼저 흘려보내는데, 그 찰나에 내용이 비어 있어
+   *    여기서 innerHTML 을 갈아엎으면 방금 시작된 조합이 취소되고 **첫 글자가 먹히지
+   *    않습니다.** ("선택하고 바로 타이핑하면 가끔 입력이 안 되던" 자리)
+   */
+  const clearIfEmpty = useCallback(() => {
     const el = ref.current;
-    // 다 지우면 브라우저가 <br> 을 남깁니다 — 그대로 두면 `:empty` 안내가 뜨지 않습니다
     if (el && el.textContent === '' && el.innerHTML !== '') el.innerHTML = '';
+  }, []);
+
+  const onInput = useCallback(() => {
+    if (composing.current) return;
+    clearIfEmpty();
     schedule();
-  }, [schedule]);
+  }, [clearIfEmpty, schedule]);
 
   useEffect(
     () => () => {
@@ -181,7 +207,22 @@ export function EditableText({
       contentEditable
       suppressContentEditableWarning
       onInput={onInput}
-      onBlur={() => flush(true)}
+      onCompositionStart={() => {
+        composing.current = true;
+      }}
+      // 조합이 끝난 뒤에야 DOM 정리와 값 올리기를 합니다. 마지막 input 이 compositionend
+      // 앞뒤 어디로 오는지는 브라우저마다 달라, 양쪽 모두에서 걸리도록 두 곳에서 부릅니다
+      onCompositionEnd={() => {
+        composing.current = false;
+        clearIfEmpty();
+        schedule();
+      }}
+      onBlur={() => {
+        // 조합 중에 포커스가 빠지면 compositionend 를 못 받는 IME 가 있습니다.
+        // 여기서 풀어두지 않으면 다음 편집까지 '조합 중' 으로 굳어 값이 안 올라갑니다
+        composing.current = false;
+        flush(true);
+      }}
       // 붙여넣기는 **글자만** 받습니다 (남의 서식·태그가 청첩장 마크업을 깨뜨립니다)
       onPaste={(e) => {
         e.preventDefault();
@@ -198,8 +239,11 @@ export function EditableText({
           e.currentTarget.blur();
           return;
         }
+        // 조합 중의 Backspace 는 '자음 하나 되돌리기' 입니다 — 상자를 지우면 안 됩니다.
+        // 조합 중에는 key 가 'Process' 로 오기도 해 keyCode 229 까지 함께 봅니다
+        const imeKey = composing.current || e.keyCode === 229;
         // 이미 빈 상자에서 한 번 더 지우면 상자째 사라집니다 (PPT 와 같습니다)
-        if (onDelete && (e.key === 'Backspace' || e.key === 'Delete')) {
+        if (!imeKey && onDelete && (e.key === 'Backspace' || e.key === 'Delete')) {
           if (e.currentTarget.textContent === '') {
             e.preventDefault();
             onDelete();
