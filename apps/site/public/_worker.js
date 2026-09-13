@@ -59,10 +59,31 @@ const noindex = (r) => {
 const GONE =
   /^\/i\/assets\/(?:couple_c\.jpg|cover\.jpg|dogface_c\.png|dog[1-6]_c\.png|embedded\/(?:img_0(?:0[1-9]|10)\.(?:jpg|png)|audio_001\.mp3))$/;
 
+/**
+ * 진입 경로를 브랜드 도메인 하나로 모은다.
+ *
+ * Pages 는 프로젝트마다 `{name}.pages.dev` 를 자동으로 붙이고 **끄는 옵션이 없다.**
+ * 그대로 두면 같은 내용이 두 주소로 열려 검색 순위가 갈리고, 누가 pages.dev 주소를
+ * 공유하면 브랜드 주소가 퍼지지 않는다. 지울 수 없으니 301 로 넘긴다.
+ *
+ * ⚠️ 정확히 이 한 호스트만 본다. `{hash}.luvi-site.pages.dev` 미리보기 배포까지 걸면
+ *    배포 전 확인이 막힌다. 그래서 endsWith 가 아니라 === 다.
+ *
+ * 🔴 인쇄된 QR(`luvi-wedding.pages.dev`)과는 무관하다. 그쪽은 **다른 프로젝트**이고
+ *    목적지가 이미 `luv-ai.co.kr/i/hoseok-songhee` 라 이 워커의 이 분기를 타지 않는다.
+ */
+const CANONICAL_HOST = 'luv-ai.co.kr';
+const ALIAS_HOST = 'luvi-site.pages.dev';
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const p = url.pathname;
+
+    if (url.hostname === ALIAS_HOST) {
+      url.hostname = CANONICAL_HOST; // 경로·쿼리는 그대로 따라간다
+      return Response.redirect(url.toString(), 301);
+    }
 
     if (GONE.test(p)) {
       return new Response('gone', { status: 410, headers: { 'Cache-Control': 'no-store' } });
