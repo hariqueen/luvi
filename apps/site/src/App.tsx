@@ -23,6 +23,8 @@ import NotFound from '@/routes/NotFound';
 // 법률 문서는 마크다운 원문을 통째로 품고 있어 번들이 작지 않습니다.
 // 대부분의 방문자가 열지 않으므로 분할합니다 — 동의 화면에서 새 탭으로 엽니다.
 const Legal = lazyPage(() => import('@/routes/Legal'));
+// 공지사항도 원문을 상수로 품고 있고 대부분 열지 않습니다 — 같은 이유로 분할합니다.
+const Notice = lazyPage(() => import('@/routes/Notice'));
 const Login = lazyPage(() => import('@/routes/Login'));
 const SocialCallback = lazyPage(() => import('@/routes/SocialCallback'));
 const Dashboard = lazyPage(() => import('@/routes/Dashboard'));
@@ -48,6 +50,9 @@ export default function App() {
           {/* 법정 게시물 — 푸터·로그인·동의 화면이 모두 여기를 가리킵니다 */}
           <Route path="terms" element={<Legal kind="terms" />} />
           <Route path="privacy" element={<Legal kind="privacy" />} />
+          {/* 방침 제14조 ② 가 약속한 고지 창구 — 개정 예고가 여기 올라갑니다 */}
+          <Route path="notice" element={<Notice />} />
+          <Route path="notice/:id" element={<Notice />} />
         </Route>
 
         {/* ── 로그인 (레이아웃 없음 — 집중형 화면) ── */}

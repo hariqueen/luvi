@@ -141,6 +141,9 @@ export function SiteLayout() {
             <Link to="/privacy" className="font-semibold text-ink hover:text-gold">
               개인정보처리방침
             </Link>
+            <Link to="/notice" className="text-muted hover:text-ink">
+              공지사항
+            </Link>
             <a href="mailto:help@luv-ai.co.kr" className="text-muted hover:text-ink">
               문의
             </a>

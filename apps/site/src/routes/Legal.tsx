@@ -113,6 +113,10 @@ export default function Legal({ kind }: { kind: DocKind }) {
           <Link to={`?v=${pending}`} className="text-gold underline underline-offset-2">
             개정본 미리 보기
           </Link>
+          {' · '}
+          <Link to="/notice" className="text-gold underline underline-offset-2">
+            개정 고지 보기
+          </Link>
         </div>
       )}
 
