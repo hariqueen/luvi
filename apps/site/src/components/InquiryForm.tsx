@@ -57,6 +57,19 @@ export function InquiryForm({
   const { status, user } = useAuth();
   const signedIn = status === 'signed-in' && Boolean(user);
 
+  /**
+   * 🔴 **회원이라고 이메일이 있는 것은 아닙니다.**
+   *
+   * 카카오·네이버는 이메일이 **선택 동의** 항목이라 제공을 거부한 회원은 `user.email` 이
+   * null 입니다(`lib/auth.tsx` 의 `AuthUser` 주석). 그 회원의 문의를 그냥 받으면
+   * **답변을 보낼 주소가 어디에도 없습니다.** 화면에 뜨는 조회 링크가 유일한 경로가 되는데,
+   * 창을 닫으면 그걸로 끝입니다.
+   *
+   * 그래서 "로그인했는가" 가 아니라 **"답변을 보낼 주소가 있는가"** 로 갈라 묻습니다.
+   */
+  const accountEmail = signedIn ? (user?.email ?? '') : '';
+  const needsEmail = !accountEmail;
+
   const [category, setCategory] = useState<InquiryCategory>(defaultCategory ?? 'invitation');
   const [message, setMessage] = useState(INQUIRY_TEMPLATES[defaultCategory ?? 'invitation']);
   /** 사용자가 내용을 건드렸으면 유형을 바꿔도 템플릿으로 덮지 않습니다 */
@@ -124,18 +137,21 @@ export function InquiryForm({
       setError('문의 내용을 입력해주세요');
       return;
     }
-    if (!signedIn) {
-      if (!name.trim()) return setError('이름을 입력해주세요');
-      if (!email.includes('@')) return setError('답변을 받을 이메일 주소를 정확히 입력해주세요');
-      if (!agreed) return setError('개인정보 수집·이용에 동의해주세요');
+    if (!signedIn && !name.trim()) return setError('이름을 입력해주세요');
+    if (needsEmail && !email.includes('@')) {
+      return setError('답변을 받을 이메일 주소를 정확히 입력해주세요');
     }
+    if (!signedIn && !agreed) return setError('개인정보 수집·이용에 동의해주세요');
 
     setState({ phase: 'sending' });
 
     const res = await api.inquiries.create({
       category,
       message,
-      ...(signedIn ? {} : { name, email, privacyAgreed: agreed, turnstileToken }),
+      ...(signedIn ? {} : { name, privacyAgreed: agreed, turnstileToken }),
+      // 계정에 이메일이 없는 회원도 여기서 받은 주소로 보냅니다 (`needsEmail` 주석 참고).
+      // 계정 이메일이 있으면 서버가 계정 값으로 덮으므로 보내봐야 무시됩니다.
+      ...(needsEmail ? { email } : {}),
       ...(category === 'consult' ? { weddingDate, services } : {}),
       ...(context ? { context } : {}),
       ...(company ? { company } : {}),
@@ -229,8 +245,8 @@ export function InquiryForm({
         </select>
       </div>
 
-      {!signedIn && (
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {!signedIn && (
           <div>
             <label className={labelClass} htmlFor="inq-name">
               이름
@@ -245,6 +261,9 @@ export function InquiryForm({
               autoComplete="name"
             />
           </div>
+        )}
+
+        {needsEmail && (
           <div>
             <label className={labelClass} htmlFor="inq-email">
               이메일 <span className="text-gold">(답변을 여기로 보냅니다)</span>
@@ -259,8 +278,28 @@ export function InquiryForm({
               placeholder="name@example.com"
               autoComplete="email"
             />
+            {/* 로그인은 했는데 계정에 이메일이 없는 경우 — 왜 또 묻는지 알려줘야 합니다 */}
+            {signedIn && (
+              <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted">
+                로그인하신 계정에 이메일 주소가 없어요. 답변을 보내드릴 주소를 알려주세요.
+              </p>
+            )}
           </div>
-        </div>
+        )}
+      </div>
+
+      {/*
+        회원에게는 "어느 계정으로, 어디로 답이 가는지" 한 줄이면 충분합니다.
+        답변 경로 설명은 아래 '안내 사항' 에 있으므로 여기서 되풀이하지 않습니다.
+
+        이 한 줄이 필요한 이유: 카카오·구글·네이버로 각각 가입해 **계정이 여럿인 사람**이
+        어느 계정으로 로그인했는지 모른 채 문의하면, 답변이 안 보는 메일함으로 갑니다.
+      */}
+      {signedIn && accountEmail && (
+        <p className="text-[12px] text-muted-faint">
+          <span className="text-muted">{user?.displayName ?? '회원'}</span> · {accountEmail} 으로
+          접수돼요
+        </p>
       )}
 
       {/*

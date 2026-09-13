@@ -102,11 +102,9 @@ export default function Support() {
         <h2 className="text-[15px] font-semibold text-ink">문의하기</h2>
 
         {signedIn ? (
+          // 안내 문구를 여기 두지 않습니다 — 답변 경로는 아래 '안내 사항' 에 이미 있어
+          // 겹치고, "어느 계정으로 접수되는지" 는 폼이 직접 보여주는 편이 맞습니다.
           <div className="mt-4">
-            <p className="mb-4 rounded-lg bg-surface-sunken px-3 py-2.5 text-[12.5px] text-muted">
-              <strong className="text-ink">{user?.displayName ?? '회원'}</strong>님으로 문의합니다.
-              답변은 이 사이트와 이메일로 알려드립니다.
-            </p>
             <InquiryForm entry="support" />
           </div>
         ) : (
