@@ -3,9 +3,19 @@ main = "src/index.ts"
 compatibility_date = "2024-09-23"
 
 [vars]
-# 에셋 서빙 베이스. R2 커스텀 도메인(cdn.luv-ai.co.kr)이 아직 없어서 워커의 /api/assets/* 경유로 서빙한다.
-# 나중에 R2 커스텀 도메인을 붙이면 이 값을 "https://cdn.luv-ai.co.kr" 로 바꾸고 재배포하면 된다.
-CDN_BASE = "https://luvi-api.hariqueen985813.workers.dev/api/assets"
+# 에셋 서빙 베이스. 발행 스냅샷에 cdnBase 로 구워져 하객 화면의 사진·음원 주소가 된다.
+#
+# 2026-09-13 R2 커스텀 도메인으로 전환했다. 워커 경유(구값)를 쓰면 **BGM 이 아이폰에서 재생되지
+# 않는다** — /api/assets/* 핸들러가 Range 요청을 무시하고 매번 파일 전체를 200 으로 돌려주는데,
+# 사파리는 오디오에 206 Partial Content 를 요구한다. R2 커스텀 도메인은 206 을 정상 반환한다.
+#
+# 🔴 되돌리지 말 것. 되돌리면 BGM 이 조용히 깨진다(에러 없이 재생만 안 됨).
+# 🔴 /api/assets/* 라우트는 지우지 말 것. **이미 발행된 청첩장은 스냅샷에 구값이 박혀 있어**
+#    계속 그 경로로 사진을 받는다. 라우트를 지우면 기존 청첩장 사진이 전부 깨진다.
+#
+# cdn.luv-ai.co.kr 에는 Transform Rule 로 X-Robots-Tag(noindex,noimageindex,noarchive) 가
+# 걸려 있다. 커플 사진이 이미지 검색에 걸리지 않도록 하는 장치이므로 규칙을 지우지 말 것.
+CDN_BASE = "https://cdn.luv-ai.co.kr"
 SITE_ORIGIN = "https://luv-ai.co.kr"
 FIREBASE_PROJECT_ID = "wedding-f328e"
 
