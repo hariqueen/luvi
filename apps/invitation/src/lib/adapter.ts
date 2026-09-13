@@ -95,6 +95,8 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
 
     groom: person(c.couple.groom),
     bride: person(c.couple.bride),
+    // 옛 스냅샷에는 이 키가 없습니다 — 없으면 빈 값(= 두 이름으로 만듦)으로 둡니다
+    coupleLine: c.couple.line ?? '',
     weddingAt,
 
     cover: {

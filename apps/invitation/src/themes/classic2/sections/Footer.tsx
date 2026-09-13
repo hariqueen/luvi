@@ -9,12 +9,13 @@
  */
 import { useShare } from '@/hooks/useShare';
 import { Ornament, SectionText } from '../ui';
+import { resolveCoupleLine } from '@luvi/schema';
 import { useInvitation } from '@/lib/invitationContext';
 import { Field } from '@/components/common/Editable';
 import { Derived } from '@/components/common/PreviewSlot';
 
 export function Footer() {
-  const { footer, groom, bride, share, sectionText, labels } = useInvitation();
+  const { footer, groom, bride, coupleLine, share, sectionText, labels } = useInvitation();
   const text = sectionText.footer;
   const { kakaoAvailable, sharing, shareNote, linkCopied, shareToKakao, copyLink } = useShare();
 
@@ -53,9 +54,13 @@ export function Footer() {
           blocks={text.head}
           override={{ title: 'font-pinyon text-[46px] leading-none text-c2-sage-deep' }}
         />
+        {/* 한 덩어리입니다 — 가운데 글자까지 사용자의 값입니다 (classic1 과 같은 규칙) */}
         <div className="mb-1.5 mt-[18px] font-myeongjo text-sm leading-[1.9] text-c2-ink">
-          <Field path="core.couple.groom.firstName" value={groom.firstName} /> ·{' '}
-          <Field path="core.couple.bride.firstName" value={bride.firstName} />
+          <Field
+            path="core.couple.line"
+            value={resolveCoupleLine({ groom, bride, line: coupleLine }, '·')}
+            placeholder="두 사람 이름"
+          />
         </div>
         <div className="text-[12.5px] tracking-[0.08em] text-c2-ink-soft">
           <Derived form="ceremony" hint="예식 일시에서 계산됩니다 — 눌러서 일시를 고치세요">

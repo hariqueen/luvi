@@ -102,6 +102,11 @@ export interface InvitationConfig {
 
   groom: Person;
   bride: Person;
+  /**
+   * 마무리의 **두 사람 줄** 원본 (예: `길동 ♥ 영희`). 비어 있으면 두 `firstName` 으로
+   * 만듭니다 — 가운데 글자는 디자인이 정합니다 (`resolveCoupleLine`).
+   */
+  coupleLine: string;
 
   /** 예식 일시 (ISO, 로컬 기준). 카운트다운·캘린더의 기준값 */
   weddingAt: string;
@@ -281,6 +286,8 @@ export const invitation: InvitationConfig = {
     firstName: '신부',
     parentsLine: '아버지 · 어머니 <b>의 장녀</b> 신부',
   },
+  // 비워 두면 위 두 이름으로 만들어집니다
+  coupleLine: '',
 
   weddingAt: '2026-10-24T13:00:00',
 

@@ -5,13 +5,14 @@
  * 이 파일은 classic1 의 **모양**만 담당합니다.
  */
 import { useShare } from '@/hooks/useShare';
+import { resolveCoupleLine } from '@luvi/schema';
 import { useInvitation } from '@/lib/invitationContext';
 import { SectionText } from '../ui';
 import { Field } from '@/components/common/Editable';
 import { Derived } from '@/components/common/PreviewSlot';
 
 export function Footer() {
-  const { footer, groom, bride, share, sectionText, labels } = useInvitation();
+  const { footer, groom, bride, coupleLine, share, sectionText, labels } = useInvitation();
   const text = sectionText.footer;
   const {
     kakaoAvailable,
@@ -46,9 +47,17 @@ export function Footer() {
             note: 'text-[12px] leading-relaxed text-white/90',
           }}
         />
+        {/*
+          🔴 **한 덩어리입니다.** 예전에는 이름 두 칸 사이에 ♥ 가 화면에 박혀 있어서,
+             `길동 & 영희` 처럼 가운데 글자를 바꾸는 것이 아예 불가능했습니다.
+             혼주 줄과 같은 규칙입니다 (`resolveCoupleLine`).
+        */}
         <div className="my-3.5 mb-1.5 font-myeongjo text-[15px] leading-[1.9]">
-          <Field path="core.couple.groom.firstName" value={groom.firstName} /> ♥{' '}
-          <Field path="core.couple.bride.firstName" value={bride.firstName} />
+          <Field
+            path="core.couple.line"
+            value={resolveCoupleLine({ groom, bride, line: coupleLine }, '♥')}
+            placeholder="두 사람 이름"
+          />
         </div>
         <div className="text-[13px] tracking-[0.08em] opacity-90">
           <Derived form="ceremony" hint="예식 일시에서 계산됩니다 — 눌러서 일시를 고치세요">

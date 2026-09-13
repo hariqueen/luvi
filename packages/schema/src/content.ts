@@ -183,6 +183,29 @@ export function resolveParentsLine(p: Person): string {
   return [parents, relation, escapeRich(p.firstName)].filter(Boolean).join(' ');
 }
 
+/**
+ * 화면에 그릴 두 사람 줄.
+ *
+ * 🔴 값이 없는 청첩장은 **예전 두 칸으로 같은 줄을 만들어** 돌려줍니다. 이미 발행된
+ *    청첩장은 예식까지 몇 달을 살아 있고 그 스냅샷에는 `line` 이 없습니다 — 빈 줄을
+ *    그리면 하객 화면에서 두 사람 이름이 통째로 사라집니다.
+ *
+ * 가운데 글자(`♥` · `·`)는 디자인마다 다르므로 만들 때만 받습니다. 한 번 고치고 나면
+ * 그 글자까지 사용자의 값이라, 디자인을 바꿔도 따라가지 않습니다.
+ */
+export function resolveCoupleLine(
+  /** 읽는 것은 두 이름과 저장된 줄뿐입니다 — 뷰어의 Person 은 모양이 조금 다릅니다 */
+  couple: { groom: { firstName: string }; bride: { firstName: string }; line?: string },
+  separator: string,
+): string {
+  if (couple.line?.trim()) return couple.line;
+
+  const left = escapeRich(couple.groom.firstName ?? '');
+  const right = escapeRich(couple.bride.firstName ?? '');
+  if (!left && !right) return '';
+  return [left, right].filter(Boolean).join(` ${separator} `);
+}
+
 export interface TransportItem {
   icon: string;
   title: string;
@@ -288,7 +311,22 @@ export interface GameContent {
 
 /** 모든 테마가 공유하는 필드 */
 export interface CoreContent {
-  couple: { groom: Person; bride: Person };
+  couple: {
+    groom: Person;
+    bride: Person;
+    /**
+     * 마무리의 **두 사람 줄 한 줄 통째로** (예: `길동 ♥ 영희`).
+     *
+     * 예전에는 신랑 이름과 신부 이름이 각각 다른 칸이었고 사이의 `♥` 는 화면에 박혀
+     * 있었습니다 — 그래서 `길동 & 영희`, `GILDONG · YOUNGHEE` 처럼 **줄 모양 자체를
+     * 바꾸는 것**은 아예 할 수 없었습니다. 혼주 줄(`parentsLine`)이 같은 이유로 한 줄이
+     * 됐고, 여기도 같습니다. 미리보기에서 이 줄을 통째로 고칩니다.
+     *
+     * 비어 있으면 두 사람의 `firstName` 으로 만듭니다 (`resolveCoupleLine`) — 목록의
+     * 카드 제목·공유 제목이 여전히 그 이름을 읽으므로 이름 칸 자체는 남아 있습니다.
+     */
+    line: string;
+  };
   /** 'YYYY-MM-DDTHH:mm:ss' (한국 시간). 캘린더·D-day·일정등록이 전부 여기서 파생 */
   weddingAt: string;
   cover: {

@@ -28,7 +28,8 @@ export function emptyContent(): ContentDoc {
 
   return {
     core: {
-      couple: { groom: person(), bride: person() },
+      // `line` 은 비워 둡니다 — 비면 두 이름으로 만들어집니다 (`resolveCoupleLine`)
+      couple: { groom: person(), bride: person(), line: '' },
       weddingAt: '',
       cover: { image: null, layers: [] },
       greeting: { message: '', bubbleText: '', bubbleImage: null, showBubble: true },
@@ -94,6 +95,8 @@ export function sampleContent(): ContentDoc {
           mother: '',
           relation: '',
         },
+        // 비워 두면 위 두 이름으로 만들어집니다 — 디자인이 정한 가운데 글자(♥ · ·)가 붙습니다
+        line: '',
       },
       weddingAt: '2026-10-24T13:00:00',
       cover: {

@@ -174,6 +174,9 @@ export const CORE_SECTIONS: SectionDef[] = [
       // 혼주 줄은 아버지·어머니·관계로 쪼개지 않습니다 — 사이의 '·' 와 '의' 까지
       // 미리보기에서 통째로 고칩니다 (`resolveParentsLine`)
       { path: 'core.couple.bride.parentsLine', type: 'text', label: '신부 혼주 줄', hint: '아버지 · 어머니 의 장녀 이름', maxLength: 120, previewEdit: true },
+      // 마무리의 두 사람 줄도 신랑/신부로 쪼개지 않습니다 — 가운데 글자(♥ · ·)까지
+      // 미리보기에서 통째로 고칩니다 (`resolveCoupleLine`)
+      { path: 'core.couple.line', type: 'text', label: '두 사람 줄', hint: '비우면 두 이름으로 만들어집니다', maxLength: 60, previewEdit: true },
     ],
   },
   {
