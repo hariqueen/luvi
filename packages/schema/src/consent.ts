@@ -5,22 +5,62 @@
  * **같은 판정을 내려야** 합니다. 버전 상수나 판정 함수가 양쪽에 따로 있으면 한쪽만 올리는
  * 순간 "화면은 통과시켰는데 서버가 막는" 상태가 됩니다.
  *
- * 🔴 **문서를 개정하면 `DOC_VERSIONS` 의 해당 값을 올리세요.** 그것만으로 기존 회원 전원에게
- *    재동의가 트리거됩니다 (`users.consentVersions` 와 달라지므로). 문서 파일만 고치고
- *    버전을 안 올리면 아무도 새 문서에 동의하지 않은 상태로 남습니다.
+ * 🔴 **문서를 개정하면 `DOC_VERSIONS` 의 해당 값을 올리세요.** 문서 파일만 고치고 버전을 안
+ *    올리면 화면이 옛 버전을 계속 보여줍니다 (`Legal.tsx` 가 이 값을 현행본으로 씁니다).
+ *
+ * 🔴 **그리고 그 개정이 경미한지 판단해 `ACCEPTED_PAST_VERSIONS` 를 함께 손보세요.**
+ *    버전만 올리면 기존 회원 **전원**이 재동의 대상이 되고, `CONSENT_ENFORCED` 가 켜져 있으면
+ *    그때까지 편집·발행이 막힙니다. 예식을 앞둔 이용자에게는 이것 자체가 사고입니다.
  *
  * 문서 원본: `docs/legal/privacy-{version}.md` · `docs/legal/terms-{version}.md`
  */
 
 export type ConsentDocType = 'terms' | 'privacy' | 'age14' | 'marketing';
 
-/** 현재 시행 중인 문서 버전. 개정 시 여기를 올립니다 */
+/**
+ * **현재 시행 중인** 문서 버전. 새로 받는 동의는 이 버전으로 기록되고, `Legal.tsx` 는 이 값을
+ * 현행본으로 보여줍니다. 그래서 **공고일이 아니라 시행일에** 올려야 합니다 — 공고만 하고
+ * 아직 시행되지 않은 문서를 현행본으로 두면, 그 사이 가입자가 시행 전 문서에 동의한 것으로 남습니다.
+ *
+ * 🟡 **예정된 변경: 2026-09-23 (privacy 1.1.0 시행일)에 `privacy` 를 '1.1.0' 으로 올립니다.**
+ *    문서는 이미 `docs/legal/privacy-1.1.0.md` 에 있고 `Legal.tsx` 에 예고본으로 등록돼 있습니다.
+ *    `ACCEPTED_PAST_VERSIONS.privacy` 에 '1.0.0' 이 이미 들어 있으므로, 올려도 기존 회원에게
+ *    재동의가 걸리지 않습니다. 올리는 것을 잊으면 **개정본이 시행되지 않은 채 문의 기능만 나갑니다.**
+ */
 export const DOC_VERSIONS: Record<ConsentDocType, string> = {
   terms: '1.0.0',
   privacy: '1.0.0',
   age14: '1.0.0',
   marketing: '1.0.0',
 };
+
+/**
+ * 재동의 없이 계속 유효한 것으로 인정하는 **과거** 버전.
+ *
+ * **왜 필요한가:** 개정에는 두 종류가 있습니다. 이용자의 권리나 기존 수집 범위를 바꾸는
+ * **중대한 개정**은 다시 동의를 받아야 합니다. 반면 신규 **선택** 기능에만 적용되는 수집 항목이
+ * 늘거나, 오타·연락처가 바뀌는 **경미한 개정**까지 전원을 멈춰 세우는 것은 과합니다.
+ * 그 둘을 구분할 수단이 없으면 결국 "고쳐야 하는데 고칠 수 없는" 문서가 됩니다.
+ *
+ * **현행 버전은 언제나 유효하므로 여기에 적지 않습니다.** 여기에는 옛 버전만 남깁니다.
+ * 중대한 개정일 때는 이 배열을 **비워서** 전원 재동의를 트리거합니다.
+ *
+ * · privacy 1.0.0 → 1.1.0 (2026-09-23 시행): 고객센터 문의 기능 신설. 늘어난 항목은
+ *   **이용자가 문의를 접수할 때만** 적용되고, 접수 화면에서 개별 동의를 따로 받습니다.
+ *   기존 회원의 기존 이용에는 달라지는 것이 없어 재동의 대상에서 제외합니다.
+ */
+export const ACCEPTED_PAST_VERSIONS: Record<ConsentDocType, readonly string[]> = {
+  terms: [],
+  privacy: ['1.0.0'],
+  age14: [],
+  marketing: [],
+};
+
+/** 이 버전으로 받아둔 동의가 지금도 유효한가 */
+export function isAcceptedVersion(docType: ConsentDocType, version: string | undefined): boolean {
+  if (!version) return false;
+  return version === DOC_VERSIONS[docType] || ACCEPTED_PAST_VERSIONS[docType].includes(version);
+}
 
 /** 미동의 시 가입할 수 없는 항목 */
 export const REQUIRED_CONSENTS = ['age14', 'terms', 'privacy'] as const satisfies
@@ -81,13 +121,14 @@ export interface ConsentStatus {
 /**
  * 아직 동의가 필요한 필수 문서를 계산합니다.
  *
- * 버전 문자열을 **정확히 일치**로 비교합니다 — 대소 비교를 하면 버전을 되돌린 경우
- * (잘못 올려 롤백) 재동의가 트리거되지 않습니다.
+ * 버전 문자열을 **정확히 일치**로 비교합니다 (목록 안에 있는지) — 대소 비교(semver)를 하면
+ * 버전을 되돌린 경우(잘못 올려 롤백) 재동의가 트리거되지 않습니다. 인정할 옛 버전은
+ * `ACCEPTED_PAST_VERSIONS` 에 **손으로 적습니다.** 자동으로 넓히지 않습니다.
  */
 export function missingConsents(
   versions: Partial<Record<ConsentDocType, string>> | null | undefined,
 ): ConsentDocType[] {
-  return REQUIRED_CONSENTS.filter((t) => versions?.[t] !== DOC_VERSIONS[t]);
+  return REQUIRED_CONSENTS.filter((t) => !isAcceptedVersion(t, versions?.[t]));
 }
 
 export function toConsentStatus(
