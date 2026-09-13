@@ -44,8 +44,28 @@ import type {
   SocialProvider,
   SubmitConsentsBody,
   UpdateAccountBody,
+  AdminInquiryList,
+  CreateInquiryBody,
+  CreateInquiryResult,
+  InquiryCategory,
+  InquiryContext,
+  InquiryStatus,
+  InquiryThread,
 } from '@luvi/schema';
-import { DOC_VERSIONS, isRequiredConsent, parseThemeId, toConsentStatus } from '@luvi/schema';
+import {
+  DOC_VERSIONS,
+  INQUIRY_ATTACHMENT_TYPES,
+  INQUIRY_CATEGORIES,
+  INQUIRY_EXTRAS_ENABLED,
+  INQUIRY_LIMITS,
+  deriveSubject,
+  inquiryCategoryLabel,
+  isRequiredConsent,
+  maskEmail,
+  maskPhone,
+  parseThemeId,
+  toConsentStatus,
+} from '@luvi/schema';
 
 import { createCustomToken } from './lib/customToken';
 import { resolveSocialProfile } from './lib/social';
@@ -60,7 +80,18 @@ import {
   removeSnapshot,
   writeSnapshot,
 } from './lib/snapshot';
-import { hashIp, signUploadToken, verifyUploadToken, SecretError } from './lib/secrets';
+import {
+  hashAccessToken,
+  hashIp,
+  randomAccessToken,
+  signInquiryUpload,
+  signUploadToken,
+  verifyInquiryUpload,
+  verifyUploadToken,
+  SecretError,
+} from './lib/secrets';
+import { verifyTurnstile } from './lib/turnstile';
+import { adminAlertMail, receiptMail, send as sendMail } from './lib/mail';
 import {
   AssetError,
   IMMUTABLE_CACHE,
@@ -76,6 +107,7 @@ import * as rankingsRepo from './repo/rankings';
 import * as usersRepo from './repo/users';
 import * as consentsRepo from './repo/consents';
 import * as identitiesRepo from './repo/identities';
+import * as inquiriesRepo from './repo/inquiries';
 import { createFormEntry } from './repo/forms';
 import { sampleContent } from './sample';
 
@@ -117,6 +149,18 @@ export interface Env {
   /** Firebase 서비스 계정 — 커스텀 토큰 서명 + Firestore 접근 (Secret) */
   FIREBASE_PRIVATE_KEY?: string;
   FIREBASE_CLIENT_EMAIL?: string;
+
+  /**
+   * 메일 발송 (Secret). 없으면 문의는 접수되지만 **알림이 아무에게도 가지 않습니다** —
+   * 고객은 답변을 못 받고 우리는 문의가 온 줄 모릅니다. 배포 전에 반드시 등록하세요.
+   */
+  RESEND_API_KEY?: string;
+
+  /**
+   * Turnstile 비밀키 (Secret). 없으면 비로그인 문의의 **봇 검증이 통째로 꺼집니다.**
+   * 값이 없을 때마다 오류 로그를 남기고 `/health` 에 드러냅니다.
+   */
+  TURNSTILE_SECRET?: string;
 
   /**
    * 🔴 로컬 개발용 우회. `Authorization: Bearer dev` 를 이 uid 로 취급합니다.
@@ -397,6 +441,10 @@ app.get('/health', (c) =>
       naver: Boolean(c.env.NAVER_CLIENT_ID && c.env.NAVER_CLIENT_SECRET),
       kv: Boolean(c.env.LUVI_KV),
       r2: Boolean(c.env.LUVI_ASSETS),
+      // 문의 기능의 전제 둘. resend 가 false 면 알림이 아무에게도 가지 않고,
+      // turnstile 이 false 면 비로그인 폼의 봇 검증이 꺼져 있습니다.
+      resend: Boolean(c.env.RESEND_API_KEY),
+      turnstile: Boolean(c.env.TURNSTILE_SECRET),
       devAuthBypass: Boolean(c.env.DEV_FAKE_UID),
     }),
   ),
@@ -1291,14 +1339,8 @@ function describeProviders(providers: string[]): string {
   return labels.length > 0 ? labels.join('·') : '기존 로그인 수단';
 }
 
-/** `hariqueen@naver.com` → `har***@naver.com`. 본인 확인용이지 노출용이 아닙니다 */
-function maskEmail(email: string): string {
-  const at = email.lastIndexOf('@');
-  if (at <= 0) return '***';
-  const local = email.slice(0, at);
-  const head = local.slice(0, Math.min(3, local.length));
-  return `${head}***${email.slice(at)}`;
-}
+// `maskEmail` 은 `@luvi/schema` 로 옮겼습니다 — 문의 스레드도 같은 규칙으로 가려야 하고,
+// 가리는 규칙이 화면마다 다르면 어느 쪽이 안전한지 판단할 수 없게 됩니다.
 
 // ─────────────────────────── 계정 · 동의 ───────────────────────────
 
@@ -1677,27 +1719,339 @@ function trimmed(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
-app.post('/api/inquiries', async (c) => {
-  const body = await readJson<Record<string, unknown>>(c.req);
-  const name = trimmed(body.name, 40);
-  const message = trimmed(body.message, 2000);
+/**
+ * 고객에게 돌려줄 스레드로 바꿉니다.
+ *
+ * 🔴 `adminNote · ipHash · userAgent · accessTokenHash` 는 **필드 자체를 만들지 않습니다.**
+ *    "화면에서 숨긴다" 가 아니라 "내려보내지 않는다" 입니다. 연락처는 가려서 보냅니다 —
+ *    링크를 주운 사람에게 본인 확인용 정보를 그대로 보여줄 이유가 없습니다.
+ */
+async function toThread(db: Firestore, inquiry: inquiriesRepo.StoredInquiry): Promise<InquiryThread> {
+  return {
+    id: inquiry.id,
+    number: inquiry.number,
+    status: inquiry.status,
+    category: inquiry.category,
+    subject: inquiry.subject,
+    name: inquiry.name,
+    emailMasked: maskEmail(inquiry.email),
+    phoneMasked: maskPhone(inquiry.phone),
+    createdAt: inquiry.createdAt,
+    messages: await inquiriesRepo.listMessages(db, inquiry.id),
+  };
+}
 
-  if (!name || !message) {
-    throw new HttpError({ code: 'validation_failed', message: '이름과 문의 내용을 입력해주세요' });
+/** 목록용 — 메시지를 읽지 않습니다 */
+function toThreadSummary(inquiry: inquiriesRepo.StoredInquiry): Omit<InquiryThread, 'messages'> {
+  return {
+    id: inquiry.id,
+    number: inquiry.number,
+    status: inquiry.status,
+    category: inquiry.category,
+    subject: inquiry.subject,
+    name: inquiry.name,
+    emailMasked: maskEmail(inquiry.email),
+    phoneMasked: maskPhone(inquiry.phone),
+    createdAt: inquiry.createdAt,
+  };
+}
+
+/**
+ * 문의 접수. **비로그인도 보냅니다.**
+ *
+ * 스팸을 네 겹으로 막습니다: 허니팟 → Turnstile → D1 속도 제한 → Cloudflare 규칙.
+ * 앞의 셋이 여기 있고, 넷째는 대시보드 설정입니다.
+ *
+ * 🔴 **메일 발송을 기다리지 않습니다.** Resend 가 죽어도 접수는 성공해야 합니다 —
+ *    문의는 이미 Firestore 에 있고 메일은 알림일 뿐입니다.
+ */
+app.post('/api/inquiries', async (c) => {
+  const body = await readJson<CreateInquiryBody>(c.req);
+  const uid = c.get('uid');
+  const ip = clientIp(c);
+  const ipHash = await hashIp(c.env.APP_SECRET, ip).catch(() => '');
+
+  // ① 허니팟 — 사람에게 보이지 않는 칸입니다. 차 있으면 봇입니다.
+  //    조용히 성공한 척합니다. 실패를 알려주면 봇이 우회를 학습합니다.
+  if (trimmed(body.company, 100)) {
+    console.warn('[api] 문의 허니팟에 걸렸습니다');
+    return c.json(ok({ id: 'spam', number: 'L-000000-0000', token: '', uploadToken: '' }), 201);
   }
 
-  const id = await createFormEntry(
-    firestore(c.env),
-    'inquiries',
-    {
-      name,
-      message,
-      phone: trimmed(body.phone, 30),
-      email: trimmed(body.email, 120),
-    },
-    await hashIp(c.env.APP_SECRET, clientIp(c)),
+  const category = (INQUIRY_CATEGORIES.find((x) => x.value === body.category)?.value ??
+    'etc') as InquiryCategory;
+  const message = trimmed(body.message, INQUIRY_LIMITS.message);
+  if (!message) {
+    throw new HttpError({ code: 'validation_failed', message: '문의 내용을 입력해주세요' });
+  }
+
+  // 회원은 계정 값으로 채웁니다 — 화면이 보낸 이름·이메일을 믿지 않습니다.
+  let name = trimmed(body.name, INQUIRY_LIMITS.name);
+  let email = trimmed(body.email, INQUIRY_LIMITS.email);
+
+  if (uid) {
+    const profile = await usersRepo.readAccount(firestore(c.env), uid);
+    name = profile?.displayName || name || '회원';
+    email = profile?.email || email;
+  } else {
+    // ② 비회원은 이메일이 유일한 답변 도달 경로입니다 (방침 1.1.0 제2조 ⑤).
+    if (!name) {
+      throw new HttpError({ code: 'validation_failed', message: '이름을 입력해주세요' });
+    }
+    if (!email || !email.includes('@')) {
+      throw new HttpError({
+        code: 'validation_failed',
+        message: '답변을 받을 이메일 주소를 정확히 입력해주세요',
+      });
+    }
+    if (body.privacyAgreed !== true) {
+      throw new HttpError({
+        code: 'validation_failed',
+        message: '개인정보 수집·이용에 동의해주세요',
+      });
+    }
+    if (!(await verifyTurnstile(c.env, body.turnstileToken, ip))) {
+      throw new HttpError({
+        code: 'validation_failed',
+        message: '자동 입력 방지 확인에 실패했습니다. 새로고침 후 다시 시도해주세요',
+      });
+    }
+  }
+
+  // ③ 속도 제한 — 10분에 3건까지. 진짜 고객이 연달아 3건을 쓰는 일은 드뭅니다.
+  const recent = await eventsRepo.countRecent(c.env.LUVI_LOGS, {
+    name: 'inquiry_submit',
+    ipHash,
+    withinMinutes: 10,
+  });
+  if (recent >= 3) {
+    throw new HttpError({
+      code: 'rate_limited',
+      message: '문의가 너무 잦습니다. 잠시 후 다시 시도해주세요',
+    });
+  }
+
+  const token = randomAccessToken();
+
+  /**
+   * 🔴 자동수집 맥락은 **방침 1.1.0 이 시행 중일 때만** 저장합니다.
+   *    화면에서 숨기는 것만으로는 부족합니다 — 요청을 직접 보내면 그대로 들어옵니다.
+   *    보내온 값을 여기서 버립니다 (`INQUIRY_EXTRAS_ENABLED` 주석 참고).
+   */
+  const context: InquiryContext = INQUIRY_EXTRAS_ENABLED
+    ? {
+        entry: (body.context?.entry ?? 'support') as InquiryContext['entry'],
+        path: trimmed(body.context?.path, 200),
+        invitationId: trimmed(body.context?.invitationId, 60),
+        slug: trimmed(body.context?.slug, 60),
+        sessionId: trimmed(body.context?.sessionId, 60),
+      }
+    : { entry: 'support', path: '', invitationId: '', slug: '', sessionId: '' };
+
+  const number = inquiriesRepo.makeNumber();
+  const id = await inquiriesRepo.createInquiry(firestore(c.env), {
+    number,
+    category,
+    subject: deriveSubject(message),
+    message,
+    name,
+    email,
+    phone: trimmed(body.phone, INQUIRY_LIMITS.phone),
+    uid,
+    weddingDate: trimmed(body.weddingDate, 30),
+    services: trimmed(body.services, 200),
+    context,
+    accessTokenHash: await hashAccessToken(token),
+    tokenExpiresAt: new Date(
+      Date.now() + inquiriesRepo.TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString(),
+    ipHash,
+    // 브라우저 정보도 1.1.0 에서 추가한 항목입니다
+    userAgent: INQUIRY_EXTRAS_ENABLED ? (c.req.header('User-Agent') ?? '').slice(0, 200) : '',
+  });
+
+  // 접수 자체를 이벤트로 남깁니다 — 속도 제한이 이 기록을 셉니다(추가 쓰기 없음).
+  await audit(c, { name: 'inquiry_submit', detail: `${number} ${category} ${uid ? 'member' : 'guest'}` });
+
+  const categoryLabel = inquiryCategoryLabel(category);
+  const mailInput = { number, category: categoryLabel, name, message, token };
+
+  // 🔴 기다리지 않습니다. 메일 실패가 접수 실패가 되면 안 됩니다.
+  c.executionCtx.waitUntil(
+    (async () => {
+      if (email) {
+        await sendMail(c.env, { ...receiptMail(c.env, mailInput), to: email });
+      }
+      await sendMail(
+        c.env,
+        adminAlertMail(c.env, {
+          ...mailInput,
+          id,
+          email,
+          phone: trimmed(body.phone, INQUIRY_LIMITS.phone),
+          entry: context.entry,
+          invitationId: context.invitationId || null,
+          sessionId: context.sessionId || null,
+        }),
+      );
+    })(),
   );
-  return c.json(ok({ id }), 201);
+
+  const uploadToken = await signInquiryUpload(c.env.APP_SECRET, id).catch(() => '');
+
+  return c.json(ok<CreateInquiryResult>({ id, number, token, uploadToken }), 201);
+});
+
+/**
+ * 문의 첨부 업로드. **글이 먼저, 사진이 뒤입니다.**
+ *
+ * 먼저 올리고 나중에 제출하면 고아 파일이 R2 에 남습니다. 티켓을 먼저 만들면
+ * 업로드가 실패해도 문의 본문은 살아 있습니다.
+ *
+ * 🔴 SVG·HTML 은 허용하지 않습니다 — 우리 도메인에서 서빙되면 그 안의 `<script>` 가
+ *    우리 오리진 권한으로 실행됩니다 (저장형 XSS). `lib/assets.ts` 와 같은 원칙입니다.
+ */
+app.put('/api/inquiries/:id/attachments', async (c) => {
+  // 🔴 방침 1.1.0 시행 전에는 첨부를 받지 않습니다. 수집 항목에 없는 것을 받으면
+  //    고지 없이 수집한 상태가 됩니다.
+  if (!INQUIRY_EXTRAS_ENABLED) {
+    throw new HttpError({
+      code: 'validation_failed',
+      message: '사진 첨부는 2026년 9월 23일부터 이용하실 수 있습니다',
+    });
+  }
+
+  const id = c.req.param('id');
+  const index = Number(c.req.query('index') ?? '0');
+  const token = c.req.query('token') ?? '';
+  const contentType = c.req.header('Content-Type') ?? '';
+  const size = Number(c.req.header('Content-Length') ?? '0');
+
+  if (!Number.isInteger(index) || index < 0 || index >= INQUIRY_LIMITS.attachments) {
+    throw new HttpError({ code: 'validation_failed', message: '첨부 위치가 올바르지 않습니다' });
+  }
+  if (!(INQUIRY_ATTACHMENT_TYPES as readonly string[]).includes(contentType)) {
+    throw new HttpError({
+      code: 'validation_failed',
+      message: 'JPG · PNG · WEBP 이미지만 첨부할 수 있습니다',
+    });
+  }
+  if (!size || size > INQUIRY_LIMITS.attachmentBytes) {
+    throw new HttpError({ code: 'validation_failed', message: '이미지 한 장은 5MB 까지입니다' });
+  }
+
+  // 토큰은 티켓·위치·타입·크기에 묶여 있습니다 — 하나라도 다르면 통과하지 못합니다.
+  if (!(await verifyInquiryUpload(c.env.APP_SECRET, token, id))) {
+    throw new HttpError({ code: 'forbidden', message: '업로드 권한이 없거나 만료됐습니다' });
+  }
+
+  const db = firestore(c.env);
+  const inquiry = await inquiriesRepo.findInquiry(db, id);
+  if (!inquiry) throw new HttpError({ code: 'not_found', message: '없는 문의입니다' });
+
+  const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+  const key = `inquiries/${id}/${index}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+
+  await c.env.LUVI_ASSETS.put(key, c.req.raw.body, {
+    httpMetadata: { contentType },
+  });
+
+  const next = [...inquiry.attachments];
+  next[index] = { name: key, size, contentType };
+  await inquiriesRepo.setAttachments(db, id, next.filter(Boolean));
+
+  return c.json(ok({ index }), 201);
+});
+
+/**
+ * 첨부 내려받기 — **권한을 확인한 뒤** 스트리밍합니다.
+ *
+ * 🔴 공개 에셋 경로(`/api/assets/*`)를 재사용하지 않는 이유: 문의 첨부에는 스크린샷 속
+ *    이름·연락처·청첩장 내용 같은 개인정보가 섞입니다. 추측 불가능한 키에 기대는 방식은
+ *    개인정보에 쓰지 않습니다.
+ */
+app.get('/api/inquiries/:id/attachments/:index', async (c) => {
+  const id = c.req.param('id');
+  const index = Number(c.req.param('index'));
+  const token = c.req.query('token') ?? '';
+
+  const db = firestore(c.env);
+  const inquiry = await inquiriesRepo.findInquiry(db, id);
+  if (!inquiry) throw new HttpError({ code: 'not_found', message: '없는 문의입니다' });
+
+  const uid = c.get('uid');
+  // 토큰은 해시로만 대조합니다 (원문을 저장하지 않으므로). 이 티켓의 토큰이 맞는지까지 봅니다 —
+  // 남의 티켓 토큰으로 이 티켓의 첨부를 여는 일이 없어야 합니다.
+  const byToken = token
+    ? (await inquiriesRepo.findByTokenHash(db, await hashAccessToken(token)))?.id === id
+    : false;
+  const byOwner = Boolean(uid && inquiry.uid === uid);
+  const byAdmin = Boolean(uid && (await usersRepo.isAdmin(db, uid)));
+  if (!byToken && !byOwner && !byAdmin) {
+    throw new HttpError({ code: 'forbidden', message: '이 첨부를 볼 권한이 없습니다' });
+  }
+
+  const attachment = inquiry.attachments[index];
+  if (!attachment) throw new HttpError({ code: 'not_found', message: '없는 첨부입니다' });
+
+  const object = await c.env.LUVI_ASSETS.get(attachment.name);
+  if (!object) throw new HttpError({ code: 'not_found', message: '파일을 찾을 수 없습니다' });
+
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': attachment.contentType,
+      // 🔴 개인정보이므로 캐시하지 않습니다. 공유 캐시에 남으면 권한 검사가 무의미해집니다.
+      'Cache-Control': 'private, no-store',
+    },
+  });
+});
+
+/**
+ * 조회 링크로 스레드 보기 (비회원).
+ *
+ * ⚠️ 이 라우트는 `/api/inquiries/:id/...` 보다 **먼저** 선언해야 합니다 —
+ *    뒤에 두면 `t` 가 `:id` 로 먹힙니다 (`/api/admin/invitations` 에서 같은 함정을 겪었습니다).
+ */
+app.get('/api/inquiries/t/:token', async (c) => {
+  const db = firestore(c.env);
+  const inquiry = await inquiriesRepo.findByTokenHash(
+    db,
+    await hashAccessToken(c.req.param('token')),
+  );
+  if (!inquiry) {
+    throw new HttpError({ code: 'not_found', message: '문의를 찾을 수 없습니다' });
+  }
+  return c.json(ok(await toThread(db, inquiry)));
+});
+
+/** 내 문의 (회원) */
+app.get('/api/inquiries/mine', async (c) => {
+  const uid = requireUid(c);
+  const db = firestore(c.env);
+  const items = await inquiriesRepo.listForUser(db, uid);
+  return c.json(ok(items.map(toThreadSummary)));
+});
+
+app.get('/api/admin/inquiries', async (c) => {
+  const uid = requireUid(c);
+  const db = firestore(c.env);
+  if (!(await usersRepo.isAdmin(db, uid))) {
+    throw new HttpError({ code: 'forbidden', message: '운영자만 볼 수 있습니다' });
+  }
+
+  const status = c.req.query('status') as InquiryStatus | undefined;
+  const items = await inquiriesRepo.listForAdmin(db, {
+    ...(status && ['new', 'open', 'answered', 'closed'].includes(status) ? { status } : {}),
+  });
+
+  const counts: Record<InquiryStatus, number> = { new: 0, open: 0, answered: 0, closed: 0 };
+  // 필터를 걸었을 때도 배지가 맞아야 하므로 전체를 한 번 더 훑습니다.
+  // 건수가 적어(수백) 비용이 문제되지 않습니다.
+  for (const row of status ? await inquiriesRepo.listForAdmin(db, {}) : items) {
+    counts[row.status] += 1;
+  }
+
+  return c.json(ok<AdminInquiryList>({ items, counts }));
 });
 
 app.post('/api/bookings', async (c) => {

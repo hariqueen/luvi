@@ -25,6 +25,9 @@ import NotFound from '@/routes/NotFound';
 const Legal = lazyPage(() => import('@/routes/Legal'));
 // 공지사항도 원문을 상수로 품고 있고 대부분 열지 않습니다 — 같은 이유로 분할합니다.
 const Notice = lazyPage(() => import('@/routes/Notice'));
+const Support = lazyPage(() => import('@/routes/Support'));
+const InquiryThread = lazyPage(() => import('@/routes/InquiryThread'));
+const AdminInquiries = lazyPage(() => import('@/routes/AdminInquiries'));
 const Login = lazyPage(() => import('@/routes/Login'));
 const SocialCallback = lazyPage(() => import('@/routes/SocialCallback'));
 const Dashboard = lazyPage(() => import('@/routes/Dashboard'));
@@ -53,6 +56,13 @@ export default function App() {
           {/* 방침 제14조 ② 가 약속한 고지 창구 — 개정 예고가 여기 올라갑니다 */}
           <Route path="notice" element={<Notice />} />
           <Route path="notice/:id" element={<Notice />} />
+          {/* 고객센터 — FAQ + 문의. 푸터 '문의' 가 여기를 가리킵니다 */}
+          <Route path="support" element={<Support />} />
+          {/*
+            조회 링크. **비로그인도 열 수 있어야 하므로** RequireAuth 밖에 둡니다 —
+            토큰 자체가 접근 권한이고, 로그인을 요구하면 링크를 보낸 의미가 없습니다.
+          */}
+          <Route path="support/t/:token" element={<InquiryThread />} />
         </Route>
 
         {/* ── 로그인 (레이아웃 없음 — 집중형 화면) ── */}
@@ -76,6 +86,7 @@ export default function App() {
           <Route path="account" element={<Account />} />
           {/* 운영자 전용. 화면은 누구나 열 수 있고, 목록은 서버가 403 으로 막습니다 */}
           <Route path="admin" element={<Admin />} />
+          <Route path="admin/inquiries" element={<AdminInquiries />} />
         </Route>
 
         {/*

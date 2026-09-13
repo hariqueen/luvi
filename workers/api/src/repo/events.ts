@@ -67,6 +67,34 @@ export async function insertEvents(db: D1Database | undefined, rows: EventRow[])
   }
 }
 
+/**
+ * 같은 사람이 최근에 이 동작을 몇 번 했나 — **속도 제한용**.
+ *
+ * **왜 KV 가 아니라 D1 인가:** KV 는 하루 1,000 쓰기 한도라 카운터로 쓰면 문의 스팸 한 번에
+ * 한도를 태웁니다 (`repo/forms.ts` 주석에 같은 판단이 있습니다). D1 은 무료 10만 쓰기/일이고,
+ * 우리는 어차피 모든 접수를 이벤트로 남기므로 **추가 쓰기 없이 세기만** 하면 됩니다.
+ *
+ * 🔴 D1 이 없거나 실패하면 **0 을 돌려줍니다 = 통과**입니다. 로그가 죽었다고 문의 창구를
+ *    닫지 않습니다. 스팸 방어는 Turnstile·허니팟까지 네 겹이라 한 겹이 빠져도 무너지지 않습니다.
+ */
+export async function countRecent(
+  db: D1Database | undefined,
+  input: { name: string; ipHash: string; withinMinutes: number },
+): Promise<number> {
+  if (!db || !input.ipHash) return 0;
+  const since = new Date(Date.now() - input.withinMinutes * 60 * 1000).toISOString();
+  try {
+    const row = await db
+      .prepare('SELECT COUNT(*) AS n FROM events WHERE name = ? AND ip_hash = ? AND at >= ?')
+      .bind(input.name, input.ipHash, since)
+      .first<{ n: number }>();
+    return row?.n ?? 0;
+  } catch (e) {
+    console.error('[api] 속도 제한 조회 실패 — 통과시킵니다', e);
+    return 0;
+  }
+}
+
 /** 보관 기간이 지난 로그를 지웁니다. Cron 이 매일 부릅니다 */
 export async function purgeOld(db: D1Database | undefined, days = RETENTION_DAYS): Promise<number> {
   if (!db) return 0;

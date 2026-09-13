@@ -72,8 +72,17 @@ enabled = true
 #   npx wrangler secret put NAVER_CLIENT_ID
 #   npx wrangler secret put NAVER_CLIENT_SECRET
 #
-# 메일 발송 (약관 개정 공지·재동의 안내):
+# 메일 발송 (문의 접수·답변 알림, 약관 개정 공지):
 #   npx wrangler secret put RESEND_API_KEY          # 로컬 값은 workers/api/.dev.vars 에 있다
+#   🔴 없으면 문의는 접수되지만 **알림이 아무에게도 가지 않습니다** —
+#      고객은 답변을 못 받고 우리는 문의가 온 줄 모릅니다.
+#
+# 문의 폼 봇 차단 (비로그인):
+#   npx wrangler secret put TURNSTILE_SECRET        # Cloudflare → Turnstile 에서 사이트 추가 후 발급
+#   그리고 사이트 키(공개 값)를 Pages 환경변수 VITE_TURNSTILE_SITE_KEY 에 넣는다.
+#   🔴 비밀키가 없으면 비로그인 문의의 봇 검증이 통째로 꺼집니다.
+#
+# 등록 확인:  curl .../health  →  "resend": true, "turnstile": true
 #
 # FIREBASE_PRIVATE_KEY 는 여러 줄이라 붙여넣기가 까다롭다.
 # JSON 키 파일에서 꺼낸 "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n" 을

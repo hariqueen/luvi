@@ -10,5 +10,6 @@ export * from './labels';
 export * from './manifest';
 export * from './derive';
 export * from './api';
+export * from './inquiry';
 export * from './consent';
 export * from './themes';

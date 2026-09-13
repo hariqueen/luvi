@@ -56,6 +56,23 @@ export const ACCEPTED_PAST_VERSIONS: Record<ConsentDocType, readonly string[]> =
   marketing: [],
 };
 
+/**
+ * 문서 버전 비교. 조각별 숫자로 봅니다 — 문자열 비교로는 `1.10.0` 이 `1.9.0` 보다 작습니다.
+ *
+ * ⚠️ **동의 판정에는 쓰지 않습니다.** 거기서는 목록 멤버십으로 정확히 일치시킵니다
+ * (버전을 잘못 올려 되돌렸을 때 재동의가 안 걸리는 문제를 피하려고). 이 함수는
+ * "이 기능이 방침에 적혀 있는가" 처럼 **순서를 따져야 할 때만** 씁니다.
+ */
+export function compareDocVersion(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i += 1) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
 /** 이 버전으로 받아둔 동의가 지금도 유효한가 */
 export function isAcceptedVersion(docType: ConsentDocType, version: string | undefined): boolean {
   if (!version) return false;
