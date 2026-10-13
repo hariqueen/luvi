@@ -1196,13 +1196,20 @@ app.post('/api/invitations/:id/rankings', async (c) => {
   }
   await c.env.LUVI_KV.put(nonceKey, '1', { expirationTtl: 60 * 60 * 2 });
 
-  // 하객이 실제로 보는 것은 발행본이라, 난이도도 발행본 기준으로 봅니다
-  const content = invitation.published ?? invitation.draft;
-  const themeGame = (
-    content.theme as Record<string, { game?: { speed?: string } } | undefined> | undefined
-  )?.[invitation.themeId]?.game;
+  /**
+   * 난이도는 발행본과 초안을 **둘 다** 넘깁니다 — 하객이 게임을 하는 동안 주인이 난이도를
+   * 낮춰 발행하면, 방금 정직하게 세운 기록이 거부됩니다. 판정은 너그러운 쪽을 씁니다.
+   */
+  const speedOf = (content: { theme?: unknown } | null): string | undefined =>
+    (content?.theme as Record<string, { game?: { speed?: string } } | undefined> | undefined)?.[
+      invitation.themeId
+    ]?.game?.speed;
 
-  const implausible = implausibleReason({ score, caught, speed: themeGame?.speed });
+  const implausible = implausibleReason({
+    score,
+    caught,
+    speeds: [speedOf(invitation.published), speedOf(invitation.draft)],
+  });
   if (implausible) {
     console.warn(`[api] 랭킹 물리 상한 초과 — ${implausible} (inv=${id} ${score}s ${caught}개)`);
     throw new HttpError({ code: 'validation_failed', message: '기록 값이 올바르지 않습니다' });

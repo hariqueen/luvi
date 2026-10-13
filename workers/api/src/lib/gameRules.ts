@@ -86,20 +86,31 @@ export function maxSurvivalSeconds(sf: number): number {
 export interface PlausibilityInput {
   score: number;
   caught: number;
-  speed: string | undefined;
+  /**
+   * 난이도 후보들. 발행본과 초안을 **둘 다** 넘기고 가장 너그러운 쪽으로 판정합니다 —
+   * 하객이 게임을 하는 도중에 주인이 난이도를 낮춰 발행하면, 방금 정직하게 세운 기록이
+   * 거부됩니다. 2026-10-13 저녁에 실제로 발행이 5번 일어났고 그 사이 난이도가 바뀌었습니다.
+   */
+  speeds: (string | undefined)[];
 }
 
 /** 기록이 **이 게임으로 나올 수 있는 값인지**. 통과하면 `null`, 아니면 거부 사유. */
 export function implausibleReason(input: PlausibilityInput): string | null {
-  const sf = speedFactor(input.speed);
+  const sf = Math.max(...input.speeds.map(speedFactor));
 
   const scoreCap = maxSurvivalSeconds(sf) * MARGIN;
   if (input.score > scoreCap) {
     return `생존 시간이 이 게임에서 나올 수 있는 최대치를 넘습니다`;
   }
 
-  // 받은 개수는 "그 시간 동안 떨어진 개수" 를 넘을 수 없습니다
-  const caughtCap = maxSpawns(input.score, sf) * MARGIN;
+  /**
+   * 받은 개수는 "그 시간 동안 떨어진 **좋은** 것" 을 넘을 수 없습니다.
+   *
+   * 🔴 `GOOD_RATIO` 를 빼먹지 마세요. 떨어지는 것의 20% 는 피해야 하는 벌이고, 벌은
+   *    받아도 `caught` 가 오르지 않습니다(체력만 깎입니다). 전체 생성 개수와 비교하면
+   *    상한이 25% 헐거워져, 물리적으로 불가능한 기록이 그대로 통과합니다.
+   */
+  const caughtCap = maxSpawns(input.score, sf) * GOOD_RATIO * MARGIN;
   if (input.caught > caughtCap) {
     return `받은 개수가 그 시간 동안 떨어진 개수보다 많습니다`;
   }
