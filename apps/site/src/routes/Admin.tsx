@@ -235,6 +235,15 @@ export default function Admin() {
                           >
                             방명록
                           </Link>
+                          {/* 미니게임을 넣은 청첩장에만 — 없으면 눌러봐야 빈 화면입니다 */}
+                          {inv.hasMinigame && (
+                            <Link
+                              to={`/app/i/${inv.id}/rankings`}
+                              className="text-muted hover:underline"
+                            >
+                              게임순위
+                            </Link>
+                          )}
                           {inv.status === 'published' && inv.slug && (
                             <a
                               href={`/i/${inv.slug}`}

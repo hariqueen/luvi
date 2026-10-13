@@ -31,7 +31,7 @@ export function MiniGame() {
   const text = sectionText.minigame;
   // 등수만 굵게 그려야 해서 `{순위}` 앞뒤로 자릅니다 (labels.ts)
   const ranked = splitRankLabel(labels.gameRanked);
-  const { rows, hasBoard, register, myRank } = useRankings(leaderboard.size);
+  const { rows, hasBoard, beginGame, register, myRank } = useRankings(leaderboard.size);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<CatchGame | null>(null);
@@ -59,6 +59,9 @@ export function MiniGame() {
     setRegistered(false);
     setNick('');
     setPhase('playing');
+    // 등록 자격은 **시작할 때** 받습니다 — 끝난 뒤에 받으면 서버가 재는 경과 시간이
+    // 0초라, 버틴 시간만큼 흘렀어야 한다는 조건에 걸려 정상 기록이 거부됩니다.
+    beginGame();
     gameRef.current?.start();
   };
 

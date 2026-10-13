@@ -35,6 +35,7 @@ const NewInvitation = lazyPage(() => import('@/routes/NewInvitation'));
 const Editor = lazyPage(() => import('@/routes/Editor'));
 const Publish = lazyPage(() => import('@/routes/Publish'));
 const Guestbook = lazyPage(() => import('@/routes/Guestbook'));
+const Rankings = lazyPage(() => import('@/routes/Rankings'));
 const Account = lazyPage(() => import('@/routes/Account'));
 const Admin = lazyPage(() => import('@/routes/Admin'));
 
@@ -82,6 +83,8 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="new" element={<NewInvitation />} />
           <Route path="i/:id/guestbook" element={<Guestbook />} />
+          {/* 미니게임 기록 관리 — 목록 카드의 '게임순위' 가 여기를 가리킵니다 */}
+          <Route path="i/:id/rankings" element={<Rankings />} />
           {/* 방침 제8조 ②가 가리키는 화면 — 열람·정정·동의철회·탈퇴 */}
           <Route path="account" element={<Account />} />
           {/* 운영자 전용. 화면은 누구나 열 수 있고, 목록은 서버가 403 으로 막습니다 */}

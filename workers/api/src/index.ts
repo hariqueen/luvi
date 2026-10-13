@@ -97,12 +97,15 @@ import {
   hashAccessToken,
   hashIp,
   randomAccessToken,
+  signGameSession,
   signInquiryUpload,
   signUploadToken,
+  verifyGameSession,
   verifyInquiryUpload,
   verifyUploadToken,
   SecretError,
 } from './lib/secrets';
+import { implausibleReason } from './lib/gameRules';
 import { verifyTurnstile } from './lib/turnstile';
 import { adminAlertMail, receiptMail, replyMail, send as sendMail } from './lib/mail';
 import {
@@ -249,6 +252,31 @@ app.use('*', (c, next) =>
     maxAge: 86_400,
   })(c, next),
 );
+
+/**
+ * 비로그인 쓰기 경로의 1차 관문 — **브라우저에서 온 요청인가.**
+ *
+ * 🔴 **CORS 는 보안 장치가 아닙니다.** 위의 `cors()` 는 *브라우저에게* 응답을 읽게 할지
+ *    말지를 알려줄 뿐이고, 브라우저가 아닌 것(curl · Postman · 스크립트)은 그 안내를
+ *    애초에 읽지 않습니다. 요청은 그대로 라우트까지 도달해 **실행됩니다.**
+ *    2026-10-12 랭킹 조작이 정확히 이 틈이었습니다 (Postman 한 번으로 1등 등록).
+ *
+ * 그래서 서버가 직접 봅니다. 브라우저는 교차 출처 쓰기에 `Origin` 을 **반드시** 붙이므로,
+ * 없으면 브라우저가 아니고 · 있는데 우리 것이 아니면 남의 페이지에서 온 것입니다.
+ *
+ * 한계도 분명히 적어둡니다: `Origin` 은 **보내는 쪽이 지어낼 수 있는 값**이라 작정한
+ * 사람은 한 줄 더 써서 넘어옵니다. 이건 장난을 걸러내는 문턱이고, 진짜 판정은
+ * 각 경로의 세션 토큰·속도 제한이 합니다. **이것 하나만 믿고 뒤를 비우지 마세요.**
+ */
+function requireBrowserOrigin(c: Context<{ Bindings: Env; Variables: Vars }>): void {
+  const origin = c.req.header('Origin') ?? '';
+  if (!allowOrigin(origin, c.env)) {
+    throw new HttpError({
+      code: 'forbidden',
+      message: '청첩장 화면에서만 등록할 수 있습니다',
+    });
+  }
+}
 
 /**
  * Bearer 토큰에서 uid 를 얻습니다.
@@ -973,6 +1001,8 @@ app.get('/api/invitations/:id/guestbook', async (c) => {
 
 /** 하객이 남깁니다 — 비로그인 허용 */
 app.post('/api/invitations/:id/guestbook', async (c) => {
+  requireBrowserOrigin(c);
+
   const db = firestore(c.env);
   const id = c.req.param('id');
 
@@ -1072,11 +1102,50 @@ app.get('/api/invitations/:id/rankings', async (c) => {
   return c.json(ok<RankEntry[]>(entries));
 });
 
+/**
+ * 게임 시작 — 등록 자격(세션 토큰)을 발급합니다.
+ *
+ * 토큰 안의 발급 시각은 **서버 시계**로 서명돼 있어서, 등록할 때 "정말 그 시간을 버텼는지"
+ * 를 서버가 스스로 압니다. 자세한 설계 의도는 `lib/secrets.ts` 의 `signGameSession` 주석.
+ */
+app.post('/api/invitations/:id/rankings/session', async (c) => {
+  requireBrowserOrigin(c);
+
+  const id = c.req.param('id');
+  // 없는 청첩장으로 토큰을 받아가지 못하게 합니다
+  const invitation = await invitationsRepo.findInvitation(firestore(c.env), id);
+  if (!invitation) {
+    throw new HttpError({ code: 'not_found', message: '청첩장을 찾을 수 없습니다' });
+  }
+
+  return c.json(ok({ token: await signGameSession(c.env.APP_SECRET, id) }), 201);
+});
+
+/**
+ * 기록 등록 — 비로그인입니다. 그래서 **네 겹**으로 봅니다.
+ *
+ * 🔴 **2026-10-12 사고:** 예전에는 `score <= 600 && caught <= 2000` 범위 검사만 있었습니다.
+ *    범위는 "형식이 맞는가" 만 말해줄 뿐 **"게임을 해서 나온 값인가" 는 말해주지 않습니다.**
+ *    Postman 으로 본문만 만들어 보낸 기록이 실제 운영 청첩장의 1등에 올랐습니다.
+ *    인증이 없는 경로에서는 **보내온 값을 설명할 수 있어야** 받는다, 가 교훈입니다.
+ *
+ *  ① 오리진    — 브라우저에서 온 요청인가 (장난 차단)
+ *  ② 세션 토큰 — 게임을 시작했고, 적어도 기록한 시간만큼 실제로 흘렀는가 (핵심)
+ *  ③ 물리 상한 — 이 게임이 만들어낼 수 있는 값인가 (`lib/gameRules.ts`)
+ *  ④ 속도 제한 — 한 사람이 랭킹판을 통째로 채우지 못하게
+ */
 app.post('/api/invitations/:id/rankings', async (c) => {
+  requireBrowserOrigin(c);
+
   const db = firestore(c.env);
   const id = c.req.param('id');
 
-  const body = await readJson<{ nick: string; score: number; caught: number }>(c.req);
+  const body = await readJson<{
+    nick: string;
+    score: number;
+    caught: number;
+    token: string;
+  }>(c.req);
 
   // score 는 생존 시간(초)이라 **소수**입니다. 정수 검사를 넣으면 정상 기록이 전부 거부됩니다.
   const score = Number(body.score);
@@ -1090,11 +1159,74 @@ app.post('/api/invitations/:id/rankings', async (c) => {
     throw new HttpError({ code: 'not_found', message: '청첩장을 찾을 수 없습니다' });
   }
 
+  const now = Date.now();
+  const session = await verifyGameSession(c.env.APP_SECRET, body.token ?? '', id, now);
+  if (!session) {
+    throw new HttpError({
+      code: 'forbidden',
+      message: '게임 기록을 확인할 수 없습니다. 게임을 다시 한 판 해주세요',
+    });
+  }
+
+  /**
+   * 생존 시간만큼은 **실제로** 흘렀어야 합니다.
+   *
+   * 2초를 빼두는 것은 네트워크·렌더링 지연 때문입니다 — 발급 요청이 날아가는 동안에도
+   * 화면에서는 이미 게임이 돌고 있어서, 엄격히 비교하면 정상 기록이 간발의 차로 거부됩니다.
+   */
+  const elapsedSec = (now - session.issuedAt) / 1000;
+  if (score > elapsedSec + 2) {
+    throw new HttpError({
+      code: 'validation_failed',
+      message: '기록 값이 올바르지 않습니다',
+    });
+  }
+
+  /**
+   * 토큰 한 장은 기록 한 건입니다. 없으면 한 번 받아둔 토큰으로 같은 기록을 계속 올릴 수
+   * 있습니다. KV 는 쓰기 직후 다른 지역에서 잠깐 안 보일 수 있어 **완벽한 잠금은 아니지만**,
+   * 위의 경과 시간 조건이 함께 걸려 있어 반복에는 매번 게임 시간이 듭니다.
+   */
+  const nonceKey = `RANK_NONCE:${session.nonce}`;
+  if (await c.env.LUVI_KV.get(nonceKey)) {
+    throw new HttpError({
+      code: 'forbidden',
+      message: '이미 등록된 기록입니다. 게임을 다시 한 판 해주세요',
+    });
+  }
+  await c.env.LUVI_KV.put(nonceKey, '1', { expirationTtl: 60 * 60 * 2 });
+
+  // 하객이 실제로 보는 것은 발행본이라, 난이도도 발행본 기준으로 봅니다
+  const content = invitation.published ?? invitation.draft;
+  const themeGame = (
+    content.theme as Record<string, { game?: { speed?: string } } | undefined> | undefined
+  )?.[invitation.themeId]?.game;
+
+  const implausible = implausibleReason({ score, caught, speed: themeGame?.speed });
+  if (implausible) {
+    console.warn(`[api] 랭킹 물리 상한 초과 — ${implausible} (inv=${id} ${score}s ${caught}개)`);
+    throw new HttpError({ code: 'validation_failed', message: '기록 값이 올바르지 않습니다' });
+  }
+
+  /**
+   * 한 사람(= 같은 IP)이 올릴 수 있는 기록 수.
+   *
+   * 방명록(15건)보다 넉넉합니다. 미니게임은 원래 여러 판 하는 것이고, 예식장 와이파이는
+   * **하객 전체가 같은 IP 로 묶입니다** — 좁게 잡으면 조작범이 아니라 진짜 하객이 막힙니다.
+   */
+  const ipHash = await hashIp(c.env.APP_SECRET, clientIp(c));
+  if (rankingsRepo.isFlooding(await rankingsRepo.countByIp(db, id, ipHash))) {
+    throw new HttpError({
+      code: 'rate_limited',
+      message: '기록이 너무 많습니다. 잠시 뒤에 다시 시도해주세요',
+    });
+  }
+
   const entry = await rankingsRepo.createRank(db, id, {
     nick: (body.nick ?? '').trim().slice(0, 20) || '익명 하객',
     score,
     caught,
-    ipHash: await hashIp(c.env.APP_SECRET, clientIp(c)),
+    ipHash,
   });
   return c.json(ok<RankEntry>(entry), 201);
 });
@@ -1115,6 +1247,27 @@ app.delete('/api/invitations/:id/rankings/:entryId', async (c) => {
 });
 
 // ─────────────────────────── 에셋 ───────────────────────────
+
+/**
+ * 기록 전체 초기화 — 하객 기록을 **전부** 지웁니다.
+ *
+ * 방명록 초기화(`DELETE /guestbook`)와 같은 모양입니다. 한 건씩 지우는 경로와 세그먼트
+ * 수가 달라 라우팅이 겹치지 않습니다. 되돌릴 수 없어 화면에서 건수를 보여주고 확인받습니다.
+ */
+app.delete('/api/invitations/:id/rankings', async (c) => {
+  const db = firestore(c.env);
+  const id = c.req.param('id');
+  const invitation = await requireOwned(c, db, id);
+
+  const deleted = await rankingsRepo.clearRankings(db, id);
+  await audit(c, {
+    name: 'ranking_clear',
+    invitationId: id,
+    ownerUid: invitation.ownerUid,
+    detail: `deleted=${deleted}`,
+  });
+  return c.json(ok({ deleted }));
+});
 
 app.post('/api/assets/sign', async (c) => {
   const db = firestore(c.env);

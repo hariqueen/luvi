@@ -23,6 +23,8 @@ import { readFileSync } from 'node:fs';
 const SA_PATH = process.env.SA;
 const WEB_KEY = process.env.LUVI_WEB_API_KEY;
 const API = (process.env.API ?? '').replace(/\/$/, '');
+/** 비로그인 쓰기 경로가 요구하는 Origin (`requireBrowserOrigin`) */
+const SITE_ORIGIN = process.env.LUVI_ORIGIN ?? 'https://luv-ai.co.kr';
 
 if (!SA_PATH || !WEB_KEY || !API) {
   console.error('환경변수 SA · LUVI_WEB_API_KEY · API 가 모두 필요합니다 (파일 상단 주석 참고)');
@@ -254,8 +256,10 @@ try {
   console.log('\n[6] 방명록 남기기');
   must(
     '방명록',
+    // Origin 이 없으면 403 입니다 — 비로그인 쓰기는 브라우저에서 온 요청만 받습니다
     await api('POST', `/api/invitations/${invitationId}/guestbook`, {
       body: { name: 'E2E하객', msg: '탈퇴 검증용 글입니다' },
+      headers: { Origin: SITE_ORIGIN },
     }),
     201,
   );

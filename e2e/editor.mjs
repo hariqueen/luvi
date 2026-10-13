@@ -249,9 +249,11 @@ try {
   // 7. 방명록 관리 — 하객 글 2건을 심어놓고 숨김/삭제를 눌러본다
   try {
     for (const [name, msg] of [['하객가', '축하합니다 1'], ['하객나', '축하합니다 2']]) {
+      // Origin 은 **브라우저 흉내가 아니라 통과 조건**입니다 — 비로그인 쓰기 경로는
+      // 브라우저에서 온 요청만 받습니다 (`requireBrowserOrigin`). 빼면 403 입니다.
       await fetch(`${API}/invitations/${invitationId}/guestbook`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'User-Agent': UA },
+        headers: { 'content-type': 'application/json', 'User-Agent': UA, Origin: ORIGIN },
         body: JSON.stringify({ name, msg }),
       });
     }

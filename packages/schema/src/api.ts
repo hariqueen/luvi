@@ -165,6 +165,13 @@ export interface InvitationSummary {
   thumbKey: string | null;
   /** 발행본과 초안이 다른 항목 수. 0이면 '발행됨', 1 이상이면 '발행됨 · 변경 N건' */
   unpublishedChanges: number;
+  /**
+   * 미니게임 섹션이 담겨 있는가.
+   *
+   * 목록 카드에 '게임순위' 를 보일지 정합니다. 미니게임이 없는 청첩장에 그 링크를 두면
+   * 눌러봐야 빈 화면이라, 섹션을 넣은 청첩장에서만 보입니다.
+   */
+  hasMinigame: boolean;
   updatedAt: string;
 }
 
@@ -350,6 +357,16 @@ export interface CreateRankBody {
   nick: string;
   score: number;
   caught: number;
+  /**
+   * 게임을 시작할 때 `POST /api/invitations/{id}/rankings/session` 으로 받은 등록 자격.
+   * 없으면 거부됩니다 — 예전에는 본문만 지어내 보내면 1등이 됐습니다 (2026-10-12).
+   */
+  token: string;
+}
+
+/** POST /api/invitations/{id}/rankings/session — 한 판 시작 */
+export interface GameSessionResult {
+  token: string;
 }
 
 // ─────────────────────────── 에셋 ───────────────────────────

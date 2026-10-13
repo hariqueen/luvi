@@ -378,6 +378,8 @@ export function toSummary(inv: StoredInvitation): InvitationSummary {
     coupleLabel: coupleLabel(inv),
     weddingAt: inv.draft.core.weddingAt,
     thumbKey: inv.draft.core.cover.image?.key ?? inv.draft.core.gallery[0]?.key ?? null,
+    // 목록 카드의 '게임순위' 링크 노출 조건 — 담긴 섹션으로 판단합니다
+    hasMinigame: inv.sections.includes('minigame'),
     // 발행본이 없으면 '변경 N건' 배지가 의미 없으므로 0 입니다
     unpublishedChanges: inv.published
       ? countChanges({

@@ -89,16 +89,35 @@ export async function fetchRankings(invitationId: string): Promise<RankEntry[] |
   return data.map((e) => ({ nick: e.nick, score: e.score, caught: e.caught, ts: toMs(e.createdAt) }));
 }
 
-/** 랭킹 등록 */
+/**
+ * 게임 시작을 서버에 알리고 등록 자격(토큰)을 받습니다.
+ *
+ * 서버는 이 토큰에 **발급 시각을 서명해서** 넣어두고, 등록할 때 "정말 그 시간을 버텼는지"
+ * 를 자기 시계로 확인합니다. 토큰 없이 보낸 기록은 거부됩니다 — 예전에는 본문만 지어내
+ * 보내면 1등이 됐습니다(2026-10-12).
+ *
+ * 실패하면 `null` 입니다. 그래도 게임은 그대로 돌아갑니다 — 기록이 서버에 안 올라갈 뿐이고,
+ * 화면은 localStorage 로 폴백합니다. 게임을 못 하게 막는 쪽이 훨씬 나쁩니다.
+ */
+export async function startGameSession(invitationId: string): Promise<string | null> {
+  const data = await call<{ token: string }>(
+    `/invitations/${encodeURIComponent(invitationId)}/rankings/session`,
+    { method: 'POST' },
+  );
+  return data?.token ?? null;
+}
+
+/** 랭킹 등록 — `startGameSession()` 으로 받은 토큰이 있어야 합니다 */
 export async function postRank(
   invitationId: string,
   nick: string,
   score: number,
   caught: number,
+  token: string,
 ): Promise<boolean> {
   const data = await call<ApiRankEntry>(
     `/invitations/${encodeURIComponent(invitationId)}/rankings`,
-    { method: 'POST', body: JSON.stringify({ nick, score, caught }) },
+    { method: 'POST', body: JSON.stringify({ nick, score, caught, token }) },
   );
   return data !== null;
 }

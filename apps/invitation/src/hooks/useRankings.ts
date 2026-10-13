@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchRankings, postRank } from '@/lib/guestApi';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fetchRankings, postRank, startGameSession } from '@/lib/guestApi';
 import { useInvitation } from '@/lib/invitationContext';
 import { loadArray, saveArray, STORAGE_KEYS } from '@/lib/storage';
 import type { RankEntry } from '@/lib/types';
@@ -33,6 +33,13 @@ export function useRankings(size: number) {
   );
   const [newTs, setNewTs] = useState(0);
 
+  /**
+   * 이번 판의 등록 자격. 게임을 **시작할 때** 받아둡니다 — 서버가 발급 시각을 기준으로
+   * "정말 그 시간을 버텼는지" 를 보기 때문에, 끝난 뒤에 받으면 경과가 0초라 거부됩니다.
+   * state 가 아니라 ref 인 이유: 값이 바뀌어도 다시 그릴 일이 없습니다.
+   */
+  const sessionRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!invitationId) return;
     let alive = true;
@@ -42,6 +49,15 @@ export function useRankings(size: number) {
     return () => {
       alive = false;
     };
+  }, [invitationId]);
+
+  /** 한 판 시작 — 등록 자격을 미리 받아둡니다 (실패해도 게임은 그대로 진행됩니다) */
+  const beginGame = useCallback(() => {
+    sessionRef.current = null;
+    if (!invitationId) return;
+    void startGameSession(invitationId).then((token) => {
+      sessionRef.current = token;
+    });
   }, [invitationId]);
 
   const register = useCallback(
@@ -60,7 +76,12 @@ export function useRankings(size: number) {
 
       // 서버 목록으로 덮어쓰지 않습니다 — isMine 강조가 ts 로 판별되는데
       // 서버가 돌려준 createdAt 은 ts 와 달라 방금 세운 기록 강조가 풀립니다.
-      if (invitationId) void postRank(invitationId, name, score, caught);
+      //
+      // 토큰은 한 판에 한 번만 씁니다. 다 쓴 뒤 비우는 것은 등록 버튼을 두 번 눌렀을 때
+      // 같은 기록이 두 줄로 올라가는 것을 막기 위해서입니다 (서버도 따로 막습니다).
+      const token = sessionRef.current;
+      sessionRef.current = null;
+      if (invitationId && token) void postRank(invitationId, name, score, caught, token);
     },
     [invitationId, keep],
   );
@@ -82,5 +103,12 @@ export function useRankings(size: number) {
     return i < 0 ? 0 : i + 1;
   }, [board, newTs]);
 
-  return { rows, hasBoard: board.length > 0, register, myRank, resetNewTs: () => setNewTs(0) };
+  return {
+    rows,
+    hasBoard: board.length > 0,
+    beginGame,
+    register,
+    myRank,
+    resetNewTs: () => setNewTs(0),
+  };
 }

@@ -178,8 +178,12 @@ export function createClient(opts: ClientOptions) {
         get<RankEntry[]>(`/invitations/${invitationId}/rankings`),
       create: (invitationId: string, body: CreateRankBody) =>
         post<RankEntry>(`/invitations/${invitationId}/rankings`, body),
+      /** 한 건 삭제 — 소유자·운영자만. 조작된 기록을 치우는 용도입니다 */
       remove: (invitationId: string, entryId: string) =>
         del<{ id: string }>(`/invitations/${invitationId}/rankings/${entryId}`),
+      /** 전체 초기화 — 되돌릴 수 없다. 지운 건수를 돌려준다 */
+      clear: (invitationId: string) =>
+        del<{ deleted: number }>(`/invitations/${invitationId}/rankings`),
     },
 
     assets: {
