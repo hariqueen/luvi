@@ -188,6 +188,8 @@ function ImagesField({
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  /** 올리는 중일 때 '몇 장 중 몇 장' — 한 번에 50장을 고르면 몇 분이 걸립니다 */
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const items = (bound.value as AssetRef[] | undefined) ?? [];
@@ -200,16 +202,24 @@ function ImagesField({
     const room = Math.max(0, max - items.length);
     const picked = Array.from(files).slice(0, room);
     const added: AssetRef[] = [];
+    setProgress({ done: 0, total: picked.length });
     try {
       // 순차 업로드 — 한 장이 실패해도 앞서 성공한 것들은 살립니다
       for (const file of picked) {
         added.push(await editor.uploadImage(field.path, file));
+        /*
+          한 장 끝날 때마다 숫자를 올립니다. 50장이면 몇 분이 걸리는데 '올리는 중…' 만
+          떠 있으면 멈춘 줄 알고 창을 닫습니다 — 그러면 올라간 사진이 저장되지 않습니다
+          (저장은 전부 끝난 뒤 한 번에 합니다).
+        */
+        setProgress({ done: added.length, total: picked.length });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : '일부 사진을 올리지 못했습니다');
     } finally {
       if (added.length) bound.set(max === 1 ? added.slice(0, 1) : [...items, ...added]);
       setBusy(false);
+      setProgress(null);
       if (ref.current) ref.current.value = '';
     }
   };
@@ -297,7 +307,9 @@ function ImagesField({
         className="w-full rounded-lg border border-dashed border-line-strong py-3 text-[12.5px] text-ink-soft disabled:opacity-50"
       >
         {busy
-          ? '올리는 중…'
+          ? progress
+            ? `올리는 중… (${progress.done}/${progress.total})`
+            : '올리는 중…'
           : items.length >= max
             ? `최대 ${max}장까지예요`
             : `+ 사진 추가 (${items.length}/${max})`}
