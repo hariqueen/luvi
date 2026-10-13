@@ -245,7 +245,13 @@ function ImagesField({
                 i === 0 ? 'border-gold' : 'border-line'
               } ${dragIndex === i ? 'opacity-40' : ''}`}
             >
-              <img src={assetUrl(asset.key)} alt="" className="size-full cursor-move object-cover" />
+              {/* 50장까지 깔리는 자리라 작은 복사본을 씁니다 (없는 옛 사진은 원본으로) */}
+              <img
+                src={assetUrl(asset.thumb ?? asset.key)}
+                alt=""
+                loading="lazy"
+                className="size-full cursor-move object-cover"
+              />
               {i === 0 && (
                 <span className="absolute left-1 top-1 rounded bg-gold px-1.5 py-0.5 text-[9px] font-semibold text-white">
                   대표

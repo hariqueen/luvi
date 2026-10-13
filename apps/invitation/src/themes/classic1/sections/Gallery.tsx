@@ -23,7 +23,8 @@ export function Gallery() {
         <button
           onClick={() => setOpenAt(0)}
           className="mb-2 mt-6 block aspect-[3/2] w-full cursor-pointer overflow-hidden rounded-xl border-none bg-cover shadow-sm"
-          style={{ backgroundImage: `url("${hero.thumb}")`, backgroundPosition: 'center 28%' }}
+          /* 대표 사진은 화면 폭을 꽉 채우므로 작은 썸네일이 아니라 원본을 씁니다 */
+          style={{ backgroundImage: `url("${hero.full}")`, backgroundPosition: 'center 28%' }}
           aria-label="사진 크게 보기"
         />
       )}
@@ -34,10 +35,18 @@ export function Gallery() {
           <button
             key={i}
             onClick={() => setOpenAt(i + 1)}
-            className="aspect-square cursor-pointer rounded-sm border-none bg-cover bg-center"
-            style={{ backgroundImage: `url("${item.thumb}")` }}
+            className="relative aspect-square cursor-pointer overflow-hidden rounded-sm border-none p-0"
             aria-label="사진 크게 보기"
-          />
+          >
+            {/* 배경이 아니라 <img> 인 이유: 사진이 50장까지 들어가므로 화면에 들어올 때
+                받도록 지연 로딩을 겁니다. 배경 이미지에는 loading 속성이 없습니다 */}
+            <img
+              src={item.thumb}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          </button>
         ))}
       </div>
 

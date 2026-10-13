@@ -274,7 +274,7 @@ export const CORE_SECTIONS: SectionDef[] = [
         type: 'images',
         label: '사진',
         hint: '첫 번째 사진이 대표로 크게 보입니다. 끌어서 순서를 바꿀 수 있어요',
-        max: 10,
+        max: 50,
       },
       /**
        * 안내 문구 뒤에 붙는 한 마디. 사진이 2장 이상일 때만 나옵니다.

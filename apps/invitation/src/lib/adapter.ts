@@ -120,7 +120,15 @@ export function adaptInvitation(pub: PublicInvitation): InvitationConfig {
       highlightDay: valid ? d.getDate() : 0,
     },
 
-    gallery: c.gallery.map((g) => ({ thumb: url(g), full: url(g) })),
+    /*
+      그리드는 작은 복사본(`thumb`), 확대 보기는 원본입니다 — 50장짜리 갤러리가 원본을
+      그대로 깔면 하객이 첫 화면에서 10MB 넘게 받습니다. 이 기능 전에 올린 사진에는
+      `thumb` 이 없으므로 그때는 예전처럼 원본으로 떨어집니다.
+    */
+    gallery: c.gallery.map((g) => ({
+      thumb: g.thumb ? `${pub.cdnBase}/${g.thumb}` : url(g),
+      full: url(g),
+    })),
 
     game: {
       gameId: game.gameId,
