@@ -1162,6 +1162,12 @@ app.post('/api/invitations/:id/rankings', async (c) => {
   const caught = Number(body.caught);
   const ipHash = await hashIp(c.env.APP_SECRET, clientIp(c)).catch(() => null);
 
+  /**
+   * 로그에도 함께 남깁니다 — 거부된 기록을 되살릴 때 점수만으로는 누구 것인지 모릅니다.
+   * 하객이 랭킹판에 공개로 올리려고 적은 값이라 남겨도 되는 것으로 정했습니다 (2026-10-14).
+   */
+  const nick = (body.nick ?? '').trim().slice(0, 20) || '익명 하객';
+
   /** 제출 한 건의 결말을 남깁니다 — 성공만 `session` 을 채워 1회용 토큰 판정에 씁니다 */
   const logRank = (name: string, okFlag: boolean, detail: string, session: string | null) =>
     eventsRepo.insertEvents(c.env.LUVI_LOGS, [
@@ -1186,7 +1192,7 @@ app.post('/api/invitations/:id/rankings', async (c) => {
    * 타입 검사기가 "여기서 흐름이 끝난다" 를 알아야 뒤 코드의 null 검사가 풀리기 때문입니다.
    */
   const reject = async (reason: string, error: ApiError): Promise<HttpError> => {
-    await logRank('rank_reject', false, `${reason} (${score}s/${caught})`, null);
+    await logRank('rank_reject', false, `${reason} (${nick} ${score}s/${caught})`, null);
     return new HttpError(error);
   };
 
@@ -1280,13 +1286,13 @@ app.post('/api/invitations/:id/rankings', async (c) => {
   }
 
   const entry = await rankingsRepo.createRank(db, id, {
-    nick: (body.nick ?? '').trim().slice(0, 20) || '익명 하객',
+    nick,
     score,
     caught,
     ipHash: ipHash ?? '',
   });
 
-  await logRank('rank_submit', true, `${score}s/${caught}`, session.nonce);
+  await logRank('rank_submit', true, `${nick} ${score}s/${caught}`, session.nonce);
   return c.json(ok<RankEntry>(entry), 201);
 });
 

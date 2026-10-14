@@ -97,16 +97,16 @@ export function useRankings(size: number) {
        * 되살릴 수 있어야 합니다 — 2026-10-14 에 "기록이 누락됐다" 는 항의를 받고도 서버에
        * 아무 흔적이 없어 복구할 방법이 없었습니다.
        *
-       * 🔴 **닉네임은 넣지 않습니다.** 선물이 걸린 랭킹이라 실명을 쓰는 분이 많고,
-       *    이 로그에는 이름을 넣지 않는다는 규칙이 있습니다 (`lib/log.ts`).
-       *    이름은 되살릴 때 본인에게 물으면 되고, 로그에 남겨 둘 이유가 없습니다.
+       * 닉네임도 함께 남깁니다 — 되살릴 때 "누구의 기록인가" 가 없으면 점수만 보고 본인을
+       * 찾아가 확인받아야 합니다. 하객이 랭킹판에 공개로 올리려고 적은 값이라 남겨 둡니다
+       * (`lib/log.ts` 의 예외 항목). 방명록의 이름·본문은 여전히 넣지 않습니다.
        */
       const saved = token ? await postRank(invitationId, name, score, caught, token) : false;
       logEvent({
         kind: saved ? 'click' : 'error',
         name: 'rank_register',
         ok: saved,
-        detail: `${score}s/${caught}${token ? '' : ' 토큰없음'}`,
+        detail: `${name} ${score}s/${caught}${token ? '' : ' 토큰없음'}`,
       });
       return saved;
     },
