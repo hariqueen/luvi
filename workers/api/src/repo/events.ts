@@ -68,6 +68,37 @@ export async function insertEvents(db: D1Database | undefined, rows: EventRow[])
 }
 
 /**
+ * 이 `session` 값으로 이미 성공한 기록이 있나 — **1회용 토큰 판정용**.
+ *
+ * **왜 KV 가 아니라 D1 인가:** 처음에는 nonce 를 KV 에 썼는데, KV 는 **하루 1,000 쓰기**
+ * 한도라 기록 한 건마다 한 번씩 쓰면 한도를 태웁니다. 그러면 KV 쓰기가 실패하면서
+ * 기록 등록이 죽고, **발행 스냅샷까지 같이 죽습니다.** 이 파일 아래 `countRecent` 와
+ * `repo/forms.ts` 에 같은 판단이 이미 적혀 있었는데 거기에 걸려 넘어진 것입니다.
+ *
+ * 성공한 제출은 어차피 이벤트로 남기므로, 그 행의 `session` 을 보면 **추가 쓰기 없이**
+ * 재사용을 판별할 수 있습니다.
+ *
+ * 🔴 D1 이 없거나 실패하면 `false` = 통과입니다. 로그가 죽었다고 하객 기록을 막지 않습니다.
+ */
+export async function existsWithSession(
+  db: D1Database | undefined,
+  name: string,
+  session: string,
+): Promise<boolean> {
+  if (!db || !session) return false;
+  try {
+    const row = await db
+      .prepare('SELECT 1 AS hit FROM events WHERE name = ? AND session = ? LIMIT 1')
+      .bind(name, session)
+      .first<{ hit: number }>();
+    return Boolean(row);
+  } catch (e) {
+    console.error('[api] 토큰 재사용 조회 실패 — 통과시킵니다', e);
+    return false;
+  }
+}
+
+/**
  * 같은 사람이 최근에 이 동작을 몇 번 했나 — **속도 제한용**.
  *
  * **왜 KV 가 아니라 D1 인가:** KV 는 하루 1,000 쓰기 한도라 카운터로 쓰면 문의 스팸 한 번에

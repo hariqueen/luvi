@@ -60,8 +60,15 @@ export function useRankings(size: number) {
     });
   }, [invitationId]);
 
+  /**
+   * 기록을 올립니다. **서버에 올라갔는지를 돌려줍니다** — 호출부가 하객에게 알려줘야 합니다.
+   *
+   * 🔴 예전에는 결과를 버렸습니다. 그래서 2026-10-12 배포 사고로 등록이 거부되는 동안에도
+   *    하객 화면은 아무 일 없다는 듯 순위를 보여줬고, **하객 본인은 올라간 줄 알았습니다.**
+   *    "기록이 누락됐다" 는 항의가 반복된 이유입니다. 실패는 보이게 합니다.
+   */
   const register = useCallback(
-    (nick: string, score: number, caught: number) => {
+    async (nick: string, score: number, caught: number): Promise<boolean> => {
       const name = nick.trim() || '익명 하객';
       const ts = Date.now();
 
@@ -79,9 +86,12 @@ export function useRankings(size: number) {
       //
       // 토큰은 한 판에 한 번만 씁니다. 다 쓴 뒤 비우는 것은 등록 버튼을 두 번 눌렀을 때
       // 같은 기록이 두 줄로 올라가는 것을 막기 위해서입니다 (서버도 따로 막습니다).
+      // 미리보기·옛 스냅샷(invitationId 없음)은 로컬 전용이라 성공으로 봅니다
       const token = sessionRef.current;
       sessionRef.current = null;
-      if (invitationId && token) void postRank(invitationId, name, score, caught, token);
+      if (!invitationId) return true;
+      if (!token) return false;
+      return postRank(invitationId, name, score, caught, token);
     },
     [invitationId, keep],
   );

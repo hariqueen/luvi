@@ -44,7 +44,9 @@ export default function Rankings() {
   const [clearing, setClearing] = useState(false);
 
   const fetchBoard = useCallback(async () => {
-    const res = await api.rankings.list(id);
+    // 관리 화면은 **전부** 봐야 지울 수 있습니다 — 하객 화면처럼 상위 몇 개만 받으면
+    // 순위 밖으로 밀린 기록(조작이든 장난이든)에 손댈 방법이 없습니다 (서버 상한 100)
+    const res = await api.rankings.list(id, 100);
     if (res.ok) setEntries(res.data);
     return res;
   }, [id]);

@@ -1098,7 +1098,14 @@ app.delete('/api/invitations/:id/guestbook', async (c) => {
 
 app.get('/api/invitations/:id/rankings', async (c) => {
   const db = firestore(c.env);
-  const entries = await rankingsRepo.listRankings(db, c.req.param('id'));
+
+  // 하객 화면은 상위 몇 개면 되지만, 관리 화면은 **전부** 봐야 지울 수 있습니다 (서버 상한 100)
+  const limit = Number(c.req.query('limit') ?? 20);
+  const entries = await rankingsRepo.listRankings(
+    db,
+    c.req.param('id'),
+    Number.isFinite(limit) ? limit : 20,
+  );
   return c.json(ok<RankEntry[]>(entries));
 });
 
@@ -1133,6 +1140,10 @@ app.post('/api/invitations/:id/rankings/session', async (c) => {
  *  ② 세션 토큰 — 게임을 시작했고, 적어도 기록한 시간만큼 실제로 흘렀는가 (핵심)
  *  ③ 물리 상한 — 이 게임이 만들어낼 수 있는 값인가 (`lib/gameRules.ts`)
  *  ④ 속도 제한 — 한 사람이 랭킹판을 통째로 채우지 못하게
+ *
+ * 🔴 **거부도 전부 로그로 남깁니다 (`rank_reject`).** 2026-10-14 에 "기록이 안 올라간다" 는
+ *    항의를 받고도 **서버에 아무 흔적이 없어** 원인을 좁히는 데 한참 걸렸습니다. 조용히
+ *    거부하는 경로는 없는 것과 같습니다 — 왜 거부했는지가 남아야 다음에 답할 수 있습니다.
  */
 app.post('/api/invitations/:id/rankings', async (c) => {
   requireBrowserOrigin(c);
@@ -1147,11 +1158,44 @@ app.post('/api/invitations/:id/rankings', async (c) => {
     token: string;
   }>(c.req);
 
-  // score 는 생존 시간(초)이라 **소수**입니다. 정수 검사를 넣으면 정상 기록이 전부 거부됩니다.
   const score = Number(body.score);
   const caught = Number(body.caught);
+  const ipHash = await hashIp(c.env.APP_SECRET, clientIp(c)).catch(() => null);
+
+  /** 제출 한 건의 결말을 남깁니다 — 성공만 `session` 을 채워 1회용 토큰 판정에 씁니다 */
+  const logRank = (name: string, okFlag: boolean, detail: string, session: string | null) =>
+    eventsRepo.insertEvents(c.env.LUVI_LOGS, [
+      {
+        at: new Date().toISOString(),
+        kind: okFlag ? 'click' : 'error',
+        name,
+        ok: okFlag ? 1 : 0,
+        detail: detail.slice(0, 500),
+        invitationId: id,
+        slug: null,
+        session,
+        uid: c.get('uid'),
+        path: null,
+        ua: (c.req.header('User-Agent') ?? '').slice(0, 200),
+        ipHash,
+      },
+    ]);
+
+  /**
+   * 거부를 기록하고 던질 오류를 돌려줍니다. 호출부가 `throw await reject(...)` 로 쓰는 이유는
+   * 타입 검사기가 "여기서 흐름이 끝난다" 를 알아야 뒤 코드의 null 검사가 풀리기 때문입니다.
+   */
+  const reject = async (reason: string, error: ApiError): Promise<HttpError> => {
+    await logRank('rank_reject', false, `${reason} (${score}s/${caught})`, null);
+    return new HttpError(error);
+  };
+
+  // score 는 생존 시간(초)이라 **소수**입니다. 정수 검사를 넣으면 정상 기록이 전부 거부됩니다.
   if (!(score >= 0 && score <= 600) || !(caught >= 0 && caught <= 2000)) {
-    throw new HttpError({ code: 'validation_failed', message: '기록 값이 올바르지 않습니다' });
+    throw await reject('범위 초과', {
+      code: 'validation_failed',
+      message: '기록 값이 올바르지 않습니다',
+    });
   }
 
   const invitation = await invitationsRepo.findInvitation(db, id);
@@ -1162,7 +1206,7 @@ app.post('/api/invitations/:id/rankings', async (c) => {
   const now = Date.now();
   const session = await verifyGameSession(c.env.APP_SECRET, body.token ?? '', id, now);
   if (!session) {
-    throw new HttpError({
+    throw await reject('토큰 없음·위조·만료', {
       code: 'forbidden',
       message: '게임 기록을 확인할 수 없습니다. 게임을 다시 한 판 해주세요',
     });
@@ -1176,25 +1220,11 @@ app.post('/api/invitations/:id/rankings', async (c) => {
    */
   const elapsedSec = (now - session.issuedAt) / 1000;
   if (score > elapsedSec + 2) {
-    throw new HttpError({
+    throw await reject(`경과 부족 ${elapsedSec.toFixed(1)}s`, {
       code: 'validation_failed',
       message: '기록 값이 올바르지 않습니다',
     });
   }
-
-  /**
-   * 토큰 한 장은 기록 한 건입니다. 없으면 한 번 받아둔 토큰으로 같은 기록을 계속 올릴 수
-   * 있습니다. KV 는 쓰기 직후 다른 지역에서 잠깐 안 보일 수 있어 **완벽한 잠금은 아니지만**,
-   * 위의 경과 시간 조건이 함께 걸려 있어 반복에는 매번 게임 시간이 듭니다.
-   */
-  const nonceKey = `RANK_NONCE:${session.nonce}`;
-  if (await c.env.LUVI_KV.get(nonceKey)) {
-    throw new HttpError({
-      code: 'forbidden',
-      message: '이미 등록된 기록입니다. 게임을 다시 한 판 해주세요',
-    });
-  }
-  await c.env.LUVI_KV.put(nonceKey, '1', { expirationTtl: 60 * 60 * 2 });
 
   /**
    * 난이도는 발행본과 초안을 **둘 다** 넘깁니다 — 하객이 게임을 하는 동안 주인이 난이도를
@@ -1211,21 +1241,41 @@ app.post('/api/invitations/:id/rankings', async (c) => {
     speeds: [speedOf(invitation.published), speedOf(invitation.draft)],
   });
   if (implausible) {
-    console.warn(`[api] 랭킹 물리 상한 초과 — ${implausible} (inv=${id} ${score}s ${caught}개)`);
-    throw new HttpError({ code: 'validation_failed', message: '기록 값이 올바르지 않습니다' });
+    throw await reject(implausible, { code: 'validation_failed', message: '기록 값이 올바르지 않습니다' });
   }
 
   /**
-   * 한 사람(= 같은 IP)이 올릴 수 있는 기록 수.
-   *
-   * 방명록(15건)보다 넉넉합니다. 미니게임은 원래 여러 판 하는 것이고, 예식장 와이파이는
-   * **하객 전체가 같은 IP 로 묶입니다** — 좁게 잡으면 조작범이 아니라 진짜 하객이 막힙니다.
+   * 토큰 한 장은 기록 한 건입니다. **성공한 제출만** 토큰을 태웁니다 — 거부된 제출까지
+   * 태우면, 우리 쪽 판정이 틀렸을 때 하객이 다시 올릴 길까지 막습니다.
    */
-  const ipHash = await hashIp(c.env.APP_SECRET, clientIp(c));
-  if (rankingsRepo.isFlooding(await rankingsRepo.countByIp(db, id, ipHash))) {
-    throw new HttpError({
+  if (await eventsRepo.existsWithSession(c.env.LUVI_LOGS, 'rank_submit', session.nonce)) {
+    throw await reject('토큰 재사용', {
+      code: 'forbidden',
+      message: '이미 등록된 기록입니다. 게임을 다시 한 판 해주세요',
+    });
+  }
+
+  /**
+   * 속도 제한 — 10분에 60건.
+   *
+   * 🔴 **평생 누적이 아니라 최근 10분입니다.** 처음에는 "이 IP 가 올린 기록 수" 를 통째로
+   *    세어 50건에서 막았는데, 그러면 열심히 한 사람이 **영구히** 막힙니다 (1~3등 선물이
+   *    걸려 있어 수십 판씩 합니다). 막으려던 것은 도배이지 단골이 아닙니다.
+   *
+   * 넉넉한 이유: 예식장 와이파이는 **하객 전체가 한 IP** 로 묶입니다. 그리고 토큰이 이미
+   * "기록한 시간만큼 실제로 기다려야 한다" 를 강제하므로, 이 숫자는 마지막 안전장치입니다.
+   */
+  const recent = ipHash
+    ? await eventsRepo.countRecent(c.env.LUVI_LOGS, {
+        name: 'rank_submit',
+        ipHash,
+        withinMinutes: 10,
+      })
+    : 0;
+  if (recent >= 60) {
+    throw await reject(`속도 제한 ${recent}건/10분`, {
       code: 'rate_limited',
-      message: '기록이 너무 많습니다. 잠시 뒤에 다시 시도해주세요',
+      message: '기록이 너무 잦습니다. 잠시 뒤에 다시 시도해주세요',
     });
   }
 
@@ -1233,8 +1283,10 @@ app.post('/api/invitations/:id/rankings', async (c) => {
     nick: (body.nick ?? '').trim().slice(0, 20) || '익명 하객',
     score,
     caught,
-    ipHash,
+    ipHash: ipHash ?? '',
   });
+
+  await logRank('rank_submit', true, `${score}s/${caught}`, session.nonce);
   return c.json(ok<RankEntry>(entry), 201);
 });
 

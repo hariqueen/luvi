@@ -174,8 +174,11 @@ export function createClient(opts: ClientOptions) {
     },
 
     rankings: {
-      list: (invitationId: string) =>
-        get<RankEntry[]>(`/invitations/${invitationId}/rankings`),
+      /** 목록. 관리 화면은 넉넉히 넘깁니다 (기본 20, 서버 상한 100) */
+      list: (invitationId: string, limit?: number) =>
+        get<RankEntry[]>(
+          `/invitations/${invitationId}/rankings${limit ? `?limit=${limit}` : ''}`,
+        ),
       create: (invitationId: string, body: CreateRankBody) =>
         post<RankEntry>(`/invitations/${invitationId}/rankings`, body),
       /** 한 건 삭제 — 소유자·운영자만. 조작된 기록을 치우는 용도입니다 */

@@ -52,6 +52,7 @@ export function MiniGame() {
   const [result, setResult] = useState<GameResult>({ score: 0, caught: 0 });
   const [nick, setNick] = useState('');
   const [registered, setRegistered] = useState(false);
+  const [submitFailed, setSubmitFailed] = useState(false);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -79,8 +80,12 @@ export function MiniGame() {
   };
 
   const onRegister = () => {
-    register(nick, result.score, result.caught);
-    setRegistered(true);
+    setSubmitFailed(false);
+    void register(nick, result.score, result.caught).then((saved) => {
+      // 올라가지 않았으면 등록된 척하지 않습니다 — 하객이 다시 누를 수 있어야 합니다
+      if (saved) setRegistered(true);
+      else setSubmitFailed(true);
+    });
   };
 
   /** 문구 치환용 값 — 결과 화면에서 받은 횟수·점수를 쓸 수 있습니다 */
@@ -181,6 +186,13 @@ export function MiniGame() {
                   maxLength={12}
                   className="w-full rounded-full border-none bg-white px-4 py-3 text-center text-sm text-ink outline-none"
                 />
+                {submitFailed && (
+                  <div className="w-full rounded-xl bg-[#7a2e2e] px-3 py-2 text-[12.5px] leading-[1.6] text-white">
+                    기록을 올리지 못했어요. 한 번 더 눌러주세요.
+                    <br />
+                    계속 안 되면 새로고침 후 다시 해주세요.
+                  </div>
+                )}
                 <button
                   onClick={onRegister}
                   className="w-full cursor-pointer rounded-full border-none bg-rose py-3.5 text-[15px] font-extrabold text-white shadow-[0_6px_0_#A65A6E] transition-[transform,box-shadow] duration-100 active:translate-y-[3px] active:shadow-[0_3px_0_#A65A6E]"
