@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fillGameText, splitRankLabel } from '@luvi/schema';
 import { CatchGame, type GameResult } from '@/game/catchGame';
 import { useRankings } from '@/hooks/useRankings';
+import { logEvent } from '@/lib/log';
 import { useInvitation } from '@/lib/invitationContext';
 import { GameIntro, GameSpriteView, type BlockClassMap } from '@/components/common/GameParts';
 import { SectionText } from '../ui';
@@ -50,6 +51,11 @@ export function MiniGame() {
       onGameOver: (r) => {
         setResult(r);
         setPhase('over');
+        /**
+         * 한 판의 결과는 **등록을 누르지 않아도** 남깁니다. 등록이 거부되거나 하객이 그냥
+         * 창을 닫아도, 나중에 "그 시각에 이런 기록이 나왔다" 를 확인할 수 있어야 합니다.
+         */
+        logEvent({ kind: 'click', name: 'game_over', ok: true, detail: `${r.score}s/${r.caught}` });
       },
     });
     gameRef.current = engine;
@@ -63,6 +69,7 @@ export function MiniGame() {
     // 등록 자격은 **시작할 때** 받습니다 — 끝난 뒤에 받으면 서버가 재는 경과 시간이
     // 0초라, 버틴 시간만큼 흘렀어야 한다는 조건에 걸려 정상 기록이 거부됩니다.
     beginGame();
+    logEvent({ kind: 'click', name: 'game_start', ok: true, detail: game.speed });
     gameRef.current?.start();
   };
 

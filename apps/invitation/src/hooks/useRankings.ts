@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchRankings, postRank, startGameSession } from '@/lib/guestApi';
+import { logEvent } from '@/lib/log';
 import { useInvitation } from '@/lib/invitationContext';
 import { loadArray, saveArray, STORAGE_KEYS } from '@/lib/storage';
 import type { RankEntry } from '@/lib/types';
@@ -90,8 +91,24 @@ export function useRankings(size: number) {
       const token = sessionRef.current;
       sessionRef.current = null;
       if (!invitationId) return true;
-      if (!token) return false;
-      return postRank(invitationId, name, score, caught, token);
+
+      /**
+       * 등록 시도는 **성공이든 실패든** 남깁니다. 기록이 거부돼도 로그의 점수·획득·시각으로
+       * 되살릴 수 있어야 합니다 — 2026-10-14 에 "기록이 누락됐다" 는 항의를 받고도 서버에
+       * 아무 흔적이 없어 복구할 방법이 없었습니다.
+       *
+       * 🔴 **닉네임은 넣지 않습니다.** 선물이 걸린 랭킹이라 실명을 쓰는 분이 많고,
+       *    이 로그에는 이름을 넣지 않는다는 규칙이 있습니다 (`lib/log.ts`).
+       *    이름은 되살릴 때 본인에게 물으면 되고, 로그에 남겨 둘 이유가 없습니다.
+       */
+      const saved = token ? await postRank(invitationId, name, score, caught, token) : false;
+      logEvent({
+        kind: saved ? 'click' : 'error',
+        name: 'rank_register',
+        ok: saved,
+        detail: `${score}s/${caught}${token ? '' : ' 토큰없음'}`,
+      });
+      return saved;
     },
     [invitationId, keep],
   );

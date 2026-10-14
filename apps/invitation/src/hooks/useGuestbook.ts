@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchGuestbook, postGuestbook } from '@/lib/guestApi';
+import { logEvent } from '@/lib/log';
 import { useInvitation } from '@/lib/invitationContext';
 import { loadArray, saveArray, STORAGE_KEYS } from '@/lib/storage';
 import type { GuestbookEntry } from '@/lib/types';
@@ -44,6 +45,13 @@ export function useGuestbook() {
         // 서버가 도배를 막거나 실패해도 화면은 그대로 둡니다 — 축하 메시지를 쓴 직후
         // 글이 사라지는 것이 더 나쁩니다. 다음 방문에서 서버 목록으로 정리됩니다.
         void postGuestbook(invitationId, n, m).then((saved) => {
+          // 글자 수만 남깁니다 — 이름·본문은 넣지 않습니다 (`lib/log.ts` 의 규칙)
+          logEvent({
+            kind: saved ? 'click' : 'error',
+            name: 'guestbook_write',
+            ok: saved,
+            detail: `${m.length}자`,
+          });
           if (saved) void fetchGuestbook(invitationId).then((r) => r && setEntries(r));
         });
       }
